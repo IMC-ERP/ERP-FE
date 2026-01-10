@@ -1,0 +1,53 @@
+/**
+ * MetricCard CSS
+ * Streamlit 스타일 메트릭 카드
+ */
+
+.metric-card {
+  background: white;
+  border-radius: 12px;
+  padding: 20px 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.metric-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+.metric-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+}
+
+.metric-blue .metric-icon { background: linear-gradient(135deg, #4287f5, #2563eb); }
+.metric-green .metric-icon { background: linear-gradient(135deg, #22c55e, #16a34a); }
+.metric-orange .metric-icon { background: linear-gradient(135deg, #f97316, #ea580c); }
+.metric-red .metric-icon { background: linear-gradient(135deg, #ef4444, #dc2626); }
+
+.metric-content {
+  flex: 1;
+}
+
+.metric-title {
+  font-size: 0.85rem;
+  color: #64748b;
+  margin: 0 0 4px 0;
+  font-weight: 500;
+}
+
+.metric-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0;
+}

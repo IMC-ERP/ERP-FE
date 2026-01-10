@@ -1,0 +1,16 @@
+/**
+ * Layout CSS
+ */
+
+.app-layout {
+  display: flex;
+  min-height: 100vh;
+  background-color: #f5f7fa;
+}
+
+.main-content {
+  flex: 1;
+  margin-left: 260px;
+  padding: 24px 32px;
+  overflow-y: auto;
+}

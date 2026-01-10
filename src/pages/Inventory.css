@@ -1,0 +1,156 @@
+/**
+ * Inventory Page CSS
+ */
+
+.inventory-page {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.inventory-section {
+  margin-bottom: 32px;
+}
+
+.inventory-section h2 {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #1e293b;
+  margin: 0 0 16px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.inventory-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.inventory-card {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  border-left: 4px solid #22c55e;
+}
+
+.inventory-card.warning {
+  border-left-color: #f97316;
+}
+
+.inventory-card.danger {
+  border-left-color: #ef4444;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.card-header h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1e293b;
+  margin: 0;
+}
+
+.status-badge {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.status-badge.good {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+.status-badge.warning {
+  background: #ffedd5;
+  color: #ea580c;
+}
+
+.status-badge.danger {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.stock-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.stock-info .label {
+  font-size: 0.85rem;
+  color: #64748b;
+}
+
+.stock-info .value {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.stock-bar {
+  height: 8px;
+  background: #e2e8f0;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.stock-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #22c55e, #4ade80);
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.inventory-card.warning .stock-fill {
+  background: linear-gradient(90deg, #f97316, #fb923c);
+}
+
+.inventory-card.danger .stock-fill {
+  background: linear-gradient(90deg, #ef4444, #f87171);
+}
+
+.card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.card-footer .initial {
+  font-size: 0.8rem;
+  color: #94a3b8;
+}
+
+.edit-input {
+  width: 100px;
+  padding: 6px 10px;
+  border: 1px solid #4287f5;
+  border-radius: 6px;
+  font-size: 1rem;
+  text-align: right;
+}
+
+.edit-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.loading {
+  text-align: center;
+  color: #64748b;
+  padding: 60px;
+}
