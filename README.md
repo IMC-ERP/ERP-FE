@@ -41,17 +41,6 @@ npm run build
 
 빌드된 파일은 `dist/` 폴더에 생성됩니다.
 
-### 4. 프로덕션 미리보기
-
-```bash
-npm run preview
-```
-
-### 5. 린트 검사
-
-```bash
-npm run lint
-```
 
 ## 주요 기능
 
@@ -91,14 +80,10 @@ frontend/
 ```
 
 ## API 연동
+백엔드는 실시간 서버에 공유한 후 연결하여 재배포하도록 하겠습니다!
 
-백엔드 API와 통신하기 위해 [src/services/api.ts](src/services/api.ts)에서 Axios 인스턴스를 설정합니다.
-
-기본 API 주소: `http://localhost:8000`
-
-백엔드 서버가 다른 포트나 주소에서 실행 중이라면 [api.ts](src/services/api.ts:4)의 `baseURL`을 수정하세요.
-
-## 개발 가이드
+## 개발 가이드 
+(프론트 개발 전반적인 부분은 우선 AI의 도움으로 해결하고자 합니다. 아래 내용은 단순 참고 부탁드려요!)
 
 ### 새 페이지 추가하기
 
@@ -161,6 +146,3 @@ TypeScript errors
   npx tsc --noEmit
   ```
 
-## 라이선스
-
-MIT
