@@ -1,5 +1,5 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { SaleItem, InventoryItem, StoreProfile, AppSettings } from '../types';
+import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
+import type { SaleItem, InventoryItem, StoreProfile, AppSettings } from '../types';
 import { generateMockSales, INITIAL_INVENTORY } from '../constants';
 
 interface DataContextType {

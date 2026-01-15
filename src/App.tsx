@@ -11,6 +11,10 @@ import Sales from './pages/Sales';
 import Inventory from './pages/Inventory';
 import Recipes from './pages/Recipes';
 import AIAssistant from './pages/AIAssistant';
+import PeriodAnalysis from './pages/PeriodAnalysis';
+import TransactionManager from './pages/TransactionManager';
+import CostRecipeManager from './pages/CostRecipeManager';
+import SettingsPage from './pages/SettingsPage';
 import './index.css';
 
 // Home Page (GCP 스타일)
@@ -42,29 +46,6 @@ const HomePage = () => (
 );
 
 // Placeholder Pages
-const PeriodAnalysisPage = () => (
-  <div className="p-8 text-center bg-white rounded-xl border border-slate-200 shadow-sm min-h-[400px] flex flex-col justify-center items-center animate-fade-in">
-    <div className="text-6xl mb-4">📈</div>
-    <h2 className="text-2xl font-bold text-slate-800 mb-2">매출 분석</h2>
-    <p className="text-slate-500 max-w-md">기간별 매출 데이터를 분석합니다.</p>
-  </div>
-);
-
-const TransactionsPage = () => (
-  <div className="p-8 text-center bg-white rounded-xl border border-slate-200 shadow-sm min-h-[400px] flex flex-col justify-center items-center animate-fade-in">
-    <div className="text-6xl mb-4">📋</div>
-    <h2 className="text-2xl font-bold text-slate-800 mb-2">거래 데이터 관리</h2>
-    <p className="text-slate-500 max-w-md">판매 및 입고 거래 내역을 관리합니다.</p>
-  </div>
-);
-
-const CostRecipePage = () => (
-  <div className="p-8 text-center bg-white rounded-xl border border-slate-200 shadow-sm min-h-[400px] flex flex-col justify-center items-center animate-fade-in">
-    <div className="text-6xl mb-4">👨‍🍳</div>
-    <h2 className="text-2xl font-bold text-slate-800 mb-2">원가/레시피 관리</h2>
-    <p className="text-slate-500 max-w-md">메뉴별 원가와 레시피를 관리합니다.</p>
-  </div>
-);
 
 const HelpPage = () => (
   <div className="p-8 text-center bg-white rounded-xl border border-slate-200 shadow-sm min-h-[400px] flex flex-col justify-center items-center animate-fade-in">
@@ -77,13 +58,7 @@ const HelpPage = () => (
   </div>
 );
 
-const SettingsPage = () => (
-  <div className="p-8 text-center bg-white rounded-xl border border-slate-200 shadow-sm min-h-[400px] flex flex-col justify-center items-center animate-fade-in">
-    <div className="text-6xl mb-4">⚙️</div>
-    <h2 className="text-2xl font-bold text-slate-800 mb-2">설정</h2>
-    <p className="text-slate-500 max-w-md">시스템 설정을 관리합니다.</p>
-  </div>
-);
+
 
 function App() {
   return (
@@ -93,11 +68,11 @@ function App() {
           <Route path="/" element={<Layout />}>
             <Route index element={<HomePage />} />
             <Route path="dashboard" element={<Dashboard />} />
-            <Route path="period" element={<PeriodAnalysisPage />} />
-            <Route path="transactions" element={<TransactionsPage />} />
+            <Route path="period" element={<PeriodAnalysis />} />
+            <Route path="transactions" element={<TransactionManager />} />
             <Route path="sales" element={<Sales />} />
             <Route path="inventory" element={<Inventory />} />
-            <Route path="cost-recipe" element={<CostRecipePage />} />
+            <Route path="cost-recipe" element={<CostRecipeManager />} />
             <Route path="recipes" element={<Recipes />} />
             <Route path="help" element={<HelpPage />} />
             <Route path="settings" element={<SettingsPage />} />

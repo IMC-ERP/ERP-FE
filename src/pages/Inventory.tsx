@@ -39,7 +39,7 @@ export default function Inventory() {
   const { inventory } = useData();
   const [activeTab, setActiveTab] = useState("summary");
   const [selectedMenu, setSelectedMenu] = useState("Americano (I/H)");
-  const [refreshKey, setRefreshKey] = useState(0);
+  const [_refreshKey, setRefreshKey] = useState(0);
 
   const handleRefresh = () => {
     setRefreshKey(prev => prev + 1);
