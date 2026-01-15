@@ -30,21 +30,8 @@ export default function Dashboard() {
   const [currentDate] = useState(new Date("2025-11-25"));
   const [selectedUtilityMonth, setSelectedUtilityMonth] = useState("2025-11");
 
-  // Initial Mock Utility Data
-  const [utilityData, setUtilityData] = useState<MonthlyUtilities>({
-    "2025-10": [
-      { id: '1', name: '월세', amount: 1500000, type: 'recurring' },
-      { id: '2', name: '전기세', amount: 350000, type: 'recurring' },
-      { id: '3', name: '수도세', amount: 80000, type: 'recurring' },
-      { id: '4', name: '에어컨 수리', amount: 120000, type: 'onetime' },
-    ],
-    "2025-11": [
-      { id: '1', name: '월세', amount: 1500000, type: 'recurring' },
-      { id: '2', name: '전기세', amount: 320000, type: 'recurring' },
-      { id: '3', name: '수도세', amount: 75000, type: 'recurring' },
-      { id: '5', name: '캡스 경비', amount: 50000, type: 'recurring' },
-    ]
-  });
+  // Utility Data (사용자 입력 - 향후 API 연동 가능)
+  const [utilityData, setUtilityData] = useState<MonthlyUtilities>({});
 
   // New Utility Input State
   const [newItemName, setNewItemName] = useState("");

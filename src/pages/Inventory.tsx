@@ -3,7 +3,7 @@
  * GCP-ERP 스타일 재고 관리
  */
 
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { useData } from '../contexts/DataContext';
 import {
   RefreshCw, Upload, TrendingUp, AlertTriangle,
@@ -13,27 +13,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend
 } from 'recharts';
 
-// Mock Data for AI Prediction Chart
-const generatePredictionData = () => {
-  const data = [];
-  const today = new Date("2025-12-05");
-  for (let i = 0; i < 21; i++) {
-    const d = new Date(today);
-    d.setDate(today.getDate() + i);
-    data.push({
-      date: d.toISOString().split('T')[0].slice(5),
-      actual: i < 1 ? 10 : null,
-      predicted: Math.floor(Math.random() * 20) + 5 + (i % 7 === 5 || i % 7 === 6 ? 10 : 0),
-      confidenceLower: 0,
-      confidenceUpper: 0
-    });
-  }
-  return data.map(d => ({
-    ...d,
-    confidenceLower: (d.predicted || 0) * 0.8,
-    confidenceUpper: (d.predicted || 0) * 1.2
-  }));
-};
+// AI Prediction은 aiApi.forecast()를 통해 가져옴 - AiImpactTab에서 구현
 
 export default function Inventory() {
   const { inventory } = useData();
@@ -202,7 +182,33 @@ export default function Inventory() {
 
   // 4. AI Impact Tab
   const AiImpactTab = () => {
-    const data = useMemo(() => generatePredictionData(), []);
+    const [predictionData, setPredictionData] = useState<Array<{ date: string; actual: number | null; predicted: number }>>([]);
+    const [isLoadingPrediction, setIsLoadingPrediction] = useState(false);
+    const [predictionError, setPredictionError] = useState<string | null>(null);
+    const [totalPredicted, setTotalPredicted] = useState(0);
+
+    const fetchPrediction = async () => {
+      setIsLoadingPrediction(true);
+      setPredictionError(null);
+      try {
+        const { aiApi } = await import('../services/api');
+        const response = await aiApi.forecast(selectedMenu, 21);
+        // API 응답 형식에 따라 데이터 변환
+        if (response.data && Array.isArray(response.data.predictions)) {
+          setPredictionData(response.data.predictions);
+          setTotalPredicted(response.data.total || response.data.predictions.reduce((sum: number, p: { predicted: number }) => sum + p.predicted, 0));
+        } else {
+          setPredictionData([]);
+          setTotalPredicted(0);
+        }
+      } catch (err) {
+        console.error('AI Prediction failed:', err);
+        setPredictionError('AI 예측을 불러올 수 없습니다. 백엔드 서버를 확인해주세요.');
+        setPredictionData([]);
+      } finally {
+        setIsLoadingPrediction(false);
+      }
+    };
 
     return (
       <div className="space-y-6 animate-fade-in">
@@ -224,30 +230,55 @@ export default function Inventory() {
           </select>
         </div>
 
-        <div className="bg-blue-50 text-blue-800 p-4 rounded-lg text-sm font-medium border border-blue-100 flex items-center gap-2">
-          <span className="text-lg">🔮</span> AI 수요 예측을 향후 <span className="font-bold">21일</span> 기준으로 실행합니다.
-        </div>
+        <button
+          onClick={fetchPrediction}
+          disabled={isLoadingPrediction}
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
+        >
+          {isLoadingPrediction ? '예측 중...' : '🔮 AI 예측 실행'}
+        </button>
 
-        <div className="bg-green-50 text-green-800 p-4 rounded-lg text-sm font-medium border border-green-100 flex items-center gap-2">
-          <span className="text-lg">🤖</span> AI 예측: '{selectedMenu}'의 향후 <span className="font-bold">21일간</span> 예상 판매량을 <span className="font-bold">192개</span>로 예측했습니다.
-        </div>
-
-        <div className="space-y-2 mt-6">
-          <h3 className="font-bold text-slate-800 text-sm">'{selectedMenu}' 전체 기간 수요 예측</h3>
-          <div className="h-80 bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={data} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="date" tick={{ fontSize: 12 }} />
-                <YAxis tick={{ fontSize: 12 }} />
-                <RechartsTooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-                <Legend verticalAlign="top" height={36} />
-                <Line type="monotone" dataKey="actual" name="실제 판매량(전체)" stroke="#4b5563" strokeWidth={2} dot={{ r: 4 }} connectNulls />
-                <Line type="monotone" dataKey="predicted" name="AI 예측(향후)" stroke="#3b82f6" strokeWidth={2} strokeDasharray="5 5" dot={{ r: 3 }} />
-              </LineChart>
-            </ResponsiveContainer>
+        {predictionError && (
+          <div className="bg-red-50 text-red-800 p-4 rounded-lg text-sm font-medium border border-red-100">
+            ⚠️ {predictionError}
           </div>
-        </div>
+        )}
+
+        {predictionData.length > 0 && (
+          <>
+            <div className="bg-blue-50 text-blue-800 p-4 rounded-lg text-sm font-medium border border-blue-100 flex items-center gap-2">
+              <span className="text-lg">🔮</span> AI 수요 예측을 향후 <span className="font-bold">21일</span> 기준으로 실행합니다.
+            </div>
+
+            <div className="bg-green-50 text-green-800 p-4 rounded-lg text-sm font-medium border border-green-100 flex items-center gap-2">
+              <span className="text-lg">🤖</span> AI 예측: '{selectedMenu}'의 향후 <span className="font-bold">21일간</span> 예상 판매량을 <span className="font-bold">{totalPredicted}개</span>로 예측했습니다.
+            </div>
+
+            <div className="space-y-2 mt-6">
+              <h3 className="font-bold text-slate-800 text-sm">'{selectedMenu}' 전체 기간 수요 예측</h3>
+              <div className="h-80 bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={predictionData} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="date" tick={{ fontSize: 12 }} />
+                    <YAxis tick={{ fontSize: 12 }} />
+                    <RechartsTooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                    <Legend verticalAlign="top" height={36} />
+                    <Line type="monotone" dataKey="actual" name="실제 판매량(전체)" stroke="#4b5563" strokeWidth={2} dot={{ r: 4 }} connectNulls />
+                    <Line type="monotone" dataKey="predicted" name="AI 예측(향후)" stroke="#3b82f6" strokeWidth={2} strokeDasharray="5 5" dot={{ r: 3 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          </>
+        )}
+
+        {!isLoadingPrediction && predictionData.length === 0 && !predictionError && (
+          <div className="bg-slate-50 text-slate-600 p-8 rounded-lg text-center border border-slate-200">
+            <p className="text-lg mb-2">📊 AI 예측 대기 중</p>
+            <p className="text-sm text-slate-500">메뉴를 선택하고 &quot;AI 예측 실행&quot; 버튼을 클릭하세요.</p>
+          </div>
+        )}
       </div>
     );
   };

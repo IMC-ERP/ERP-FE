@@ -1,11 +1,12 @@
 /**
  * AI Assistant Page
- * GCP-ERP 스타일 AI 비서 채팅 인터페이스
+ * GCP-ERP 스타일 AI 비서 채팅 인터페이스 - 백엔드 API 연동
  */
 
 import { useState, useRef, useEffect } from 'react';
 import { useData } from '../contexts/DataContext';
-import { Bot, Send, User } from 'lucide-react';
+import { aiApi } from '../services/api';
+import { Bot, Send, User, AlertCircle } from 'lucide-react';
 
 interface Message {
   role: 'assistant' | 'user';
@@ -16,23 +17,6 @@ interface AIAssistantProps {
   isWidget?: boolean;
 }
 
-// Simulated AI response (fallback when no API key)
-const generateSimulatedResponse = (userMsg: string, context: string): string => {
-  const lowerMsg = userMsg.toLowerCase();
-
-  if (lowerMsg.includes('재고') || lowerMsg.includes('위험')) {
-    return `📦 재고 분석 결과입니다:\n\n${context}\n\n✅ 현재 대부분의 재고가 안정적인 수준입니다. 정기적인 모니터링을 권장합니다.`;
-  }
-  if (lowerMsg.includes('마진') || lowerMsg.includes('수익')) {
-    return `💰 마진 분석:\n\n현재 평균 마진율은 약 35-40%로 양호한 편입니다. 원두와 우유 비용이 가장 큰 비중을 차지합니다.`;
-  }
-  if (lowerMsg.includes('판매') || lowerMsg.includes('패턴')) {
-    return `📈 판매 패턴 분석:\n\n• 주말 매출이 평일 대비 약 30% 높습니다\n• 오전 10-11시가 피크 타임입니다\n• Americano가 가장 인기 메뉴입니다`;
-  }
-
-  return `안녕하세요! "${userMsg}"에 대한 답변입니다.\n\n현재 시뮬레이션 모드로 동작 중입니다. 실제 AI 분석을 위해서는 백엔드 서버 연결이 필요합니다.`;
-};
-
 export default function AIAssistant({ isWidget = false }: AIAssistantProps) {
   const { sales, inventory } = useData();
   const [messages, setMessages] = useState<Message[]>([
@@ -40,6 +24,7 @@ export default function AIAssistant({ isWidget = false }: AIAssistantProps) {
   ]);
   const [input, setInput] = useState("");
   const [isThinking, setIsThinking] = useState(false);
+  const [apiError, setApiError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -55,22 +40,45 @@ export default function AIAssistant({ isWidget = false }: AIAssistantProps) {
     setMessages(prev => [...prev, { role: 'user', content: userMsg }]);
     setInput("");
     setIsThinking(true);
+    setApiError(null);
 
-    // Prepare Context for AI
+    // Prepare Context for AI - include business data
     const salesSummary = `Total Sales Count: ${sales.length}, Total Revenue: ${sales.reduce((a, b) => a + b.revenue, 0).toLocaleString()}원`;
     const lowStockItems = inventory.filter(i => i.currentStock < i.safetyStock).map(i => i.name_ko).join(", ");
 
     const context = `
-      Sales Summary: ${salesSummary}
-      Low Stock Alerts: ${lowStockItems || "None"}
-    `;
+[현재 ERP 데이터]
+- 판매 요약: ${salesSummary}
+- 재고 부족 알림: ${lowStockItems || "없음"}
+- 재고 품목 수: ${inventory.length}개
 
-    // Simulate delay for realistic feel
-    await new Promise(resolve => setTimeout(resolve, 800));
+[사용자 질문]
+${userMsg}
+    `.trim();
 
-    const responseText = generateSimulatedResponse(userMsg, context);
-    setMessages(prev => [...prev, { role: 'assistant', content: responseText }]);
-    setIsThinking(false);
+    try {
+      // Call real AI API
+      const response = await aiApi.chat({ message: context });
+
+      if (response.data.success && response.data.message) {
+        setMessages(prev => [...prev, { role: 'assistant', content: response.data.message || '' }]);
+      } else if (response.data.error) {
+        setApiError(response.data.error);
+        setMessages(prev => [...prev, {
+          role: 'assistant',
+          content: `죄송합니다. AI 응답을 받지 못했습니다: ${response.data.error}`
+        }]);
+      }
+    } catch (err) {
+      console.error('AI Chat Error:', err);
+      setApiError('백엔드 서버에 연결할 수 없습니다.');
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: '⚠️ 백엔드 서버에 연결할 수 없습니다. 서버가 실행 중인지 확인해주세요.'
+      }]);
+    } finally {
+      setIsThinking(false);
+    }
   };
 
   const handleQuickPrompt = (prompt: string) => {
@@ -85,9 +93,17 @@ export default function AIAssistant({ isWidget = false }: AIAssistantProps) {
   return (
     <div className={containerClass}>
       {!isWidget && (
-        <div className="p-4 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
-          <Bot className="text-blue-600" />
-          <h2 className="font-bold text-slate-800">AI 비서</h2>
+        <div className="p-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Bot className="text-blue-600" />
+            <h2 className="font-bold text-slate-800">AI 비서</h2>
+          </div>
+          {apiError && (
+            <div className="flex items-center gap-1 text-amber-600 text-xs">
+              <AlertCircle size={14} />
+              <span>연결 문제</span>
+            </div>
+          )}
         </div>
       )}
 
@@ -100,8 +116,8 @@ export default function AIAssistant({ isWidget = false }: AIAssistantProps) {
                 {msg.role === 'user' ? <User size={16} className="text-blue-700" /> : <Bot size={16} className="text-amber-700" />}
               </div>
               <div className={`p-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap ${msg.role === 'user'
-                  ? 'bg-blue-600 text-white rounded-tr-none'
-                  : 'bg-slate-100 text-slate-800 rounded-tl-none'
+                ? 'bg-blue-600 text-white rounded-tr-none'
+                : 'bg-slate-100 text-slate-800 rounded-tl-none'
                 }`}>
                 {msg.content}
               </div>
@@ -120,7 +136,7 @@ export default function AIAssistant({ isWidget = false }: AIAssistantProps) {
       {/* Input Area */}
       <div className="p-4 border-t border-slate-100 bg-white">
         <div className="flex gap-2 mb-4 overflow-x-auto pb-2 scrollbar-hide">
-          {["🚨 재고 위험", "💰 마진 분석", "📈 판매 패턴"].map((txt) => (
+          {["🚨 재고 위험 분석해줘", "💰 마진 분석해줘", "📈 판매 패턴 알려줘"].map((txt) => (
             <button
               key={txt}
               onClick={() => handleQuickPrompt(txt)}

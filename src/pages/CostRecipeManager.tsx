@@ -31,125 +31,12 @@ interface MenuRecipe {
     ingredients: RecipeIngredient[];
 }
 
-// --- Initial Mock Data ---
+// --- Empty Initial Data (사용자가 직접 추가하거나 향후 API 연동) ---
 
-const INITIAL_MATERIALS: RawMaterial[] = [
-    { id: 'm1', category: 'Coffee Bean', name: '시그니처 블렌드 원두', purchasePrice: 25000, purchaseUnitQty: 1000, unit: 'g', currentStock: 5000 },
-    { id: 'm2', category: 'Dairy', name: '서울우유', purchasePrice: 3000, purchaseUnitQty: 1000, unit: 'ml', currentStock: 10000 },
-    { id: 'm3', category: 'Dairy', name: '매일 휘핑크림', purchasePrice: 6000, purchaseUnitQty: 500, unit: 'ml', currentStock: 2000 },
-    { id: 'm4', category: 'Syrup', name: '바닐라 시럽', purchasePrice: 15000, purchaseUnitQty: 1000, unit: 'ml', currentStock: 3000 },
-    { id: 'm5', category: 'Fruit', name: '냉동 딸기', purchasePrice: 12000, purchaseUnitQty: 1000, unit: 'g', currentStock: 5000 },
-    { id: 'm6', category: 'Consumable', name: '아이스컵(L)', purchasePrice: 50000, purchaseUnitQty: 500, unit: 'ea', currentStock: 400 },
-    { id: 'm7', category: 'Syrup', name: '카라멜 시럽', purchasePrice: 16000, purchaseUnitQty: 1000, unit: 'ml', currentStock: 2500 },
-    { id: 'm8', category: 'Syrup', name: '초코 소스', purchasePrice: 14000, purchaseUnitQty: 1000, unit: 'g', currentStock: 3000 },
-    { id: 'm9', category: 'Powder', name: '제주 말차 파우더', purchasePrice: 35000, purchaseUnitQty: 1000, unit: 'g', currentStock: 1000 },
-    { id: 'm10', category: 'Powder', name: '요거트 파우더', purchasePrice: 18000, purchaseUnitQty: 1000, unit: 'g', currentStock: 2000 },
-    { id: 'm11', category: 'Syrup', name: '복숭아 아이스티 시럽', purchasePrice: 9000, purchaseUnitQty: 1000, unit: 'ml', currentStock: 4000 },
-];
+const INITIAL_MATERIALS: RawMaterial[] = [];
 
-const INITIAL_RECIPES: MenuRecipe[] = [
-    {
-        id: 'r1', name: 'Americano (Ice)', salePrice: 4000,
-        ingredients: [
-            { id: 'i1', materialId: 'm1', qty: 20 },
-            { id: 'i2', materialId: 'm6', qty: 1 },
-        ]
-    },
-    {
-        id: 'r2', name: 'Caffè Latte (Ice)', salePrice: 4500,
-        ingredients: [
-            { id: 'i1', materialId: 'm1', qty: 20 },
-            { id: 'i2', materialId: 'm2', qty: 200 },
-            { id: 'i3', materialId: 'm6', qty: 1 },
-        ]
-    },
-    {
-        id: 'r3', name: 'Strawberry Latte', salePrice: 5500,
-        ingredients: [
-            { id: 'i1', materialId: 'm5', qty: 80 },
-            { id: 'i2', materialId: 'm2', qty: 250 },
-            { id: 'i3', materialId: 'm4', qty: 20 },
-            { id: 'i4', materialId: 'm6', qty: 1 },
-        ]
-    },
-    {
-        id: 'r4', name: 'Espresso (Hot)', salePrice: 3500,
-        ingredients: [{ id: 'i1', materialId: 'm1', qty: 20 }]
-    },
-    {
-        id: 'r5', name: 'Cappuccino (Hot)', salePrice: 4500,
-        ingredients: [
-            { id: 'i1', materialId: 'm1', qty: 20 },
-            { id: 'i2', materialId: 'm2', qty: 180 },
-        ]
-    },
-    {
-        id: 'r6', name: 'Vanilla Latte (Hot)', salePrice: 5000,
-        ingredients: [
-            { id: 'i1', materialId: 'm1', qty: 20 },
-            { id: 'i2', materialId: 'm2', qty: 200 },
-            { id: 'i3', materialId: 'm4', qty: 30 }
-        ]
-    },
-    {
-        id: 'r7', name: 'Caramel Macchiato (Ice)', salePrice: 5500,
-        ingredients: [
-            { id: 'i1', materialId: 'm1', qty: 20 },
-            { id: 'i2', materialId: 'm2', qty: 180 },
-            { id: 'i3', materialId: 'm7', qty: 30 },
-            { id: 'i4', materialId: 'm6', qty: 1 }
-        ]
-    },
-    {
-        id: 'r8', name: 'Cafe Mocha (Ice)', salePrice: 5500,
-        ingredients: [
-            { id: 'i1', materialId: 'm1', qty: 20 },
-            { id: 'i2', materialId: 'm2', qty: 180 },
-            { id: 'i3', materialId: 'm8', qty: 30 },
-            { id: 'i4', materialId: 'm6', qty: 1 }
-        ]
-    },
-    {
-        id: 'r9', name: 'Green Tea Latte (Ice)', salePrice: 5200,
-        ingredients: [
-            { id: 'i1', materialId: 'm9', qty: 30 },
-            { id: 'i2', materialId: 'm2', qty: 200 },
-            { id: 'i3', materialId: 'm6', qty: 1 }
-        ]
-    },
-    {
-        id: 'r10', name: 'Chocolate Latte (Ice)', salePrice: 5000,
-        ingredients: [
-            { id: 'i1', materialId: 'm8', qty: 40 },
-            { id: 'i2', materialId: 'm2', qty: 200 },
-            { id: 'i3', materialId: 'm6', qty: 1 }
-        ]
-    },
-    {
-        id: 'r11', name: 'Strawberry Smoothie', salePrice: 5800,
-        ingredients: [
-            { id: 'i1', materialId: 'm5', qty: 150 },
-            { id: 'i2', materialId: 'm2', qty: 100 },
-            { id: 'i3', materialId: 'm4', qty: 20 },
-            { id: 'i4', materialId: 'm6', qty: 1 }
-        ]
-    },
-    {
-        id: 'r12', name: 'Plain Yogurt Smoothie', salePrice: 5500,
-        ingredients: [
-            { id: 'i1', materialId: 'm10', qty: 60 },
-            { id: 'i2', materialId: 'm2', qty: 150 },
-            { id: 'i3', materialId: 'm6', qty: 1 }
-        ]
-    },
-    {
-        id: 'r13', name: 'Peach Iced Tea', salePrice: 4000,
-        ingredients: [
-            { id: 'i1', materialId: 'm11', qty: 40 },
-            { id: 'i2', materialId: 'm6', qty: 1 }
-        ]
-    }
-];
+const INITIAL_RECIPES: MenuRecipe[] = [];
+
 
 // --- Helpers ---
 
@@ -784,8 +671,8 @@ export default function CostRecipeManager() {
                 <button
                     onClick={() => setActiveTab('recipe')}
                     className={`flex items-center gap-2 px-6 py-3 text-sm font-bold rounded-t-lg transition-colors ${activeTab === 'recipe'
-                            ? "bg-white text-indigo-600 border-b-2 border-indigo-600"
-                            : "text-slate-500 hover:text-slate-800 hover:bg-slate-50"
+                        ? "bg-white text-indigo-600 border-b-2 border-indigo-600"
+                        : "text-slate-500 hover:text-slate-800 hover:bg-slate-50"
                         }`}
                 >
                     <DollarSign size={16} />
@@ -794,8 +681,8 @@ export default function CostRecipeManager() {
                 <button
                     onClick={() => setActiveTab('material')}
                     className={`flex items-center gap-2 px-6 py-3 text-sm font-bold rounded-t-lg transition-colors ${activeTab === 'material'
-                            ? "bg-white text-indigo-600 border-b-2 border-indigo-600"
-                            : "text-slate-500 hover:text-slate-800 hover:bg-slate-50"
+                        ? "bg-white text-indigo-600 border-b-2 border-indigo-600"
+                        : "text-slate-500 hover:text-slate-800 hover:bg-slate-50"
                         }`}
                 >
                     <Archive size={16} />
@@ -813,8 +700,8 @@ export default function CostRecipeManager() {
                             <button
                                 onClick={() => handleSort('name')}
                                 className={`flex items-center gap-1 px-3 py-1 text-xs rounded-full border transition-colors ${sortConfig.key === 'name'
-                                        ? 'bg-indigo-50 border-indigo-200 text-indigo-700 font-bold'
-                                        : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
+                                    ? 'bg-indigo-50 border-indigo-200 text-indigo-700 font-bold'
+                                    : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
                                     }`}
                             >
                                 이름순 {sortConfig.key === 'name' && (sortConfig.direction === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />)}
@@ -822,8 +709,8 @@ export default function CostRecipeManager() {
                             <button
                                 onClick={() => handleSort('cogs')}
                                 className={`flex items-center gap-1 px-3 py-1 text-xs rounded-full border transition-colors ${sortConfig.key === 'cogs'
-                                        ? 'bg-indigo-50 border-indigo-200 text-indigo-700 font-bold'
-                                        : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
+                                    ? 'bg-indigo-50 border-indigo-200 text-indigo-700 font-bold'
+                                    : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
                                     }`}
                             >
                                 원가율순 {sortConfig.key === 'cogs' && (sortConfig.direction === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />)}
