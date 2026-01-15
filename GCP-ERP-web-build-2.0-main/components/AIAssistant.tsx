@@ -1,10 +1,7 @@
-/**
- * AI Assistant Page
- * GCP-ERP 스타일 AI 비서 채팅 인터페이스
- */
 
-import { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useData } from '../contexts/DataContext';
+import { generateGeminiResponse } from '../services/geminiService';
 import { Bot, Send, User } from 'lucide-react';
 
 interface Message {
@@ -16,24 +13,7 @@ interface AIAssistantProps {
   isWidget?: boolean;
 }
 
-// Simulated AI response (fallback when no API key)
-const generateSimulatedResponse = (userMsg: string, context: string): string => {
-  const lowerMsg = userMsg.toLowerCase();
-
-  if (lowerMsg.includes('재고') || lowerMsg.includes('위험')) {
-    return `📦 재고 분석 결과입니다:\n\n${context}\n\n✅ 현재 대부분의 재고가 안정적인 수준입니다. 정기적인 모니터링을 권장합니다.`;
-  }
-  if (lowerMsg.includes('마진') || lowerMsg.includes('수익')) {
-    return `💰 마진 분석:\n\n현재 평균 마진율은 약 35-40%로 양호한 편입니다. 원두와 우유 비용이 가장 큰 비중을 차지합니다.`;
-  }
-  if (lowerMsg.includes('판매') || lowerMsg.includes('패턴')) {
-    return `📈 판매 패턴 분석:\n\n• 주말 매출이 평일 대비 약 30% 높습니다\n• 오전 10-11시가 피크 타임입니다\n• Americano가 가장 인기 메뉴입니다`;
-  }
-
-  return `안녕하세요! "${userMsg}"에 대한 답변입니다.\n\n현재 시뮬레이션 모드로 동작 중입니다. 실제 AI 분석을 위해서는 백엔드 서버 연결이 필요합니다.`;
-};
-
-export default function AIAssistant({ isWidget = false }: AIAssistantProps) {
+export const AIAssistant = ({ isWidget = false }: AIAssistantProps) => {
   const { sales, inventory } = useData();
   const [messages, setMessages] = useState<Message[]>([
     { role: 'assistant', content: "안녕하세요! 커피 ERP AI 비서입니다. 매출 분석, 재고 위험, 마진 분석 등 무엇이든 물어보세요." }
@@ -57,29 +37,31 @@ export default function AIAssistant({ isWidget = false }: AIAssistantProps) {
     setIsThinking(true);
 
     // Prepare Context for AI
-    const salesSummary = `Total Sales Count: ${sales.length}, Total Revenue: ${sales.reduce((a, b) => a + b.revenue, 0).toLocaleString()}원`;
+    const salesSummary = `Total Sales Count: ${sales.length}, Total Revenue: ${sales.reduce((a,b)=>a+b.revenue,0)}`;
+    const recentSales = sales.slice(-10).map(s => `${s.date}: ${s.itemDetail} (${s.qty})`).join("\n");
     const lowStockItems = inventory.filter(i => i.currentStock < i.safetyStock).map(i => i.name_ko).join(", ");
-
+    
     const context = `
       Sales Summary: ${salesSummary}
+      Recent Transactions: \n${recentSales}
       Low Stock Alerts: ${lowStockItems || "None"}
     `;
 
-    // Simulate delay for realistic feel
-    await new Promise(resolve => setTimeout(resolve, 800));
+    const responseText = await generateGeminiResponse(userMsg, context);
 
-    const responseText = generateSimulatedResponse(userMsg, context);
     setMessages(prev => [...prev, { role: 'assistant', content: responseText }]);
     setIsThinking(false);
   };
 
   const handleQuickPrompt = (prompt: string) => {
     setInput(prompt);
+    // Optional: auto-submit
+    // handleSend();
   };
 
   // Dynamic classes based on isWidget prop
-  const containerClass = isWidget
-    ? "flex flex-col h-full bg-white"
+  const containerClass = isWidget 
+    ? "flex flex-col h-full bg-white" 
     : "h-[calc(100vh-8rem)] flex flex-col bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden animate-fade-in";
 
   return (
@@ -87,7 +69,8 @@ export default function AIAssistant({ isWidget = false }: AIAssistantProps) {
       {!isWidget && (
         <div className="p-4 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
           <Bot className="text-blue-600" />
-          <h2 className="font-bold text-slate-800">AI 비서</h2>
+          {/* Updated model reference in UI */}
+          <h2 className="font-bold text-slate-800">AI 비서 (Gemini 3)</h2>
         </div>
       )}
 
@@ -97,12 +80,13 @@ export default function AIAssistant({ isWidget = false }: AIAssistantProps) {
           <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             <div className={`flex items-start gap-3 max-w-[90%] ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
               <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${msg.role === 'user' ? 'bg-blue-100' : 'bg-amber-100'}`}>
-                {msg.role === 'user' ? <User size={16} className="text-blue-700" /> : <Bot size={16} className="text-amber-700" />}
+                {msg.role === 'user' ? <User size={16} className="text-blue-700"/> : <Bot size={16} className="text-amber-700"/>}
               </div>
-              <div className={`p-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap ${msg.role === 'user'
-                  ? 'bg-blue-600 text-white rounded-tr-none'
+              <div className={`p-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap ${
+                msg.role === 'user' 
+                  ? 'bg-blue-600 text-white rounded-tr-none' 
                   : 'bg-slate-100 text-slate-800 rounded-tl-none'
-                }`}>
+              }`}>
                 {msg.content}
               </div>
             </div>
@@ -110,9 +94,9 @@ export default function AIAssistant({ isWidget = false }: AIAssistantProps) {
         ))}
         {isThinking && (
           <div className="flex justify-start">
-            <div className="flex items-center gap-2 text-slate-400 text-sm ml-12">
-              <span className="animate-pulse">AI가 생각 중입니다...</span>
-            </div>
+             <div className="flex items-center gap-2 text-slate-400 text-sm ml-12">
+                <span className="animate-pulse">AI가 생각 중입니다...</span>
+             </div>
           </div>
         )}
       </div>
@@ -121,7 +105,7 @@ export default function AIAssistant({ isWidget = false }: AIAssistantProps) {
       <div className="p-4 border-t border-slate-100 bg-white">
         <div className="flex gap-2 mb-4 overflow-x-auto pb-2 scrollbar-hide">
           {["🚨 재고 위험", "💰 마진 분석", "📈 판매 패턴"].map((txt) => (
-            <button
+            <button 
               key={txt}
               onClick={() => handleQuickPrompt(txt)}
               className="px-3 py-1.5 bg-white border border-slate-200 rounded-full text-xs text-slate-600 hover:bg-slate-50 hover:border-blue-300 transition-colors whitespace-nowrap"
@@ -139,7 +123,7 @@ export default function AIAssistant({ isWidget = false }: AIAssistantProps) {
             placeholder="AI에게 질문..."
             className="flex-1 p-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
           />
-          <button
+          <button 
             onClick={handleSend}
             disabled={!input.trim() || isThinking}
             className="p-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors"
@@ -150,4 +134,4 @@ export default function AIAssistant({ isWidget = false }: AIAssistantProps) {
       </div>
     </div>
   );
-}
+};

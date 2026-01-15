@@ -1,8 +1,10 @@
 /**
  * App.tsx - Main Application with React Router
+ * GCP-ERP 스타일 적용
  */
 
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { DataProvider } from './contexts/DataContext';
 import Layout from './components/Layout/Layout';
 import Dashboard from './pages/Dashboard';
 import Sales from './pages/Sales';
@@ -11,19 +13,99 @@ import Recipes from './pages/Recipes';
 import AIAssistant from './pages/AIAssistant';
 import './index.css';
 
+// Home Page (GCP 스타일)
+const HomePage = () => (
+  <div className="space-y-6 animate-fade-in">
+    <div className="bg-gradient-to-r from-amber-500 to-orange-600 p-8 rounded-2xl text-white">
+      <h1 className="text-3xl font-bold mb-2">☕ Coffee ERP에 오신 것을 환영합니다!</h1>
+      <p className="text-amber-100">좌측 메뉴에서 원하시는 기능을 선택해주세요.</p>
+    </div>
+
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+        <div className="text-3xl mb-3">📊</div>
+        <h3 className="font-bold text-slate-800 mb-2">경영 현황</h3>
+        <p className="text-sm text-slate-500">실시간 수익성 분석과 공과금 관리</p>
+      </div>
+      <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+        <div className="text-3xl mb-3">📈</div>
+        <h3 className="font-bold text-slate-800 mb-2">매출 분석</h3>
+        <p className="text-sm text-slate-500">기간별, 상품별 매출 트렌드 분석</p>
+      </div>
+      <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+        <div className="text-3xl mb-3">📦</div>
+        <h3 className="font-bold text-slate-800 mb-2">재고 관리</h3>
+        <p className="text-sm text-slate-500">AI 기반 재고 예측 및 발주 관리</p>
+      </div>
+    </div>
+  </div>
+);
+
+// Placeholder Pages
+const PeriodAnalysisPage = () => (
+  <div className="p-8 text-center bg-white rounded-xl border border-slate-200 shadow-sm min-h-[400px] flex flex-col justify-center items-center animate-fade-in">
+    <div className="text-6xl mb-4">📈</div>
+    <h2 className="text-2xl font-bold text-slate-800 mb-2">매출 분석</h2>
+    <p className="text-slate-500 max-w-md">기간별 매출 데이터를 분석합니다.</p>
+  </div>
+);
+
+const TransactionsPage = () => (
+  <div className="p-8 text-center bg-white rounded-xl border border-slate-200 shadow-sm min-h-[400px] flex flex-col justify-center items-center animate-fade-in">
+    <div className="text-6xl mb-4">📋</div>
+    <h2 className="text-2xl font-bold text-slate-800 mb-2">거래 데이터 관리</h2>
+    <p className="text-slate-500 max-w-md">판매 및 입고 거래 내역을 관리합니다.</p>
+  </div>
+);
+
+const CostRecipePage = () => (
+  <div className="p-8 text-center bg-white rounded-xl border border-slate-200 shadow-sm min-h-[400px] flex flex-col justify-center items-center animate-fade-in">
+    <div className="text-6xl mb-4">👨‍🍳</div>
+    <h2 className="text-2xl font-bold text-slate-800 mb-2">원가/레시피 관리</h2>
+    <p className="text-slate-500 max-w-md">메뉴별 원가와 레시피를 관리합니다.</p>
+  </div>
+);
+
+const HelpPage = () => (
+  <div className="p-8 text-center bg-white rounded-xl border border-slate-200 shadow-sm min-h-[400px] flex flex-col justify-center items-center animate-fade-in">
+    <div className="text-6xl mb-4">📖</div>
+    <h2 className="text-2xl font-bold text-slate-800 mb-2">도움말 및 가이드</h2>
+    <p className="text-slate-500 max-w-md">
+      ERP 시스템 사용에 어려움이 있으신가요? <br />
+      관리자에게 문의해주세요.
+    </p>
+  </div>
+);
+
+const SettingsPage = () => (
+  <div className="p-8 text-center bg-white rounded-xl border border-slate-200 shadow-sm min-h-[400px] flex flex-col justify-center items-center animate-fade-in">
+    <div className="text-6xl mb-4">⚙️</div>
+    <h2 className="text-2xl font-bold text-slate-800 mb-2">설정</h2>
+    <p className="text-slate-500 max-w-md">시스템 설정을 관리합니다.</p>
+  </div>
+);
+
 function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Layout />}>
-          <Route index element={<Dashboard />} />
-          <Route path="sales" element={<Sales />} />
-          <Route path="inventory" element={<Inventory />} />
-          <Route path="recipes" element={<Recipes />} />
-          <Route path="ai" element={<AIAssistant />} />
-        </Route>
-      </Routes>
-    </BrowserRouter>
+    <DataProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<Layout />}>
+            <Route index element={<HomePage />} />
+            <Route path="dashboard" element={<Dashboard />} />
+            <Route path="period" element={<PeriodAnalysisPage />} />
+            <Route path="transactions" element={<TransactionsPage />} />
+            <Route path="sales" element={<Sales />} />
+            <Route path="inventory" element={<Inventory />} />
+            <Route path="cost-recipe" element={<CostRecipePage />} />
+            <Route path="recipes" element={<Recipes />} />
+            <Route path="help" element={<HelpPage />} />
+            <Route path="settings" element={<SettingsPage />} />
+            <Route path="ai" element={<AIAssistant />} />
+          </Route>
+        </Routes>
+      </BrowserRouter>
+    </DataProvider>
   );
 }
 

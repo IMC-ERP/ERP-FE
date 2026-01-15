@@ -1,0 +1,5 @@
+{
+  "name": "Coffee ERP Dashboard",
+  "description": "A comprehensive Coffee ERP system for sales management, inventory tracking, and AI-driven business insights, ported from Streamlit to React.",
+  "requestFramePermissions": []
+}
