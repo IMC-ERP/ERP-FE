@@ -30,15 +30,32 @@ export interface Sale {
 
 export interface InventoryItem {
   id: string;
-  상품상세_en: string;
-  상품상세?: string;
-  초기재고: number;
-  현재재고: number;
+  category: string;
+  max_stock_level: number;
+  quantity_on_hand: number;
+  safety_stock: number;
+  needs_reorder: boolean;
+  unit_cost: number;
   uom: string;
-  is_ingredient: boolean;
-  cost_unit_size?: number;
-  cost_per_unit?: number;
-  unit_cost?: number;
+}
+
+export interface StockIntake {
+  category: string;
+  name: string;
+  price_per_unit: number;
+  quantity: number;
+  total_amount: number;
+  volume: number;
+  uom?: string;
+}
+
+export interface OCRReceiptData {
+  category?: string;
+  name: string;
+  volume: number;
+  quantity: number;
+  price_per_unit: number;
+  total_amount: number;
 }
 
 export interface DashboardSummary {
@@ -74,7 +91,62 @@ export const salesApi = {
 export const inventoryApi = {
   getAll: () => api.get<InventoryItem[]>('/inventory'),
   getById: (id: string) => api.get<InventoryItem>(`/inventory/${id}`),
+  create: (data: Omit<InventoryItem, 'id'> & { id: string }) => api.post('/inventory', data),
   update: (id: string, data: Partial<InventoryItem>) => api.put(`/inventory/${id}`, data),
+};
+
+// ==================== Stock Intake API ====================
+
+export const stockIntakeApi = {
+  create: (data: StockIntake) => api.post('/stock-intake', data),
+};
+
+// ==================== 레시피 원가 타입 ====================
+export interface Ingredient {
+  name: string;
+  cost_per_unit: number;
+  usage: number;
+  cost: number;
+}
+
+export interface RecipeCost {
+  menu_name: string;
+  category: string;
+  selling_price: number;
+  total_cost: number;
+  cost_ratio: number;
+  status: 'safe' | 'needs_check' | 'danger';
+  ingredients: Ingredient[];
+}
+
+// ==================== 레시피 원가 API ====================
+export const recipeCostApi = {
+  getAll: () => api.get<RecipeCost[]>('/recipe-costs'),
+  getByName: (menuName: string) => api.get<RecipeCost>(`/recipe-costs/${encodeURIComponent(menuName)}`),
+  create: (data: Omit<RecipeCost, 'total_cost' | 'cost_ratio' | 'status'>) => api.post('/recipe-costs', data),
+  delete: (menuName: string) => api.delete(`/recipe-costs/${encodeURIComponent(menuName)}`),
+};
+
+// ==================== OCR API ====================
+
+export const ocrApi = {
+  // 단일 영수증 이미지 OCR
+  analyzeSingleReceipt: (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post<OCRReceiptData>('/ocr/receipt', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+  },
+
+  // 다중 영수증 이미지 OCR
+  analyzeMultipleReceipts: (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post<OCRReceiptData[]>('/ocr/receipt/multiple', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+  }
 };
 
 // ==================== Dashboard API ====================
@@ -116,7 +188,7 @@ export interface ChatResponse {
 export const aiApi = {
   getStatus: () => api.get<AIStatus>('/ai/status'),
   chat: (request: ChatRequest) => api.post<ChatResponse>('/ai/chat', request),
-  forecast: (menuSku: string, days: number = 7) => 
+  forecast: (menuSku: string, days: number = 7) =>
     api.post('/ai/forecast', { menu_sku_en: menuSku, days }),
 };
 
@@ -135,7 +207,7 @@ export interface SKUParam {
 export const skuParamsApi = {
   getAll: () => api.get<SKUParam[]>('/sku-params'),
   getById: (skuEn: string) => api.get<SKUParam>(`/sku-params/${encodeURIComponent(skuEn)}`),
-  update: (skuEn: string, data: Partial<SKUParam>) => 
+  update: (skuEn: string, data: Partial<SKUParam>) =>
     api.put(`/sku-params/${encodeURIComponent(skuEn)}`, data),
 };
 
