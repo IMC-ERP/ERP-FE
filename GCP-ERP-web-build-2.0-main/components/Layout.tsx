@@ -1,49 +1,28 @@
-/**
- * Layout Component
- * GCP-ERP 스타일 - 고정 사이드바 + AI 드로어
- */
+import React, { useState } from 'react';
+import { Link, useLocation } from 'react-router-dom';
+import { LayoutDashboard, Calendar, PlusCircle, Package, Bot, Coffee, Home, FileText, X, ClipboardList, ChefHat, Settings, HelpCircle } from 'lucide-react';
+import { AIAssistant } from './AIAssistant';
+import { useData } from '../contexts/DataContext';
 
-import { useState, lazy, Suspense } from 'react';
-import { Link, Outlet, useLocation } from 'react-router-dom';
-import {
-  LayoutDashboard,
-  Calendar,
-  Package,
-  Bot,
-  Coffee,
-  Home,
-  ClipboardList,
-  ChefHat,
-  Settings,
-  HelpCircle,
-  X
-} from 'lucide-react';
-import { useData } from '../../contexts/DataContext';
-
-// Lazy load AIAssistant to avoid circular dependency
-const AIAssistant = lazy(() => import('../../pages/AIAssistant'));
-
-interface NavItemProps {
-  to: string;
-  icon: React.ComponentType<{ size?: number }>;
-  label: string;
-  active: boolean;
+interface LayoutProps {
+  children?: React.ReactNode;
 }
 
-const NavItem = ({ to, icon: Icon, label, active }: NavItemProps) => (
+const NavItem = ({ to, icon: Icon, label, active }: { to: string, icon: any, label: string, active: boolean }) => (
   <Link
     to={to}
-    className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors duration-200 ${active
-        ? "bg-blue-100 text-blue-700 font-semibold"
+    className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors duration-200 ${
+      active 
+        ? "bg-blue-100 text-blue-700 font-semibold" 
         : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-      }`}
+    }`}
   >
     <Icon size={20} />
     <span>{label}</span>
   </Link>
 );
 
-export default function Layout() {
+export const Layout = ({ children }: LayoutProps) => {
   const location = useLocation();
   const [isAIDrawerOpen, setIsAIDrawerOpen] = useState(false);
   const { storeProfile } = useData();
@@ -55,7 +34,7 @@ export default function Layout() {
         {/* Sidebar Header */}
         <div className="p-6 border-b border-slate-100 flex items-center gap-3">
           {storeProfile.logoUrl ? (
-            <img src={storeProfile.logoUrl} alt="Logo" className="w-10 h-10 rounded-full object-cover border border-slate-200" />
+             <img src={storeProfile.logoUrl} alt="Logo" className="w-10 h-10 rounded-full object-cover border border-slate-200" />
           ) : (
             <div className="bg-amber-100 p-2 rounded-full">
               <Coffee className="text-amber-700" size={24} />
@@ -66,7 +45,7 @@ export default function Layout() {
             <p className="text-[10px] text-slate-400">Coffee ERP v2.5.4</p>
           </div>
         </div>
-
+        
         {/* Main Navigation */}
         <nav className="p-4 space-y-1 flex-1 overflow-y-auto">
           <NavItem to="/" icon={Home} label="홈" active={location.pathname === '/'} />
@@ -79,18 +58,18 @@ export default function Layout() {
 
         {/* Bottom Utility Navigation */}
         <div className="p-4 border-t border-slate-100 space-y-1 bg-slate-50/50">
-          <NavItem to="/help" icon={HelpCircle} label="도움말" active={location.pathname === '/help'} />
-          <NavItem to="/settings" icon={Settings} label="설정" active={location.pathname === '/settings'} />
+           <NavItem to="/help" icon={HelpCircle} label="도움말" active={location.pathname === '/help'} />
+           <NavItem to="/settings" icon={Settings} label="설정" active={location.pathname === '/settings'} />
         </div>
       </div>
 
       {/* Main Content Wrapper - Pushes content when drawer is open */}
-      <div
+      <div 
         className="flex-1 ml-64 relative transition-all duration-300 ease-in-out"
         style={{ marginRight: isAIDrawerOpen ? '400px' : '0' }}
       >
         <main className="p-8 max-w-7xl mx-auto">
-          <Outlet />
+          {children}
         </main>
       </div>
 
@@ -104,33 +83,32 @@ export default function Layout() {
       </button>
 
       {/* AI Assistant Drawer (Push Mode) */}
-      <div
-        className={`fixed inset-y-0 right-0 w-[400px] bg-white shadow-xl z-50 transform transition-transform duration-300 ease-in-out border-l border-slate-200 flex flex-col ${isAIDrawerOpen ? 'translate-x-0' : 'translate-x-full'
-          }`}
+      <div 
+        className={`fixed inset-y-0 right-0 w-[400px] bg-white shadow-xl z-50 transform transition-transform duration-300 ease-in-out border-l border-slate-200 flex flex-col ${
+          isAIDrawerOpen ? 'translate-x-0' : 'translate-x-full'
+        }`}
       >
-        {/* Drawer Header */}
-        <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-100 flex justify-between items-center flex-shrink-0">
-          <div className="flex items-center gap-2 font-bold text-slate-800">
-            <div className="bg-white p-1.5 rounded-full shadow-sm">
-              <Bot className="text-blue-600" size={20} />
+         {/* Drawer Header */}
+         <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-100 flex justify-between items-center flex-shrink-0">
+            <div className="flex items-center gap-2 font-bold text-slate-800">
+               <div className="bg-white p-1.5 rounded-full shadow-sm">
+                  <Bot className="text-blue-600" size={20} />
+               </div>
+               <span>AI 경영 비서</span>
             </div>
-            <span>AI 경영 비서</span>
-          </div>
-          <button
-            onClick={() => setIsAIDrawerOpen(false)}
-            className="p-1 text-slate-400 hover:text-slate-600 hover:bg-white/50 rounded-full transition-colors"
-          >
-            <X size={20} />
-          </button>
-        </div>
-
-        {/* Drawer Content */}
-        <div className="flex-1 overflow-hidden">
-          <Suspense fallback={<div className="p-4 text-center text-slate-400">로딩 중...</div>}>
+            <button 
+              onClick={() => setIsAIDrawerOpen(false)}
+              className="p-1 text-slate-400 hover:text-slate-600 hover:bg-white/50 rounded-full transition-colors"
+            >
+               <X size={20} />
+            </button>
+         </div>
+         
+         {/* Drawer Content */}
+         <div className="flex-1 overflow-hidden">
             <AIAssistant isWidget={true} />
-          </Suspense>
-        </div>
+         </div>
       </div>
     </div>
   );
-}
+};

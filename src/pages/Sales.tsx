@@ -1,12 +1,11 @@
 /**
  * Sales Page
- * 판매 관리 페이지 (판매 조회/입력/삭제)
+ * GCP-ERP 스타일 판매 관리 페이지
  */
 
 import { useEffect, useState } from 'react';
-import { Plus, Trash2, RefreshCw } from 'lucide-react';
+import { Plus, Trash2, RefreshCw, ShoppingCart } from 'lucide-react';
 import { salesApi, type Sale } from '../services/api';
-import './Sales.css';
 
 const MENU_OPTIONS = [
   'Americano (I/H)',
@@ -24,8 +23,7 @@ export default function Sales() {
   const [sales, setSales] = useState<Sale[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  
-  // Form state
+
   const [formData, setFormData] = useState({
     상품상세: MENU_OPTIONS[0],
     단가: 4500,
@@ -71,70 +69,91 @@ export default function Sales() {
   };
 
   return (
-    <div className="sales-page">
-      <header className="page-header">
-        <div>
-          <h1>🛒 판매 관리</h1>
-          <p>판매 데이터 조회 및 입력</p>
+    <div className="space-y-6 animate-fade-in">
+      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <span className="text-blue-600"><ShoppingCart size={32} /></span>
+          <div>
+            <h1 className="text-3xl font-extrabold text-slate-800">판매 관리</h1>
+            <p className="text-slate-500 text-sm">판매 데이터 조회 및 입력</p>
+          </div>
         </div>
-        <div className="header-actions">
-          <button className="btn btn-secondary" onClick={fetchSales}>
-            <RefreshCw size={18} /> 새로고침
+        <div className="flex gap-2">
+          <button
+            onClick={fetchSales}
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-300 rounded-lg text-sm text-slate-600 hover:bg-slate-50 shadow-sm transition-colors"
+          >
+            <RefreshCw size={16} /> 새로고침
           </button>
-          <button className="btn btn-primary" onClick={() => setShowForm(!showForm)}>
-            <Plus size={18} /> 판매 입력
+          <button
+            onClick={() => setShowForm(!showForm)}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700 shadow-sm transition-colors"
+          >
+            <Plus size={16} /> 판매 입력
           </button>
         </div>
       </header>
 
       {/* 판매 입력 폼 */}
       {showForm && (
-        <div className="form-card">
-          <h3>📝 새 판매 입력</h3>
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 animate-fade-in">
+          <h3 className="text-lg font-bold text-slate-800 mb-4">📝 새 판매 입력</h3>
           <form onSubmit={handleSubmit}>
-            <div className="form-grid">
-              <div className="form-group">
-                <label>상품</label>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1">상품</label>
                 <select
                   value={formData.상품상세}
                   onChange={(e) => setFormData({ ...formData, 상품상세: e.target.value })}
+                  className="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-white text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none"
                 >
                   {MENU_OPTIONS.map((menu) => (
                     <option key={menu} value={menu}>{menu}</option>
                   ))}
                 </select>
               </div>
-              <div className="form-group">
-                <label>단가 (원)</label>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1">단가 (원)</label>
                 <input
                   type="number"
                   value={formData.단가}
                   onChange={(e) => setFormData({ ...formData, 단가: Number(e.target.value) })}
+                  className="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-white text-slate-900 text-right focus:ring-2 focus:ring-blue-500 outline-none"
                 />
               </div>
-              <div className="form-group">
-                <label>수량</label>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1">수량</label>
                 <input
                   type="number"
                   min="1"
                   value={formData.수량}
                   onChange={(e) => setFormData({ ...formData, 수량: Number(e.target.value) })}
+                  className="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-white text-slate-900 text-right focus:ring-2 focus:ring-blue-500 outline-none"
                 />
               </div>
-              <div className="form-group">
-                <label>날짜</label>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1">날짜</label>
                 <input
                   type="date"
                   value={formData.날짜}
                   onChange={(e) => setFormData({ ...formData, 날짜: e.target.value })}
+                  className="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-white text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none"
+                  style={{ colorScheme: 'light' }}
                 />
               </div>
             </div>
-            <div className="form-actions">
-              <button type="button" className="btn btn-secondary" onClick={() => setShowForm(false)}>
+            <div className="flex gap-2 justify-end">
+              <button
+                type="button"
+                onClick={() => setShowForm(false)}
+                className="px-4 py-2 bg-white border border-slate-300 rounded-lg text-sm text-slate-600 hover:bg-slate-50 transition-colors"
+              >
                 취소
               </button>
-              <button type="submit" className="btn btn-primary">
+              <button
+                type="submit"
+                className="px-4 py-2 bg-slate-800 text-white rounded-lg text-sm font-bold hover:bg-slate-900 transition-colors"
+              >
                 저장
               </button>
             </div>
@@ -143,37 +162,43 @@ export default function Sales() {
       )}
 
       {/* 판매 목록 */}
-      <div className="table-card">
-        <h3>📋 판매 내역 ({sales.length}건)</h3>
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="p-4 bg-slate-50 border-b border-slate-200">
+          <h3 className="font-bold text-slate-700">📋 판매 내역 ({sales.length}건)</h3>
+        </div>
         {loading ? (
-          <p className="loading">로딩 중...</p>
+          <div className="flex items-center justify-center h-32">
+            <div className="animate-pulse text-slate-400">로딩 중...</div>
+          </div>
         ) : sales.length === 0 ? (
-          <p className="empty">판매 데이터가 없습니다.</p>
+          <div className="flex items-center justify-center h-32 text-slate-400">
+            판매 데이터가 없습니다.
+          </div>
         ) : (
-          <div className="table-wrapper">
-            <table>
-              <thead>
+          <div className="overflow-x-auto max-h-[500px]">
+            <table className="w-full text-sm text-left">
+              <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200 sticky top-0">
                 <tr>
-                  <th>날짜</th>
-                  <th>상품</th>
-                  <th>단가</th>
-                  <th>수량</th>
-                  <th>수익</th>
-                  <th>액션</th>
+                  <th className="px-4 py-3">날짜</th>
+                  <th className="px-4 py-3">상품</th>
+                  <th className="px-4 py-3 text-right">단가</th>
+                  <th className="px-4 py-3 text-right">수량</th>
+                  <th className="px-4 py-3 text-right">수익</th>
+                  <th className="px-4 py-3 text-center">삭제</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-slate-100">
                 {sales.slice(0, 100).map((sale) => (
-                  <tr key={sale.id}>
-                    <td>{sale.날짜?.slice(0, 10) || '-'}</td>
-                    <td>{sale.상품상세}</td>
-                    <td>{formatKRW(sale.단가 || 0)}</td>
-                    <td>{sale.수량}</td>
-                    <td className="revenue">{formatKRW(sale.수익 || 0)}</td>
-                    <td>
+                  <tr key={sale.id} className="hover:bg-slate-50">
+                    <td className="px-4 py-3 text-slate-600 font-mono">{sale.날짜?.slice(0, 10) || '-'}</td>
+                    <td className="px-4 py-3 font-medium text-slate-700">{sale.상품상세}</td>
+                    <td className="px-4 py-3 text-right text-slate-600">{formatKRW(sale.단가 || 0)}</td>
+                    <td className="px-4 py-3 text-right text-slate-600">{sale.수량}</td>
+                    <td className="px-4 py-3 text-right font-mono font-bold text-emerald-600">{formatKRW(sale.수익 || 0)}</td>
+                    <td className="px-4 py-3 text-center">
                       <button
-                        className="btn btn-icon btn-danger"
                         onClick={() => sale.id && handleDelete(sale.id)}
+                        className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
                       >
                         <Trash2 size={16} />
                       </button>
