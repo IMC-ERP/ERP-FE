@@ -108,23 +108,7 @@ export default function Recipes() {
     }));
   };
 
-  // 재료 선택 (inventory에서)
-  const handleSelectIngredient = (ingredientId: string, selectedItemId: string) => {
-    const selectedItem = inventory.find(item => item.id === selectedItemId);
-    if (selectedItem) {
-      setNewMenuData(prev => ({
-        ...prev,
-        ingredients: prev.ingredients.map(ing =>
-          ing.id === ingredientId ? {
-            ...ing,
-            name: selectedItem.id,
-            cost_per_unit: selectedItem.unit_cost,
-            uom: selectedItem.uom
-          } : ing
-        )
-      }));
-    }
-  };
+  // 재료 선택 (inventory에서) - 인라인으로 처리됨
 
   // 새 메뉴 저장
   const handleSubmitNewMenu = async () => {

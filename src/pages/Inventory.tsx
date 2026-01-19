@@ -56,7 +56,7 @@ export default function Inventory() {
 
   // 이미지 업로드 및 OCR 관련 상태
   const [isImageUploadMode, setIsImageUploadMode] = useState(false); // 이미지 업로드 전용 페이지 모드
-  const [uploadedImages, setUploadedImages] = useState<File[]>([]);
+  const [, setUploadedImages] = useState<File[]>([]);
   const [imagePreviewUrls, setImagePreviewUrls] = useState<string[]>([]);
   const [isOCRProcessing, setIsOCRProcessing] = useState(false);
   const [ocrError, setOcrError] = useState<{ message: string; suggestion: string } | null>(null);
@@ -205,7 +205,7 @@ export default function Inventory() {
     const imageFiles = files.filter(file => file.type.startsWith('image/'));
 
     if (imageFiles.length === 0) {
-      setOcrError('이미지 파일만 업로드할 수 있습니다.');
+      setOcrError({ message: '이미지 파일만 업로드할 수 있습니다.', suggestion: '이미지 파일을 선택해주세요.' });
       return;
     }
 
@@ -310,72 +310,6 @@ export default function Inventory() {
     }
   };
 
-  // 이미지 업로드 및 OCR 처리
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-
-    // 파일 크기 검증 (20MB)
-    const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB in bytes
-    for (let i = 0; i < files.length; i++) {
-      if (files[i].size > MAX_FILE_SIZE) {
-        setOcrError({
-          message: '파일 크기가 너무 큽니다.',
-          suggestion: '20MB 이하의 이미지 파일을 업로드해주세요.'
-        });
-        return;
-      }
-    }
-
-    setIsOCRProcessing(true);
-    setOcrError(null);
-
-    try {
-      const fileArray = Array.from(files);
-      setUploadedImages(fileArray);
-
-      // 이미지 미리보기 URL 생성
-      const previewUrls = fileArray.map(file => URL.createObjectURL(file));
-      setImagePreviewUrls(previewUrls);
-
-      // 단일 또는 다중 API 선택
-      let ocrResults: OCRReceiptData[] = [];
-
-      if (fileArray.length === 1) {
-        // 단일 이미지 OCR
-        const response = await ocrApi.analyzeSingleReceipt(fileArray[0]);
-        ocrResults = [response.data];
-      } else {
-        // 다중 이미지 OCR
-        // 각 이미지를 개별적으로 처리
-        const results = await Promise.all(
-          fileArray.map(file => ocrApi.analyzeMultipleReceipts(file))
-        );
-        // 모든 결과를 평탄화
-        ocrResults = results.flatMap(res => res.data);
-      }
-
-      // OCR 결과를 IntakeItem 형식으로 변환
-      const newIntakeItems: IntakeItem[] = ocrResults.map((item, index) => ({
-        id: Date.now() + index,
-        category: item.category || '',
-        name: item.name,
-        volume: item.volume,
-        quantity: item.quantity,
-        price_per_unit: item.price_per_unit,
-        total_amount: item.total_amount,
-      }));
-
-      setIntakeItems(newIntakeItems);
-      setIsManualInputMode(true);
-    } catch (err: any) {
-      console.error('OCR 처리 실패:', err);
-      const errorMsg = err.response?.data?.detail || '영수증 인식에 실패했습니다. 이미지를 확인하고 다시 시도해주세요.';
-      setOcrError(errorMsg);
-    } finally {
-      setIsOCRProcessing(false);
-    }
-  };
 
   const handleAddIntakeItem = () => {
     setIntakeItems(prev => [...prev, {

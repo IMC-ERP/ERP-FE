@@ -39,13 +39,13 @@ const transformSale = (apiSale: Sale): SaleItem => ({
 
 const transformInventory = (apiItem: APIInventoryItem): InventoryItem => ({
     id: apiItem.id,
-    name_en: apiItem.상품상세_en,
-    name_ko: apiItem.상품상세 || apiItem.상품상세_en,
-    currentStock: apiItem.현재재고,
+    name_en: apiItem.id,
+    name_ko: apiItem.id,
+    currentStock: apiItem.quantity_on_hand,
     uom: apiItem.uom,
-    isIngredient: apiItem.is_ingredient,
-    leadTimeDays: 3, // 기본값, API에서 제공하면 업데이트
-    safetyStock: 100, // 기본값
+    isIngredient: true,
+    leadTimeDays: 3, // 기본값
+    safetyStock: apiItem.safety_stock,
     supplyMode: '거래처 도매', // 기본값
     avgDailyUsage: undefined
 });
