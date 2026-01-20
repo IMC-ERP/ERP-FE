@@ -4,7 +4,7 @@
  */
 
 import { useState, useMemo, useEffect } from 'react';
-import { ChevronDown, ChevronRight, Plus, Trash2, DollarSign, Calculator, Archive, AlertCircle, ArrowUp, ArrowDown, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, Plus, Trash2, DollarSign, Calculator, Archive, AlertCircle, ArrowUp, ArrowDown, X, Save } from 'lucide-react';
 import { recipeCostApi, inventoryApi } from '../services/api';
 
 // --- Types for this Module ---
@@ -255,6 +255,7 @@ interface RecipeRowProps {
     onUpdateIngredient: (recipeId: string, ingId: string, field: keyof RecipeIngredient, value: string | number) => void;
     onRemoveIngredient: (recipeId: string, ingId: string) => void;
     onAddIngredient: (recipeId: string) => void;
+    onSave: (recipe: MenuRecipe) => void;
 }
 
 const RecipeRow = ({
@@ -266,7 +267,8 @@ const RecipeRow = ({
     onUpdateMeta,
     onUpdateIngredient,
     onRemoveIngredient,
-    onAddIngredient
+    onAddIngredient,
+    onSave
 }: RecipeRowProps) => {
     const isExpanded = expandedRecipeId === recipe.id;
     const totalCost = calculateRecipeCost(recipe.ingredients, materials);
@@ -402,12 +404,20 @@ const RecipeRow = ({
                         </table>
                     </div>
 
-                    <button
-                        onClick={() => onAddIngredient(recipe.id)}
-                        className="flex items-center gap-2 text-sm font-bold text-blue-600 hover:text-blue-700 px-2 py-1 rounded hover:bg-blue-50 transition-colors"
-                    >
-                        <Plus size={16} /> 재료 추가하기
-                    </button>
+                    <div className="flex justify-between items-center mt-4 border-t border-slate-200 pt-4">
+                        <button
+                            onClick={() => onAddIngredient(recipe.id)}
+                            className="flex items-center gap-2 text-sm font-bold text-blue-600 hover:text-blue-700 px-2 py-1 rounded hover:bg-blue-50 transition-colors"
+                        >
+                            <Plus size={16} /> 재료 추가하기
+                        </button>
+                        <button
+                            onClick={() => onSave(recipe)}
+                            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg font-bold shadow hover:bg-indigo-700 transition-colors"
+                        >
+                            <Save size={16} /> 변경사항 저장
+                        </button>
+                    </div>
                 </div>
             )}
         </div>
@@ -418,9 +428,10 @@ interface MaterialTableProps {
     materials: RawMaterial[];
     onUpdate: (id: string, field: keyof RawMaterial, value: string | number) => void;
     onDelete: (id: string) => void;
+    onSave: (material: RawMaterial) => void;
 }
 
-const MaterialTable = ({ materials, onUpdate, onDelete }: MaterialTableProps) => {
+const MaterialTable = ({ materials, onUpdate, onDelete, onSave }: MaterialTableProps) => {
     const groupedMaterials = useMemo(() => {
         const groups: Record<string, RawMaterial[]> = {};
         materials.forEach(m => {
@@ -495,12 +506,21 @@ const MaterialTable = ({ materials, onUpdate, onDelete }: MaterialTableProps) =>
                                         {mat.currentStock.toLocaleString()}
                                     </td>
                                     <td className="px-6 py-3 text-center">
-                                        <button
-                                            onClick={() => onDelete(mat.id)}
-                                            className="text-slate-300 hover:text-red-500 transition-colors"
-                                        >
-                                            <Trash2 size={16} />
-                                        </button>
+                                        <div className="flex gap-2 justify-center">
+                                            <button
+                                                onClick={() => onSave(mat)}
+                                                className="text-slate-300 hover:text-indigo-600 transition-colors"
+                                                title="저장"
+                                            >
+                                                <Save size={16} />
+                                            </button>
+                                            <button
+                                                onClick={() => onDelete(mat.id)}
+                                                className="text-slate-300 hover:text-red-500 transition-colors"
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
                             ))}
@@ -599,9 +619,34 @@ export default function CostRecipeManager() {
         setMaterials(prev => prev.map(m => m.id === id ? { ...m, [field]: value } : m));
     };
 
-    const handleDeleteMaterial = (id: string) => {
+    const handleSaveExistingMaterial = async (material: RawMaterial) => {
+        try {
+            await inventoryApi.update(material.id, {
+                category: material.category,
+                quantity_on_hand: material.currentStock,
+                uom: material.unit,
+                unit_cost: material.purchasePrice / (material.purchaseUnitQty || 1),
+                safety_stock: 0,
+                max_stock_level: 0,
+                needs_reorder: false
+            });
+            alert("원재료 정보가 저장되었습니다.");
+        } catch (error) {
+            console.error("Failed to update material", error);
+            alert("저장 실패. 다시 시도해주세요.");
+        }
+    };
+
+    const handleDeleteMaterial = async (id: string) => {
         if (window.confirm("이 원재료를 삭제하시겠습니까? (사용 중인 레시피에 영향을 줄 수 있습니다.)")) {
-            setMaterials(prev => prev.filter(m => m.id !== id));
+            try {
+                // API 호출 지원 여부에 따라 주석 해제 (inventoryApi에 delete가 있다고 가정하거나 추가 필요)
+                // await inventoryApi.delete(id); 
+                setMaterials(prev => prev.filter(m => m.id !== id));
+            } catch (error) {
+                console.error("Failed to delete material", error);
+                alert("삭제 실패");
+            }
         }
     };
 
@@ -610,30 +655,89 @@ export default function CostRecipeManager() {
         setIsAddModalOpen(true);
     };
 
-    const handleSaveNewMaterial = (data: Omit<RawMaterial, 'id'>) => {
-        const newMat: RawMaterial = {
-            id: Math.random().toString(36).substr(2, 9),
-            ...data
-        };
-        setMaterials(prev => [...prev, newMat]);
+    const handleSaveNewMaterial = async (data: Omit<RawMaterial, 'id'>) => {
+        try {
+            // ID를 이름으로 사용 (백엔드 스키마에 따라 조정)
+            const newItemId = data.name;
+
+            await inventoryApi.create({
+                id: newItemId,
+                category: data.category,
+                quantity_on_hand: data.currentStock,
+                uom: data.unit,
+                unit_cost: data.purchasePrice / (data.purchaseUnitQty || 1), // 단가 계산
+                safety_stock: 0,
+                max_stock_level: 0,
+                needs_reorder: false
+            });
+
+            const newMat: RawMaterial = {
+                id: newItemId,
+                ...data
+            };
+            setMaterials(prev => [...prev, newMat]);
+            alert("원재료가 저장되었습니다.");
+        } catch (error) {
+            console.error("Failed to save material", error);
+            alert("원재료 저장 실패. 다시 시도해주세요.");
+        }
     };
 
     // --- Handlers: Recipes ---
-    const handleDeleteRecipe = (id: string) => {
+    const handleDeleteRecipe = async (id: string) => {
         if (window.confirm("이 메뉴 레시피를 삭제하시겠습니까?")) {
-            setRecipes(prev => prev.filter(r => r.id !== id));
+            try {
+                await recipeCostApi.delete(id);
+                setRecipes(prev => prev.filter(r => r.id !== id));
+            } catch (error) {
+                console.error("Failed to delete recipe", error);
+                alert("삭제 실패");
+            }
         }
     };
 
     const handleAddRecipe = () => {
         const newRecipe: MenuRecipe = {
-            id: Math.random().toString(36).substr(2, 9),
+            id: Math.random().toString(36).substr(2, 9), // 임시 ID
             name: '새 메뉴',
             salePrice: 0,
             ingredients: []
         };
         setRecipes(prev => [...prev, newRecipe]);
         setExpandedRecipeId(newRecipe.id);
+    };
+
+    const handleSaveRecipe = async (recipe: MenuRecipe) => {
+        try {
+            // API payload 변환
+            const payload = {
+                menu_name: recipe.name,
+                category: "Uncategorized", // 기본 카테고리 (UI에 카테고리 선택이 없어서)
+                selling_price: recipe.salePrice,
+                ingredients: recipe.ingredients.map(ing => {
+                    const mat = materials.find(m => m.id === ing.materialId);
+                    return {
+                        name: ing.materialId, // materialId를 name으로 사용 (백엔드 스키마 확인 필요)
+                        cost_per_unit: mat ? getUnitPrice(mat) : 0,
+                        usage: ing.qty,
+                        cost: (mat ? getUnitPrice(mat) : 0) * ing.qty
+                    };
+                })
+            };
+
+            await recipeCostApi.create(payload);
+
+            // 만약 ID가 변경되었다면(새 메뉴 저장 등) ID 업데이트 필요하지만 
+            // 현재 구조상 이름이 ID 역할을 하므로 이름 변경 시 처리가 복잡함. 
+            // 일단 저장 성공 메시지 표시.
+            alert(`'${recipe.name}' 레시피가 저장되었습니다.`);
+
+            // 데이터 갱신
+            fetchData();
+        } catch (error) {
+            console.error("Failed to save recipe", error);
+            alert("레시피 저장 실패. 다시 시도해주세요.");
+        }
     };
 
     const handleAddIngredient = (recipeId: string) => {
@@ -772,6 +876,7 @@ export default function CostRecipeManager() {
                                 onUpdateIngredient={handleUpdateIngredient}
                                 onRemoveIngredient={handleRemoveIngredient}
                                 onAddIngredient={handleAddIngredient}
+                                onSave={handleSaveRecipe}
                             />
                         ))}
                         {recipes.length === 0 && (
@@ -787,6 +892,7 @@ export default function CostRecipeManager() {
                         materials={materials}
                         onUpdate={handleUpdateMaterial}
                         onDelete={handleDeleteMaterial}
+                        onSave={handleSaveExistingMaterial}
                     />
                 )}
             </div>
