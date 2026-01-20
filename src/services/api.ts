@@ -241,4 +241,52 @@ export const stockMovesApi = {
   deduct: (request: DeductRequest) => api.post('/stock-moves/deduct', request),
 };
 
+// ==================== Daily Sales API ====================
+
+export interface DailySalesMenuItem {
+  menu: string;
+  quantity: number;
+  sales_amount?: number;
+}
+
+export interface DailySales {
+  date: string;
+  sales_by_menu: DailySalesMenuItem[];
+  total_amount: number;
+}
+
+export interface OCRSalesResponse {
+  success: boolean;
+  date: string;
+  sales_by_menu: DailySalesMenuItem[];
+  warnings: string[];
+  error: string | null;
+}
+
+export const dailySalesApi = {
+  create: (data: { date: string; sales_by_menu: DailySalesMenuItem[] }) =>
+    api.post<DailySales>('/daily-sales', data),
+
+  getAll: () => api.get<DailySales[]>('/daily-sales'),
+
+  getByDate: (date: string) => api.get<DailySales>(`/daily-sales/${date}`),
+
+  addMenu: (date: string, menu: DailySalesMenuItem) =>
+    api.post<DailySales>(`/daily-sales/${date}/menu`, menu),
+
+  deleteMenu: (date: string, menuName: string) =>
+    api.delete<DailySales>(`/daily-sales/${date}/menu/${encodeURIComponent(menuName)}`),
+
+  deleteDate: (date: string) =>
+    api.delete(`/daily-sales/${date}`),
+
+  ocr: (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post<OCRSalesResponse>('/daily-sales/ocr', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+  }
+};
+
 export default api;
