@@ -3,8 +3,9 @@
  * GCP-ERP 스타일 원가 및 레시피 관리 - Migrated from GCP-ERP-web-build-2.0-main
  */
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { ChevronDown, ChevronRight, Plus, Trash2, DollarSign, Calculator, Archive, AlertCircle, ArrowUp, ArrowDown, X } from 'lucide-react';
+import { recipeCostApi, inventoryApi } from '../services/api';
 
 // --- Types for this Module ---
 
@@ -33,9 +34,9 @@ interface MenuRecipe {
 
 // --- Empty Initial Data (사용자가 직접 추가하거나 향후 API 연동) ---
 
-const INITIAL_MATERIALS: RawMaterial[] = [];
-
-const INITIAL_RECIPES: MenuRecipe[] = [];
+// --- Empty Initial Data (사용자가 직접 추가하거나 향후 API 연동) ---
+// const INITIAL_MATERIALS: RawMaterial[] = [];
+// const INITIAL_RECIPES: MenuRecipe[] = [];
 
 
 // --- Helpers ---
@@ -515,8 +516,50 @@ const MaterialTable = ({ materials, onUpdate, onDelete }: MaterialTableProps) =>
 
 export default function CostRecipeManager() {
     const [activeTab, setActiveTab] = useState<'recipe' | 'material'>('recipe');
-    const [materials, setMaterials] = useState<RawMaterial[]>(INITIAL_MATERIALS);
-    const [recipes, setRecipes] = useState<MenuRecipe[]>(INITIAL_RECIPES);
+    const [materials, setMaterials] = useState<RawMaterial[]>([]);
+    const [recipes, setRecipes] = useState<MenuRecipe[]>([]);
+
+    // --- Data Fetching ---
+    useEffect(() => {
+        fetchData();
+    }, []);
+
+    const fetchData = async () => {
+        try {
+            const [recipesRes, inventoryRes] = await Promise.all([
+                recipeCostApi.getAll(),
+                inventoryApi.getAll()
+            ]);
+
+            // Transform InventoryItem to RawMaterial
+            const loadedMaterials: RawMaterial[] = inventoryRes.data.map(item => ({
+                id: item.id,
+                category: item.category,
+                name: item.id, // Using id as name for now based on schema
+                purchasePrice: item.unit_cost * (item.quantity_on_hand > 0 ? 1 : 1), // Approximate
+                purchaseUnitQty: 1, // Default to 1 unit
+                unit: item.uom || 'ea',
+                currentStock: item.quantity_on_hand
+            }));
+            setMaterials(loadedMaterials);
+
+            // Transform RecipeCost to MenuRecipe
+            const loadedRecipes: MenuRecipe[] = recipesRes.data.map(r => ({
+                id: r.menu_name,
+                name: r.menu_name,
+                salePrice: r.selling_price,
+                ingredients: r.ingredients.map((ing, idx) => ({
+                    id: `${r.menu_name}-${idx}`,
+                    materialId: ing.name,
+                    qty: ing.usage
+                }))
+            }));
+            setRecipes(loadedRecipes);
+
+        } catch (error) {
+            console.error("Failed to fetch data", error);
+        }
+    };
 
     const [sortConfig, setSortConfig] = useState<{ key: 'name' | 'cogs'; direction: 'asc' | 'desc' }>({ key: 'name', direction: 'asc' });
     const [expandedRecipeId, setExpandedRecipeId] = useState<string | null>(null);

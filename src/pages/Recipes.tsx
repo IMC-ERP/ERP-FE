@@ -158,17 +158,26 @@ export default function Recipes() {
     recipe.menu_name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // danger 메뉴 추출 (원가율 33% 이상)
-  const dangerRecipes = filteredRecipes.filter(recipe => recipe.status === 'danger');
+  // danger 메뉴 추출 (원가율 33% 이상, 혹은 status가 danger)
+  const dangerRecipes = filteredRecipes.filter(recipe => recipe.status === 'danger' || recipe.cost_ratio >= 33);
 
   // 카테고리별 그룹핑
   const groupedRecipes = filteredRecipes.reduce((acc, recipe) => {
-    if (!acc[recipe.category]) {
-      acc[recipe.category] = [];
+    // 카테고리가 없으면 '기타'로 분류
+    const category = recipe.category || '기타';
+    if (!acc[category]) {
+      acc[category] = [];
     }
-    acc[recipe.category].push(recipe);
+    acc[category].push(recipe);
     return acc;
   }, {} as Record<string, RecipeCost[]>);
+
+  // 레시피 데이터가 로드되거나 검색 결과가 바뀌면 모든 카테고리 펼치기
+  useEffect(() => {
+    if (Object.keys(groupedRecipes).length > 0) {
+      setExpandedCategories(new Set(Object.keys(groupedRecipes)));
+    }
+  }, [recipes, searchQuery]);
 
   // 카테고리 펼침/접기
   const toggleCategory = (category: string) => {
@@ -209,7 +218,9 @@ export default function Recipes() {
   };
 
   // 원가율 색상 클래스
-  const getCostRatioClass = (status: string) => {
+  const getCostRatioClass = (status: string, ratio: number) => {
+    if (ratio >= 33) return 'cost-ratio-danger';
+
     switch (status) {
       case 'safe':
         return 'cost-ratio-safe';
@@ -325,7 +336,7 @@ export default function Recipes() {
                     <p>판매가: {recipe.selling_price.toLocaleString()}원 · 원가: {recipe.total_cost.toLocaleString()}원</p>
                   </div>
                   <div className="menu-card-right">
-                    <div className={`cost-ratio-badge ${getCostRatioClass(recipe.status)}`}>
+                    <div className={`cost-ratio-badge ${getCostRatioClass(recipe.status, recipe.cost_ratio)}`}>
                       원가율 {recipe.cost_ratio.toFixed(1)}%
                     </div>
                     <button
@@ -451,7 +462,7 @@ export default function Recipes() {
                           </div>
                         </div>
                         <div className="menu-card-right">
-                          <div className={`cost-ratio-badge ${getCostRatioClass(recipe.status)}`}>
+                          <div className={`cost-ratio-badge ${getCostRatioClass(recipe.status, recipe.cost_ratio)}`}>
                             원가율 {recipe.cost_ratio.toFixed(1)}%
                           </div>
                           <button
