@@ -3,10 +3,11 @@
  * GCP-ERP 스타일 거래 데이터 관리 - Migrated from GCP-ERP-web-build-2.0-main
  */
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useData } from '../contexts/DataContext';
 import type { SaleItem } from '../types';
-import { FileText, PlusCircle, Search, Filter, RotateCcw, Calendar, Clock, Save, X, AlertTriangle, ArrowRight, Check } from 'lucide-react';
+import { FileText, PlusCircle, Search, Filter, RotateCcw, Calendar, Clock, Save, X, AlertTriangle, ArrowRight, Check, Camera, Upload, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import { dailySalesApi, recipeCostApi, type RecipeCost, type DailySales, type OCRSalesResponse } from '../services/api';
 
 // --- Sub-component: Transaction History ---
 const HistoryView = () => {
@@ -491,8 +492,8 @@ const AddView = () => {
                             key={item.name}
                             onClick={() => handleQuickSelect(item)}
                             className={`p-3 rounded-xl border text-left transition-all ${selectedItem === item.name
-                                    ? "border-blue-500 bg-blue-50 ring-2 ring-blue-200"
-                                    : "border-slate-200 bg-white hover:border-blue-300 hover:shadow-md"
+                                ? "border-blue-500 bg-blue-50 ring-2 ring-blue-200"
+                                : "border-slate-200 bg-white hover:border-blue-300 hover:shadow-md"
                                 }`}
                         >
                             <div className="font-bold text-slate-800 text-xs mb-1 truncate" title={item.name}>{item.name}</div>
@@ -569,9 +570,786 @@ const AddView = () => {
     );
 };
 
+// --- Sub-component: Daily Sales Add View ---
+const DailySalesAddView = () => {
+    const [mode, setMode] = useState<'select' | 'ocr' | 'manual'>('select');
+    const [ocrResult, setOcrResult] = useState<OCRSalesResponse | null>(null);
+    const [isOcrLoading, setIsOcrLoading] = useState(false);
+    const [recipes, setRecipes] = useState<RecipeCost[]>([]);
+    const [date, setDate] = useState<string>(new Date().toISOString().split('T')[0]);
+    const [manualItems, setManualItems] = useState<Array<{ menu: string; quantity: number; selling_price: number }>>([
+        { menu: '', quantity: 1, selling_price: 0 }
+    ]);
+    const [activeMenuIndex, setActiveMenuIndex] = useState<number | null>(null);
+
+    // Load recipes on mount
+    useEffect(() => {
+        recipeCostApi.getAll().then(res => {
+            setRecipes(res.data);
+        }).catch(err => {
+            console.error('레시피 조회 실패:', err);
+        });
+    }, []);
+
+    // 외부 클릭 시 드롭다운 닫기
+    useEffect(() => {
+        const handleClickOutside = () => {
+            setActiveMenuIndex(null);
+        };
+
+        if (activeMenuIndex !== null) {
+            document.addEventListener('mousedown', handleClickOutside);
+            return () => {
+                document.removeEventListener('mousedown', handleClickOutside);
+            };
+        }
+    }, [activeMenuIndex]);
+
+    // Alert 상태
+    const [alertState, setAlertState] = useState<{
+        isOpen: boolean;
+        message: string;
+        type: 'success' | 'error';
+    }>({
+        isOpen: false,
+        message: '',
+        type: 'success'
+    });
+
+    const showAlert = (message: string, type: 'success' | 'error' = 'success') => {
+        setAlertState({ isOpen: true, message, type });
+    };
+
+    const closeAlert = () => {
+        setAlertState(prev => ({ ...prev, isOpen: false }));
+    };
+
+    // OCR 파일 업로드 핸들러
+    const handleOcrFileChange = async (file: File | null) => {
+        if (!file) return;
+        setIsOcrLoading(true);
+
+        try {
+            const response = await dailySalesApi.ocr(file);
+            const data = response.data;
+
+            // success 체크
+            if (!data.success) {
+                // 인식 실패
+                showAlert(`❌ 이미지 인식 실패\n\n${data.error || '알 수 없는 오류가 발생했습니다.'}`, 'error');
+                setOcrResult(null);
+            } else {
+                // 인식 성공
+                const matchedSales = data.sales_by_menu.map(item => {
+                    const matchedRecipe = recipes.find(r => r.menu_name === item.menu);
+                    if (matchedRecipe) {
+                        return {
+                            ...item,
+                            sales_amount: matchedRecipe.selling_price * item.quantity
+                        };
+                    }
+                    // 매칭 실패 시 기존 값(OCR이 준 값, 보통 0) 유지
+                    return item;
+                });
+
+                setOcrResult({ ...data, sales_by_menu: matchedSales });
+
+                if (data.date) {
+                    setDate(data.date);
+                }
+                setMode('ocr'); // 결과 화면으로 전환
+            }
+        } catch (error: any) {
+            // HTTP 오류 (400, 500 등)
+            const errorMessage = error.response?.data?.detail || error.message || '서버 오류가 발생했습니다.';
+            showAlert(`❌ 이미지 업로드 실패\n\n${errorMessage}`, 'error');
+            setOcrResult(null);
+        } finally {
+            setIsOcrLoading(false);
+        }
+    };
+
+    // OCR 결과 수정
+    const handleOcrResultChange = (index: number, field: 'menu' | 'quantity', value: string | number) => {
+        if (!ocrResult) return;
+        const updated = { ...ocrResult };
+        const currentItem = updated.sales_by_menu[index];
+
+        let newMenu = currentItem.menu;
+        let newQuantity = currentItem.quantity;
+
+        if (field === 'menu') newMenu = value as string;
+        if (field === 'quantity') newQuantity = Number(value);
+
+        // 레시피 매칭 및 가격 업데이트
+        const matchedRecipe = recipes.find(r => r.menu_name === newMenu);
+        let newSalesAmount = currentItem.sales_amount || 0;
+
+        if (matchedRecipe) {
+            newSalesAmount = matchedRecipe.selling_price * newQuantity;
+        } else {
+            // 매칭되지 않은 경우, 기존 단가(있다면)를 유지하며 수량에 따라 계산
+            const existingUnitPrice = currentItem.quantity > 0 ? (currentItem.sales_amount || 0) / currentItem.quantity : 0;
+            newSalesAmount = existingUnitPrice * newQuantity;
+        }
+
+        updated.sales_by_menu[index] = {
+            ...currentItem,
+            menu: newMenu,
+            quantity: newQuantity,
+            sales_amount: newSalesAmount
+        };
+        setOcrResult(updated);
+    };
+
+    // OCR 데이터 저장
+    const handleSaveOcrData = async () => {
+        if (!ocrResult) return;
+
+        try {
+            await dailySalesApi.create({
+                date: ocrResult.date,
+                sales_by_menu: ocrResult.sales_by_menu.map(item => ({
+                    menu: item.menu,
+                    quantity: item.quantity
+                }))
+            });
+            showAlert('✅ 매출 데이터가 저장되었습니다!', 'success');
+            setMode('select');
+            setOcrResult(null);
+        } catch (error: any) {
+            showAlert('저장 실패: ' + (error.response?.data?.detail || error.message), 'error');
+        }
+    };
+
+    // 수기 입력 - 메뉴 선택
+    const handleMenuSelect = (index: number, recipe: RecipeCost) => {
+        const updated = [...manualItems];
+        updated[index] = {
+            menu: recipe.menu_name,
+            quantity: updated[index].quantity,
+            selling_price: recipe.selling_price
+        };
+        setManualItems(updated);
+        setActiveMenuIndex(null);
+    };
+
+    // 수기 입력 - 수량 변경
+    const handleQuantityChange = (index: number, value: number) => {
+        const updated = [...manualItems];
+        updated[index].quantity = value;
+        setManualItems(updated);
+    };
+
+    // 행 추가
+    const handleAddRow = () => {
+        setManualItems([...manualItems, { menu: '', quantity: 1, selling_price: 0 }]);
+    };
+
+    // 행 삭제
+    const handleDeleteRow = (index: number) => {
+        if (manualItems.length === 1) {
+            showAlert('최소 1개의 행은 필요합니다.', 'error');
+            return;
+        }
+        setManualItems(manualItems.filter((_, i) => i !== index));
+    };
+
+    // 수기 입력 데이터 저장
+    const handleSaveManualData = async () => {
+        const valid = manualItems.every(item => item.menu && item.quantity > 0);
+        if (!valid) {
+            showAlert('모든 필드를 올바르게 입력해주세요.', 'error');
+            return;
+        }
+
+        try {
+            await dailySalesApi.create({
+                date,
+                sales_by_menu: manualItems.map(item => ({
+                    menu: item.menu,
+                    quantity: item.quantity
+                }))
+            });
+            showAlert('✅ 매출 데이터가 저장되었습니다!', 'success');
+            setMode('select');
+            setManualItems([{ menu: '', quantity: 1, selling_price: 0 }]);
+            setDate(new Date().toISOString().split('T')[0]);
+        } catch (error: any) {
+            showAlert('저장 실패: ' + (error.response?.data?.detail || error.message), 'error');
+        }
+    };
+
+    // 선택 화면
+    const AlertModal = () => (
+        alertState.isOpen ? (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-fade-in">
+                <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 m-4 transform transition-all scale-100">
+                    <div className={`text-lg font-bold mb-4 ${alertState.type === 'error' ? 'text-red-600' : 'text-blue-600'}`}>
+                        {alertState.type === 'error' ? '오류 발생' : '알림'}
+                    </div>
+                    <p className="text-slate-700 mb-6 whitespace-pre-wrap leading-relaxed">
+                        {alertState.message}
+                    </p>
+                    <div className="flex justify-end">
+                        <button
+                            onClick={closeAlert}
+                            className={`px-6 py-2.5 rounded-lg text-white font-bold transition-colors ${alertState.type === 'error'
+                                ? 'bg-red-500 hover:bg-red-600'
+                                : 'bg-blue-600 hover:bg-blue-700'
+                                }`}
+                        >
+                            확인
+                        </button>
+                    </div>
+                </div>
+            </div>
+        ) : null
+    );
+
+    if (mode === 'select') {
+        return (
+            <div className="animate-fade-in">
+                <h3 className="text-lg font-bold text-slate-800 mb-6">매출 데이터 입력 방식을 선택해주세요</h3>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* OCR Scan Card */}
+                    <div className="bg-white p-8 rounded-2xl border border-slate-200 hover:border-blue-500 hover:shadow-xl transition-all group relative overflow-hidden">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-blue-50 rounded-bl-full -mr-10 -mt-10 transition-transform group-hover:scale-110"></div>
+
+                        <div className="relative z-10">
+                            <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                                <Camera size={32} />
+                            </div>
+
+                            <h4 className="text-xl font-bold text-slate-800 mb-2">영수증 사진 스캔</h4>
+                            <p className="text-slate-500 mb-8">
+                                판매 영수증을 촬영하거나 업로드하여<br />
+                                자동으로 매출 목록을 생성합니다.
+                            </p>
+
+                            <div className="relative">
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={(e) => handleOcrFileChange(e.target.files?.[0] || null)}
+                                    className="hidden"
+                                    id="ocr-upload"
+                                />
+                                <label
+                                    htmlFor="ocr-upload"
+                                    className="block w-full py-3 bg-blue-600 text-white font-bold text-center rounded-xl hover:bg-blue-700 cursor-pointer transition-colors shadow-lg shadow-blue-200"
+                                >
+                                    스캔 시작하기
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Manual Entry Card */}
+                    <div className="bg-white p-8 rounded-2xl border border-slate-200 hover:border-green-500 hover:shadow-xl transition-all group relative overflow-hidden">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-green-50 rounded-bl-full -mr-10 -mt-10 transition-transform group-hover:scale-110"></div>
+
+                        <div className="relative z-10">
+                            <div className="w-16 h-16 bg-green-100 text-green-600 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                                <PlusCircle size={32} />
+                            </div>
+
+                            <h4 className="text-xl font-bold text-slate-800 mb-2">수기 직접 입력</h4>
+                            <p className="text-slate-500 mb-8">
+                                상품명, 수량, 판매 금액을<br />
+                                직접 입력하여 매출을 등록합니다.
+                            </p>
+
+                            <button
+                                onClick={() => setMode('manual')}
+                                className="w-full py-3 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 transition-colors shadow-lg shadow-green-200"
+                            >
+                                직접 입력하기
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <AlertModal />
+            </div>
+        );
+    }
+
+    // OCR 모드
+    if (mode === 'ocr') {
+        return (
+            <div className="max-w-4xl mx-auto space-y-6 animate-fade-in">
+                <div className="flex items-center justify-between">
+                    <h3 className="text-xl font-bold text-slate-800">매출 영수증 업로드</h3>
+                    <button
+                        onClick={() => {
+                            setMode('select');
+                            setOcrResult(null);
+                        }}
+                        className="text-slate-500 hover:text-slate-700"
+                    >
+                        <X size={24} />
+                    </button>
+                </div>
+
+                {!ocrResult && (
+                    <div className="bg-white p-8 rounded-2xl border-2 border-dashed border-slate-300 hover:border-blue-400 transition-colors">
+                        <div className="flex flex-col items-center text-center space-y-4">
+                            <Upload className="text-slate-400" size={48} />
+                            <p className="text-sm text-slate-500">
+                                사진을 이곳에 끌어다 놓거나 클릭하세요
+                            </p>
+                            <input
+                                type="file"
+                                accept="image/jpeg,image/png"
+                                onChange={(e) => handleOcrFileChange(e.target.files?.[0] || null)}
+                                className="hidden"
+                                id="ocr-file-input"
+                            />
+                            <label
+                                htmlFor="ocr-file-input"
+                                className="px-6 py-3 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 cursor-pointer transition-colors"
+                            >
+                                파일 선택
+                            </label>
+                        </div>
+                    </div>
+                )}
+
+                {isOcrLoading && (
+                    <div className="text-center py-12">
+                        <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                        <p className="text-slate-600">이미지 인식 중...</p>
+                    </div>
+                )}
+
+                {ocrResult && !isOcrLoading && (
+                    <div className="bg-white p-6 rounded-2xl border border-slate-200 space-y-4">
+                        {ocrResult.warnings.length > 0 && (
+                            <div className="bg-amber-50 border border-amber-200 p-4 rounded-lg">
+                                <p className="text-sm font-bold text-amber-800 mb-2">⚠️ 경고</p>
+                                {ocrResult.warnings.map((warning, i) => (
+                                    <p key={i} className="text-xs text-amber-700">{warning}</p>
+                                ))}
+                            </div>
+                        )}
+
+                        <div>
+                            <label className="block text-sm font-bold text-slate-700 mb-2">날짜</label>
+                            <input
+                                type="date"
+                                value={date}
+                                onChange={(e) => setDate(e.target.value)}
+                                className="w-full p-3 border border-slate-300 rounded-lg"
+                            />
+                        </div>
+
+                        <table className="w-full text-sm">
+                            <thead className="bg-slate-50">
+                                <tr>
+                                    <th className="p-3 text-left">상품명</th>
+                                    <th className="p-3 text-right">수량</th>
+                                    <th className="p-3 text-right">판매 단가</th>
+                                    <th className="p-3 text-right">합계</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {ocrResult.sales_by_menu.map((item, index) => (
+                                    <tr key={index} className="border-t border-slate-100">
+                                        <td className="p-3">
+                                            <input
+                                                type="text"
+                                                value={item.menu}
+                                                onChange={(e) => handleOcrResultChange(index, 'menu', e.target.value)}
+                                                className="w-full p-2 border border-slate-200 rounded"
+                                            />
+                                        </td>
+                                        <td className="p-3">
+                                            <input
+                                                type="number"
+                                                value={item.quantity}
+                                                onChange={(e) => handleOcrResultChange(index, 'quantity', e.target.value)}
+                                                className="w-full p-2 border border-slate-200 rounded text-right"
+                                            />
+                                        </td>
+                                        <td className="p-3 text-right text-blue-600 font-mono">
+                                            {item.sales_amount ? (item.sales_amount / item.quantity).toLocaleString() : '0'}원
+                                        </td>
+                                        <td className="p-3 text-right font-bold text-slate-800">
+                                            {item.sales_amount?.toLocaleString() || '0'}원
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+
+                        <button
+                            onClick={handleSaveOcrData}
+                            className="w-full py-4 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 transition-colors shadow-lg flex items-center justify-center gap-2"
+                        >
+                            <Check size={20} />
+                            최종 거래 데이터 등록
+                        </button>
+                    </div>
+                )}
+                <AlertModal />
+            </div>
+        );
+    }
+
+    // 수기 입력 모드
+    if (mode === 'manual') {
+        return (
+            <div className="max-w-4xl mx-auto space-y-6 animate-fade-in">
+                <div className="flex items-center justify-between">
+                    <h3 className="text-xl font-bold text-slate-800">매출 데이터 입력</h3>
+                    <button
+                        onClick={() => {
+                            setMode('select');
+                            setManualItems([{ menu: '', quantity: 1, selling_price: 0 }]);
+                        }}
+                        className="text-slate-500 hover:text-slate-700"
+                    >
+                        <X size={24} />
+                    </button>
+                </div>
+
+                <div className="bg-green-50 border border-green-200 p-4 rounded-lg text-sm text-green-800">
+                    항목을 확인하고 각 항목을 올바르게 입력해주세요.
+                </div>
+
+                <div className="bg-white p-6 rounded-2xl border border-slate-200 space-y-4">
+                    <div>
+                        <label className="block text-sm font-bold text-slate-700 mb-2">판매 날짜</label>
+                        <input
+                            type="date"
+                            value={date}
+                            onChange={(e) => setDate(e.target.value)}
+                            className="w-full p-3 border border-slate-300 rounded-lg"
+                        />
+                    </div>
+
+                    <div className="space-y-3">
+                        <div className="grid grid-cols-12 gap-3 text-sm font-bold text-slate-500 px-3">
+                            <div className="col-span-4">상품명</div>
+                            <div className="col-span-2 text-right">수량</div>
+                            <div className="col-span-2 text-right">판매 단가</div>
+                            <div className="col-span-3 text-right">합계</div>
+                            <div className="col-span-1"></div>
+                        </div>
+
+                        {manualItems.map((item, index) => {
+                            const filteredRecipes = recipes.filter(r =>
+                                r.menu_name.toLowerCase().includes(item.menu.toLowerCase())
+                            );
+                            const showDropdown = activeMenuIndex === index &&
+                                (item.menu.length === 0 || filteredRecipes.length > 0);
+
+                            return (
+                                <div key={index} className="relative">
+                                    <div className="grid grid-cols-12 gap-3 items-center bg-slate-50 p-3 rounded-lg">
+                                        <div className="col-span-4 relative">
+                                            <input
+                                                type="text"
+                                                value={item.menu}
+                                                onChange={(e) => {
+                                                    const updated = [...manualItems];
+                                                    updated[index].menu = e.target.value;
+                                                    setManualItems(updated);
+                                                }}
+                                                onFocus={() => setActiveMenuIndex(index)}
+                                                onMouseDown={(e) => e.stopPropagation()}
+                                                placeholder="메뉴 선택"
+                                                className="w-full p-2 border border-slate-300 rounded"
+                                            />
+                                            {showDropdown && (
+                                                <div
+                                                    className="absolute z-10 w-full mt-1 bg-white border border-slate-300 rounded-lg shadow-lg max-h-48 overflow-y-auto"
+                                                    onMouseDown={(e) => e.stopPropagation()}
+                                                >
+                                                    {(item.menu.length === 0 ? recipes : filteredRecipes).map((recipe) => (
+                                                        <button
+                                                            key={recipe.menu_name}
+                                                            type="button"
+                                                            onClick={() => handleMenuSelect(index, recipe)}
+                                                            className="w-full text-left px-3 py-2 hover:bg-blue-50 text-sm"
+                                                        >
+                                                            {recipe.menu_name}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="col-span-2">
+                                            <input
+                                                type="number"
+                                                min="1"
+                                                value={item.quantity}
+                                                onChange={(e) => handleQuantityChange(index, parseInt(e.target.value) || 1)}
+                                                className="w-full p-2 border border-slate-300 rounded text-right"
+                                            />
+                                        </div>
+                                        <div className="col-span-2 text-right text-blue-600 font-mono text-sm">
+                                            {item.selling_price.toLocaleString()}원
+                                        </div>
+                                        <div className="col-span-3 text-right font-bold text-slate-800">
+                                            {(item.selling_price * item.quantity).toLocaleString()}원
+                                        </div>
+                                        <div className="col-span-1 flex justify-end">
+                                            <button
+                                                onClick={() => handleDeleteRow(index)}
+                                                className="text-red-500 hover:text-red-700"
+                                            >
+                                                <Trash2 size={18} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+
+                        <button
+                            onClick={handleAddRow}
+                            className="w-full py-3 border-2 border-dashed border-slate-300 rounded-lg text-slate-500 hover:border-blue-400 hover:text-blue-600 transition-colors font-medium"
+                        >
+                            + 행 추가하기
+                        </button>
+                    </div>
+
+                    <button
+                        onClick={handleSaveManualData}
+                        className="w-full py-4 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 transition-colors shadow-lg flex items-center justify-center gap-2"
+                    >
+                        <Check size={20} />
+                        최종 거래 데이터 등록
+                    </button>
+                </div>
+                <AlertModal />
+            </div>
+        );
+    }
+
+    return null;
+};
+
+// --- Sub-component: Daily Sales List View ---
+const DailySalesListView = () => {
+    const [salesData, setSalesData] = useState<DailySales[]>([]);
+    const [expandedDates, setExpandedDates] = useState<Set<string>>(new Set());
+    const [isLoading, setIsLoading] = useState(true);
+
+    // Alert & Confirm 상태
+    const [alertState, setAlertState] = useState<{
+        isOpen: boolean;
+        message: string;
+        type: 'success' | 'error' | 'confirm';
+        onConfirm?: () => void;
+    }>({
+        isOpen: false,
+        message: '',
+        type: 'success'
+    });
+
+    const showAlert = (message: string, type: 'success' | 'error' = 'success') => {
+        setAlertState({ isOpen: true, message, type });
+    };
+
+    const showConfirm = (message: string, onConfirm: () => void) => {
+        setAlertState({ isOpen: true, message, type: 'confirm', onConfirm });
+    };
+
+    const closeAlert = () => {
+        setAlertState(prev => ({ ...prev, isOpen: false, onConfirm: undefined }));
+    };
+
+    const AlertModal = () => (
+        alertState.isOpen ? (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-fade-in">
+                <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 m-4 transform transition-all scale-100">
+                    <div className={`text-lg font-bold mb-4 ${alertState.type === 'error' ? 'text-red-600' :
+                        alertState.type === 'confirm' ? 'text-blue-600' : 'text-blue-600'
+                        }`}>
+                        {alertState.type === 'error' ? '오류 발생' :
+                            alertState.type === 'confirm' ? '확인 필요' : '알림'}
+                    </div>
+                    <p className="text-slate-700 mb-6 whitespace-pre-wrap leading-relaxed">
+                        {alertState.message}
+                    </p>
+                    <div className="flex justify-end gap-3">
+                        {alertState.type === 'confirm' && (
+                            <button
+                                onClick={closeAlert}
+                                className="px-6 py-2.5 rounded-lg text-slate-600 font-bold hover:bg-slate-100 transition-colors"
+                            >
+                                취소
+                            </button>
+                        )}
+                        <button
+                            onClick={() => {
+                                if (alertState.type === 'confirm' && alertState.onConfirm) {
+                                    alertState.onConfirm();
+                                }
+                                closeAlert();
+                            }}
+                            className={`px-6 py-2.5 rounded-lg text-white font-bold transition-colors ${alertState.type === 'error' ? 'bg-red-500 hover:bg-red-600' :
+                                'bg-blue-600 hover:bg-blue-700'
+                                }`}
+                        >
+                            {alertState.type === 'confirm' ? '확인' : '확인'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        ) : null
+    );
+
+    const loadData = async () => {
+        setIsLoading(true);
+        try {
+            const response = await dailySalesApi.getAll();
+            setSalesData(response.data);
+        } catch (error: any) {
+            console.error('매출 데이터 조회 실패:', error);
+            showAlert('데이터 조회 실패: ' + (error.response?.data?.detail || error.message), 'error');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        loadData();
+    }, []);
+
+    const toggleExpand = (date: string) => {
+        const newExpanded = new Set(expandedDates);
+        if (newExpanded.has(date)) {
+            newExpanded.delete(date);
+        } else {
+            newExpanded.add(date);
+        }
+        setExpandedDates(newExpanded);
+    };
+
+    const handleDeleteMenu = (date: string, menuName: string) => {
+        showConfirm(`"${menuName}"를 삭제하시겠습니까?`, async () => {
+            try {
+                await dailySalesApi.deleteMenu(date, menuName);
+                showAlert('✅ 삭제되었습니다.', 'success');
+                loadData();
+            } catch (error: any) {
+                showAlert('삭제 실패: ' + (error.response?.data?.detail || error.message), 'error');
+            }
+        });
+    };
+
+    const handleDeleteDate = (date: string) => {
+        showConfirm(`${date}의 모든 매출 데이터를 삭제하시겠습니까?`, async () => {
+            try {
+                await dailySalesApi.deleteDate(date);
+                showAlert('✅ 삭제되었습니다.', 'success');
+                loadData();
+            } catch (error: any) {
+                showAlert('삭제 실패: ' + (error.response?.data?.detail || error.message), 'error');
+            }
+        });
+    };
+
+
+    if (isLoading) {
+        return (
+            <div className="text-center py-12">
+                <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                <p className="text-slate-600">데이터 로딩 중...</p>
+            </div>
+        );
+    }
+
+    if (salesData.length === 0) {
+        return (
+            <div className="text-center py-12 bg-white rounded-xl border border-slate-200">
+                <p className="text-slate-500">등록된 일일 매출 데이터가 없습니다.</p>
+                <AlertModal />
+            </div>
+        );
+    }
+
+    return (
+        <div className="space-y-4 animate-fade-in">
+            {salesData.map((data) => {
+                const isExpanded = expandedDates.has(data.date);
+                return (
+                    <div key={data.date} className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+                        <div
+                            className="p-5 flex items-center justify-between cursor-pointer hover:bg-slate-50 transition-colors"
+                            onClick={() => toggleExpand(data.date)}
+                        >
+                            <div className="flex items-center gap-4">
+                                <div>
+                                    <h3 className="text-lg font-bold text-slate-800">{data.date}</h3>
+                                    <p className="text-sm text-slate-500">총 {data.sales_by_menu.length}개 메뉴</p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-4">
+                                <div className="text-right">
+                                    <p className="text-sm text-slate-500">일일 총 매출</p>
+                                    <p className="text-xl font-bold text-blue-600">{data.total_amount.toLocaleString()}원</p>
+                                </div>
+                                {isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                            </div>
+                        </div>
+
+                        {isExpanded && (
+                            <div className="border-t border-slate-200">
+                                <table className="w-full text-sm">
+                                    <thead className="bg-slate-50">
+                                        <tr>
+                                            <th className="p-3 text-left">메뉴</th>
+                                            <th className="p-3 text-right">수량</th>
+                                            <th className="p-3 text-right">판매 금액</th>
+                                            <th className="p-3 text-center">작업</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {data.sales_by_menu.map((item, index) => (
+                                            <tr key={index} className="border-t border-slate-100">
+                                                <td className="p-3 font-medium text-slate-800">{item.menu}</td>
+                                                <td className="p-3 text-right font-mono">{item.quantity}</td>
+                                                <td className="p-3 text-right font-mono text-blue-600">
+                                                    {item.sales_amount?.toLocaleString()}원
+                                                </td>
+                                                <td className="p-3 text-center">
+                                                    <button
+                                                        onClick={() => handleDeleteMenu(data.date, item.menu)}
+                                                        className="text-red-500 hover:text-red-700"
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                                <div className="p-4 bg-slate-50 flex justify-end gap-3">
+                                    <button
+                                        onClick={() => handleDeleteDate(data.date)}
+                                        className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm font-medium"
+                                    >
+                                        전체 삭제
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                );
+            })}
+            <AlertModal />
+        </div>
+    );
+};
+
 // --- Main Container ---
 export default function TransactionManager() {
-    const [activeTab, setActiveTab] = useState("history");
+    const [activeTab, setActiveTab] = useState("dailySalesAdd");
 
     return (
         <div className="space-y-6 animate-fade-in">
@@ -585,10 +1363,30 @@ export default function TransactionManager() {
             {/* Tabs */}
             <div className="flex gap-2 border-b border-slate-200 overflow-x-auto pb-1">
                 <button
+                    onClick={() => setActiveTab("dailySalesAdd")}
+                    className={`flex items-center gap-2 px-6 py-3 text-sm font-bold rounded-t-lg transition-colors whitespace-nowrap ${activeTab === "dailySalesAdd"
+                        ? "bg-white text-blue-600 border-b-2 border-blue-600"
+                        : "text-slate-500 hover:text-slate-800 hover:bg-slate-50"
+                        }`}
+                >
+                    <PlusCircle size={16} />
+                    일일 매출 추가(임시)
+                </button>
+                <button
+                    onClick={() => setActiveTab("dailySalesList")}
+                    className={`flex items-center gap-2 px-6 py-3 text-sm font-bold rounded-t-lg transition-colors whitespace-nowrap ${activeTab === "dailySalesList"
+                        ? "bg-white text-blue-600 border-b-2 border-blue-600"
+                        : "text-slate-500 hover:text-slate-800 hover:bg-slate-50"
+                        }`}
+                >
+                    <FileText size={16} />
+                    일일 매출(임시)
+                </button>
+                <button
                     onClick={() => setActiveTab("history")}
                     className={`flex items-center gap-2 px-6 py-3 text-sm font-bold rounded-t-lg transition-colors whitespace-nowrap ${activeTab === "history"
-                            ? "bg-white text-blue-600 border-b-2 border-blue-600"
-                            : "text-slate-500 hover:text-slate-800 hover:bg-slate-50"
+                        ? "bg-white text-blue-600 border-b-2 border-blue-600"
+                        : "text-slate-500 hover:text-slate-800 hover:bg-slate-50"
                         }`}
                 >
                     <FileText size={16} />
@@ -597,8 +1395,8 @@ export default function TransactionManager() {
                 <button
                     onClick={() => setActiveTab("add")}
                     className={`flex items-center gap-2 px-6 py-3 text-sm font-bold rounded-t-lg transition-colors whitespace-nowrap ${activeTab === "add"
-                            ? "bg-white text-blue-600 border-b-2 border-blue-600"
-                            : "text-slate-500 hover:text-slate-800 hover:bg-slate-50"
+                        ? "bg-white text-blue-600 border-b-2 border-blue-600"
+                        : "text-slate-500 hover:text-slate-800 hover:bg-slate-50"
                         }`}
                 >
                     <PlusCircle size={16} />
@@ -607,6 +1405,8 @@ export default function TransactionManager() {
             </div>
 
             <div className="mt-4">
+                {activeTab === "dailySalesAdd" && <DailySalesAddView />}
+                {activeTab === "dailySalesList" && <DailySalesListView />}
                 {activeTab === "history" && <HistoryView />}
                 {activeTab === "add" && <AddView />}
             </div>

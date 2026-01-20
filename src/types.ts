@@ -62,3 +62,25 @@ export interface AppSettings {
         marketing: boolean;
     };
 }
+
+// --- Daily Sales Types ---
+
+export interface DailySalesMenuItem {
+    menu: string;
+    quantity: number;
+    sales_amount?: number; // 백엔드에서 자동 계산
+}
+
+export interface DailySales {
+    date: string; // YYYY-MM-DD 형식
+    sales_by_menu: DailySalesMenuItem[];
+    total_amount: number;
+}
+
+export interface OCRSalesResponse {
+    success: boolean;
+    date: string;
+    sales_by_menu: DailySalesMenuItem[];
+    warnings: string[];
+    error: string | null;
+}
