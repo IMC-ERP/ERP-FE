@@ -16,9 +16,11 @@ import {
   ChefHat,
   Settings,
   HelpCircle,
-  X
+  X,
+  LogOut
 } from 'lucide-react';
 import { useData } from '../../contexts/DataContext';
+import { useAuth } from '../../contexts/AuthContext';
 
 // Lazy load AIAssistant to avoid circular dependency
 const AIAssistant = lazy(() => import('../../pages/AIAssistant'));
@@ -34,8 +36,8 @@ const NavItem = ({ to, icon: Icon, label, active }: NavItemProps) => (
   <Link
     to={to}
     className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors duration-200 ${active
-        ? "bg-blue-100 text-blue-700 font-semibold"
-        : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+      ? "bg-blue-100 text-blue-700 font-semibold"
+      : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
       }`}
   >
     <Icon size={20} />
@@ -47,6 +49,15 @@ export default function Layout() {
   const location = useLocation();
   const [isAIDrawerOpen, setIsAIDrawerOpen] = useState(false);
   const { storeProfile } = useData();
+  const { user, logout } = useAuth();
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch (error) {
+      console.error('로그아웃 실패:', error);
+    }
+  };
 
   return (
     <div className="flex min-h-screen bg-slate-50 relative overflow-x-hidden">
@@ -82,6 +93,41 @@ export default function Layout() {
           <NavItem to="/help" icon={HelpCircle} label="도움말" active={location.pathname === '/help'} />
           <NavItem to="/settings" icon={Settings} label="설정" active={location.pathname === '/settings'} />
         </div>
+
+        {/* User Profile & Logout */}
+        {user && (
+          <div className="p-4 border-t border-slate-200 bg-slate-50">
+            <div className="flex items-center gap-3 mb-3">
+              {user.photoURL ? (
+                <img
+                  src={user.photoURL}
+                  alt="Profile"
+                  className="w-8 h-8 rounded-full border border-slate-200"
+                />
+              ) : (
+                <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center text-amber-700 font-bold text-sm">
+                  {user.email?.charAt(0).toUpperCase()}
+                </div>
+              )}
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-slate-700 truncate">
+                  {user.displayName || '사용자'}
+                </p>
+                <p className="text-xs text-slate-400 truncate">
+                  {user.email}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={handleLogout}
+              className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-slate-600 
+                         hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors duration-200"
+            >
+              <LogOut size={16} />
+              <span>로그아웃</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Main Content Wrapper - Pushes content when drawer is open */}

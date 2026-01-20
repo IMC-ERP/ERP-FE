@@ -1,9 +1,11 @@
 /**
  * API Service
  * FastAPI 백엔드와 통신하는 axios 클라이언트
+ * Firebase 인증 토큰 자동 첨부
  */
 
 import axios from 'axios';
+import { auth } from '../firebase';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://coffee-erp-backend-427178764915.asia-northeast3.run.app/api';
 
@@ -12,6 +14,22 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+});
+
+// Firebase ID Token 자동 첨부 인터셉터
+api.interceptors.request.use(async (config) => {
+  const user = auth.currentUser;
+  if (user) {
+    try {
+      const token = await user.getIdToken();
+      config.headers.Authorization = `Bearer ${token}`;
+    } catch (error) {
+      console.error('Failed to get Firebase token:', error);
+    }
+  }
+  return config;
+}, (error) => {
+  return Promise.reject(error);
 });
 
 // ==================== Types ====================

@@ -1,11 +1,14 @@
 /**
  * App.tsx - Main Application with React Router
- * GCP-ERP 스타일 적용
+ * GCP-ERP 스타일 적용 + Google 로그인
  */
 
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { DataProvider } from './contexts/DataContext';
+import { AuthProvider } from './contexts/AuthContext';
 import Layout from './components/Layout/Layout';
+import ProtectedRoute from './components/ProtectedRoute';
+import LoginPage from './pages/LoginPage';
 import Dashboard from './pages/Dashboard';
 import Sales from './pages/Sales';
 import Inventory from './pages/Inventory';
@@ -62,25 +65,35 @@ const HelpPage = () => (
 
 function App() {
   return (
-    <DataProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Layout />}>
-            <Route index element={<HomePage />} />
-            <Route path="dashboard" element={<Dashboard />} />
-            <Route path="period" element={<PeriodAnalysis />} />
-            <Route path="transactions" element={<TransactionManager />} />
-            <Route path="sales" element={<Sales />} />
-            <Route path="inventory" element={<Inventory />} />
-            <Route path="cost-recipe" element={<CostRecipeManager />} />
-            <Route path="recipes" element={<Recipes />} />
-            <Route path="help" element={<HelpPage />} />
-            <Route path="settings" element={<SettingsPage />} />
-            <Route path="ai" element={<AIAssistant />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
-    </DataProvider>
+    <AuthProvider>
+      <DataProvider>
+        <BrowserRouter>
+          <Routes>
+            {/* 로그인 페이지 (보호 안 함) */}
+            <Route path="/login" element={<LoginPage />} />
+
+            {/* 보호된 라우트들 */}
+            <Route path="/" element={
+              <ProtectedRoute>
+                <Layout />
+              </ProtectedRoute>
+            }>
+              <Route index element={<HomePage />} />
+              <Route path="dashboard" element={<Dashboard />} />
+              <Route path="period" element={<PeriodAnalysis />} />
+              <Route path="transactions" element={<TransactionManager />} />
+              <Route path="sales" element={<Sales />} />
+              <Route path="inventory" element={<Inventory />} />
+              <Route path="cost-recipe" element={<CostRecipeManager />} />
+              <Route path="recipes" element={<Recipes />} />
+              <Route path="help" element={<HelpPage />} />
+              <Route path="settings" element={<SettingsPage />} />
+              <Route path="ai" element={<AIAssistant />} />
+            </Route>
+          </Routes>
+        </BrowserRouter>
+      </DataProvider>
+    </AuthProvider>
   );
 }
 
