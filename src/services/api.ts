@@ -18,6 +18,9 @@ const api = axios.create({
 
 // Firebase ID Token 자동 첨부 인터셉터
 api.interceptors.request.use(async (config) => {
+  // Firebase Auth 초기화 대기 (새로고침 시 race condition 방지)
+  await auth.authStateReady();
+
   const user = auth.currentUser;
   if (user) {
     try {
