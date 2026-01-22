@@ -822,9 +822,9 @@ const DailySalesAddView = () => {
                                 <Camera size={32} />
                             </div>
 
-                            <h4 className="text-xl font-bold text-slate-800 mb-2">영수증 사진 스캔</h4>
-                            <p className="text-slate-500 mb-8">
-                                판매 영수증을 촬영하거나 업로드하여<br />
+                            <h4 className="text-xl font-bold text-slate-800 mb-2">메뉴별 매출 사진 스캔</h4>
+                            <p className="text-slate-500 mb-6 leading-relaxed">
+                                메뉴별 매출 사진을 촬영하거나 업로드하여<br />
                                 자동으로 매출 목록을 생성합니다.
                             </p>
 
