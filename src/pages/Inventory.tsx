@@ -5,10 +5,10 @@
 
 import { useEffect, useState } from 'react';
 import { RefreshCw, ChevronDown, ChevronUp, Plus, X, Trash2 } from 'lucide-react';
-import { inventoryApi, stockIntakeApi, ocrApi, type InventoryItem, type StockIntake, type OCRReceiptData } from '../services/api';
+import { inventoryApi, stockIntakeApi, ocrApi, type InventoryItem, type StockIntake, type OCRReceiptData, type StockIntakeRecord } from '../services/api';
 import './Inventory.css';
 
-type TabType = 'overview' | 'pricing' | 'receiving' | 'forecast';
+type TabType = 'overview' | 'pricing' | 'receiving' | 'forecast' | 'history';
 
 // Define IntakeItem interface based on the instruction's provided structure
 interface IntakeItem {
@@ -19,6 +19,7 @@ interface IntakeItem {
   quantity: number;
   price_per_unit: number;
   total_amount: number;
+  uom: string; // 단위 (g, ml, kg, L 등)
 }
 
 export default function Inventory() {
@@ -34,7 +35,7 @@ export default function Inventory() {
     id: '',
     category: '',
     quantity_on_hand: 0,
-    uom: 'g',
+    uom: 'g' as 'g' | 'kg' | 'ml' | 'L' | 'ea',
     safety_stock: 0,
     max_stock_level: 0,
     unit_cost: 0,
@@ -51,6 +52,7 @@ export default function Inventory() {
     quantity: 0,
     price_per_unit: 0,
     total_amount: 0,
+    uom: 'g', // 기본 단위
   }]);
   const [intakeMessage, setIntakeMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -61,6 +63,11 @@ export default function Inventory() {
   const [isOCRProcessing, setIsOCRProcessing] = useState(false);
   const [ocrError, setOcrError] = useState<{ message: string; suggestion: string } | null>(null);
   const [isDragging, setIsDragging] = useState(false); // 드래그 상태
+
+  // 재고 입고 기록 관련 상태
+  const [intakeHistory, setIntakeHistory] = useState<StockIntakeRecord[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [historyMessage, setHistoryMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const fetchInventory = async () => {
     try {
@@ -158,6 +165,7 @@ export default function Inventory() {
       quantity: 0,
       price_per_unit: 0,
       total_amount: 0,
+      uom: 'g', // 기본 단위
     }]);
     setIntakeMessage(null);
     setUploadedImages([]);
@@ -251,13 +259,17 @@ export default function Inventory() {
       if (files.length === 1) {
         // 단일 이미지 OCR
         const response = await ocrApi.analyzeSingleReceipt(files[0]);
-        ocrResults = [response.data];
+        if (response.data.success) {
+          ocrResults = response.data.items;
+        } else {
+          throw new Error(response.data.error || 'Unknown error');
+        }
       } else {
         // 다중 이미지 OCR
         const results = await Promise.all(
           files.map(file => ocrApi.analyzeMultipleReceipts(file))
         );
-        ocrResults = results.flatMap(res => res.data);
+        ocrResults = results.flatMap(res => res.data.items);
       }
 
       // OCR 결과를 IntakeItem 형식으로 변환
@@ -269,6 +281,7 @@ export default function Inventory() {
         quantity: item.quantity,
         price_per_unit: item.price_per_unit,
         total_amount: item.total_amount,
+        uom: item.uom || 'g', // OCR에서 추출한 단위 사용, 없으면 g 기본값
       }));
 
       setIntakeItems(newIntakeItems);
@@ -320,6 +333,7 @@ export default function Inventory() {
       quantity: 0,
       price_per_unit: 0,
       total_amount: 0,
+      uom: 'g', // 기본 단위
     }]);
   };
 
@@ -342,6 +356,15 @@ export default function Inventory() {
           updated.name = '';
         }
 
+        // 품목 이름이 변경되면 해당 inventory의 category와 uom 가져오기
+        if (field === 'name' && value) {
+          const selectedInventory = inventory.find(inv => inv.id === value);
+          if (selectedInventory) {
+            updated.category = selectedInventory.category; // 카테고리 자동 설정
+            updated.uom = selectedInventory.uom;
+          }
+        }
+
         return updated;
       }
       return item;
@@ -353,11 +376,11 @@ export default function Inventory() {
 
     // 유효성 검사
     const invalidItems = intakeItems.filter(item =>
-      !item.category || !item.name || item.quantity <= 0 || item.price_per_unit <= 0 || item.volume <= 0
+      !item.category || !item.name || item.quantity <= 0 || item.price_per_unit <= 0 || item.volume <= 0 || !item.uom
     );
 
     if (invalidItems.length > 0) {
-      setIntakeMessage({ type: 'error', text: '모든 품목의 정보를 올바르게 입력해주세요.' });
+      setIntakeMessage({ type: 'error', text: '모든 품목의 정보를 올바르게 입력해주세요. (카테고리, 품목, 용량, 수량, 단가, 단위 필수)' });
       return;
     }
 
@@ -371,6 +394,7 @@ export default function Inventory() {
             quantity: item.quantity,
             total_amount: item.total_amount,
             volume: item.volume,
+            uom: item.uom, // uom 필드 추가 (수동 입력 데이터나 OCR 데이터 포함)
           };
           return stockIntakeApi.create(intakeData);
         })
@@ -490,46 +514,48 @@ export default function Inventory() {
       {/* 전체 품목 리스트 */}
       <section className="category-list">
         <h3 className="section-title">전체 품목 리스트</h3>
-        {Object.entries(groupedByCategory).map(([category, items]) => {
-          const isExpanded = expandedCategories.has(category);
-          const categoryColor = getCategoryColor(category);
+        {Object.entries(groupedByCategory)
+          .sort(([catA], [catB]) => catA.localeCompare(catB, 'ko-KR'))
+          .map(([category, items]) => {
+            const isExpanded = expandedCategories.has(category);
+            const categoryColor = getCategoryColor(category);
 
-          return (
-            <div key={category} className="category-group">
-              <div
-                className="category-header"
-                onClick={() => toggleCategory(category)}
-              >
-                <div className="category-info">
-                  <span
-                    className="category-icon"
-                    style={{ backgroundColor: categoryColor }}
-                  >
-                    {category.charAt(0)}
-                  </span>
-                  <span className="category-name">{category}</span>
-                  <span className="category-count">
-                    {items.length}개 품목 등록 중
-                  </span>
-                </div>
-                <div className="category-badge-group">
-                  <span className="category-items-badge">
-                    부족 {items.filter(i => i.needs_reorder).length}
-                  </span>
-                  {isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
-                </div>
-              </div>
-
-              {isExpanded && (
-                <div className="category-content">
-                  <div className="inventory-grid">
-                    {items.map(renderInventoryCard)}
+            return (
+              <div key={category} className="category-group">
+                <div
+                  className="category-header"
+                  onClick={() => toggleCategory(category)}
+                >
+                  <div className="category-info">
+                    <span
+                      className="category-icon"
+                      style={{ backgroundColor: categoryColor }}
+                    >
+                      {category.charAt(0)}
+                    </span>
+                    <span className="category-name">{category}</span>
+                    <span className="category-count">
+                      {items.length}개 품목 등록 중
+                    </span>
+                  </div>
+                  <div className="category-badge-group">
+                    <span className="category-items-badge">
+                      부족 {items.filter(i => i.needs_reorder).length}
+                    </span>
+                    {isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
                   </div>
                 </div>
-              )}
-            </div>
-          );
-        })}
+
+                {isExpanded && (
+                  <div className="category-content">
+                    <div className="inventory-grid">
+                      {items.map(renderInventoryCard)}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
       </section>
     </div>
   );
@@ -644,7 +670,8 @@ export default function Inventory() {
                   <th>No.</th>
                   <th>카테고리</th>
                   <th>품목 이름</th>
-                  <th>개당 용량 (g)</th>
+                  <th>개당 용량</th>
+                  <th>단위</th>
                   <th>구매 수량</th>
                   <th>구매 단가 (원)</th>
                   <th>총액 (원)</th>
@@ -653,10 +680,6 @@ export default function Inventory() {
               </thead>
               <tbody>
                 {intakeItems.map((item, index) => {
-                  const availableItems = item.category
-                    ? inventory.filter(inv => inv.category === item.category)
-                    : [];
-
                   return (
                     <tr key={item.id}>
                       <td className="text-center">{index + 1}</td>
@@ -676,11 +699,11 @@ export default function Inventory() {
                         <select
                           value={item.name}
                           onChange={(e) => handleIntakeItemChange(item.id, 'name', e.target.value)}
-                          disabled={!item.category}
                           className="table-select"
                         >
                           <option value="">선택</option>
-                          {availableItems.map(invItem => (
+                          {/* 카테고리 필터링 없이 모든 inventory 표시 */}
+                          {inventory.map(invItem => (
                             <option key={invItem.id} value={invItem.id}>{invItem.id}</option>
                           ))}
                         </select>
@@ -694,6 +717,21 @@ export default function Inventory() {
                           min="0"
                           className="table-input"
                         />
+                      </td>
+                      <td>
+                        <select
+                          value={item.uom}
+                          onChange={(e) => handleIntakeItemChange(item.id, 'uom', e.target.value)}
+                          disabled={!!item.name}
+                          className="table-select"
+                          title={item.name ? `${item.name}의 재고 단위: ${item.uom}` : '품목 선택 시 자동 설정'}
+                        >
+                          <option value="g">g</option>
+                          <option value="ml">ml</option>
+                          <option value="kg">kg</option>
+                          <option value="L">L</option>
+                          <option value="ea">ea</option>
+                        </select>
                       </td>
                       <td>
                         <input
@@ -798,6 +836,166 @@ export default function Inventory() {
     );
   };
 
+  // ==================== 입고 기록 탭 ====================
+
+  const fetchIntakeHistory = async () => {
+    try {
+      setLoadingHistory(true);
+      setHistoryMessage(null);
+      const res = await stockIntakeApi.getAll(100);
+      setIntakeHistory(res.data);
+    } catch (err: any) {
+      console.error('입고 기록 조회 실패:', err);
+      setHistoryMessage({ type: 'error', text: '입고 기록을 불러오지 못했습니다.' });
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
+  const handleDeleteIntakeRecord = async (timestamp: string) => {
+    if (!window.confirm('이 입고 기록을 삭제하시겠습니까?\n\n✓ 재고 수량이 차감됩니다\n✓ 평균 단가가 역산됩니다\n\n계속하시겠습니까?')) {
+      return;
+    }
+
+    try {
+      await stockIntakeApi.delete(timestamp);
+      setHistoryMessage({ type: 'success', text: '입고 기록이 삭제되었습니다.' });
+      fetchIntakeHistory(); // 목록 새로고침
+    } catch (err: any) {
+      const errorMsg = err.response?.data?.detail || '입고 기록 삭제에 실패했습니다.';
+      setHistoryMessage({ type: 'error', text: errorMsg });
+    }
+  };
+
+  // 탭 변경 시 입고 기록 로드
+  useEffect(() => {
+    if (activeTab === 'history') {
+      const loadHistory = async () => {
+        try {
+          setLoadingHistory(true);
+          setHistoryMessage(null);
+          const res = await stockIntakeApi.getAll(100);
+          setIntakeHistory(res.data);
+        } catch (err: any) {
+          console.error('입고 기록 조회 실패:', err);
+          setHistoryMessage({ type: 'error', text: '입고 기록을 불러오지 못했습니다.' });
+        } finally {
+          setLoadingHistory(false);
+        }
+      };
+      loadHistory();
+    }
+  }, [activeTab]);
+
+  const renderHistoryTab = () => {
+    return (
+      <div className="receiving-tab">
+        {/* 헤더 */}
+        <div className="intake-header-inline">
+          <div className="intake-header-left">
+            <span className="intake-icon">📋</span>
+            <h2>재고 입고 기록</h2>
+            <p style={{ fontSize: '0.875rem', color: '#64748b', marginTop: '4px' }}>최근 100개의 입고 기록을 표시합니다. 삭제 시 재고는 되돌려지지 않습니다.</p>
+          </div>
+          <button className="btn btn-secondary" onClick={fetchIntakeHistory} disabled={loadingHistory}>
+            <RefreshCw size={18} className={loadingHistory ? 'animate-spin' : ''} />
+            새로고침
+          </button>
+        </div>
+
+        {/* 메시지 표시 */}
+        {historyMessage && (
+          <div className={`intake-message ${historyMessage.type}`}>
+            {historyMessage.text}
+          </div>
+        )}
+
+        {/* 로딩 상태 */}
+        {loadingHistory && (
+          <div className="loading-container" style={{ padding: '60px', textAlign: 'center' }}>
+            <div className="loading-spinner"></div>
+            <p style={{ marginTop: '20px', color: '#64748b' }}>입고 기록을 불러오는 중...</p>
+          </div>
+        )}
+
+        {/* 입고 기록 테이블 */}
+        {!loadingHistory && (
+          <div className="intake-table-container">
+            <table className="intake-table">
+              <thead>
+                <tr>
+                  <th>입고 일시</th>
+                  <th>카테고리</th>
+                  <th>품목명</th>
+                  <th>개당 용량</th>
+                  <th>단위</th>
+                  <th>구매 수량</th>
+                  <th>구매 단가</th>
+                  <th>총액</th>
+                  <th>삭제</th>
+                </tr>
+              </thead>
+              <tbody>
+                {intakeHistory.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} style={{ textAlign: 'center', padding: '60px', color: '#94a3b8' }}>
+                      입고 기록이 없습니다.
+                    </td>
+                  </tr>
+                ) : (
+                  intakeHistory.map((record) => {
+                    // 36시간 경과 체크
+                    const intakeTime = new Date(record.timestamp.replace(' ', 'T'));
+                    const now = new Date();
+                    const hoursDiff = (now.getTime() - intakeTime.getTime()) / (1000 * 60 * 60);
+                    const isExpired = hoursDiff > 36;
+
+                    return (
+                      <tr key={record.timestamp}>
+                        <td>{record.timestamp?.replace('T', ' ') || '-'}</td>
+                        <td>{record.category || '-'}</td>
+                        <td className="font-bold">{record.name || '-'}</td>
+                        <td className="text-right">{record.volume ? record.volume.toLocaleString() : '0'}</td>
+                        <td className="text-center">{record.uom || '-'}</td>
+                        <td className="text-right">{record.quantity || '0'}</td>
+                        <td className="text-right">{record.price_per_unit ? record.price_per_unit.toLocaleString() : '0'}원</td>
+                        <td className="text-right total-cell">
+                          <span className="total-amount">{record.total_amount ? record.total_amount.toLocaleString() : '0'}원</span>
+                        </td>
+                        <td className="text-center">
+                          {isExpired ? (
+                            <button
+                              className="btn-remove-row"
+                              disabled
+                              title="재고 관리 정확도를 위해 36시간이 지난 뒤에는 삭제할 수 없습니다"
+                              style={{ opacity: 0.3, cursor: 'not-allowed' }}
+                              aria-label="삭제 불가"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          ) : (
+                            <button
+                              className="btn-remove-row"
+                              onClick={() => handleDeleteIntakeRecord(record.timestamp)}
+                              title="입고 기록 삭제 (재고 수량 및 단가 원상복구)"
+                              aria-label="기록 삭제"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="inventory-page-new">
       <header className="page-header-new">
@@ -838,6 +1036,12 @@ export default function Inventory() {
           📥 재고 입고
         </button>
         <button
+          className={`tab-btn ${activeTab === 'history' ? 'active' : ''}`}
+          onClick={() => setActiveTab('history')}
+        >
+          📋 재고 입고 기록
+        </button>
+        <button
           className={`tab-btn ${activeTab === 'forecast' ? 'active' : ''}`}
           onClick={() => setActiveTab('forecast')}
         >
@@ -858,6 +1062,7 @@ export default function Inventory() {
               </div>
             )}
             {activeTab === 'receiving' && renderReceivingTab()}
+            {activeTab === 'history' && renderHistoryTab()}
             {activeTab === 'forecast' && (
               <div className="empty-tab">
                 <p>📈 수요예측 기능은 준비 중입니다.</p>
@@ -934,7 +1139,7 @@ export default function Inventory() {
                     <label>현재 재고</label>
                     <input
                       type="number"
-                      value={formData.quantity_on_hand}
+                      value={formData.quantity_on_hand || ''}
                       onChange={(e) => handleInputChange('quantity_on_hand', Number(e.target.value))}
                       required
                       min="0"
@@ -961,7 +1166,7 @@ export default function Inventory() {
                   <label>단위당 단가 (원)</label>
                   <input
                     type="number"
-                    value={formData.unit_cost}
+                    value={formData.unit_cost || ''}
                     onChange={(e) => handleInputChange('unit_cost', Number(e.target.value))}
                     required
                     min="0"

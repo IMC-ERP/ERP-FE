@@ -49,13 +49,22 @@ export interface StockIntake {
   uom?: string;
 }
 
+
 export interface OCRReceiptData {
-  category?: string;
+  category: string;  // 필수 필드로 변경 (빈 문자열 가능)
   name: string;
   volume: number;
   quantity: number;
   price_per_unit: number;
   total_amount: number;
+  uom?: string;
+}
+
+export interface OCRResponse {
+  success: boolean;
+  items: OCRReceiptData[];
+  warnings: string[];
+  error: string | null;
 }
 
 export interface DashboardSummary {
@@ -64,6 +73,34 @@ export interface DashboardSummary {
   avg_per_transaction: number;
   unique_products: number;
 }
+
+// ... existing code ...
+
+export const ocrApi = {
+  // 단일 영수증 이미지 OCR
+  analyzeSingleReceipt: (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post<OCRResponse>('/ocr/receipt', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+  },
+
+  // 다중 영수증 이미지 OCR (Not implemented in backend yet, but updating type for consistency if needed, or leave as is)
+  // Backend doesn't have /ocr/receipt/multiple. Frontend loops calls to single?
+  // Frontend code: Promise.all(files.map(file => ocrApi.analyzeMultipleReceipts(file)))
+  // Actually Inventory.tsx uses analyzeMultipleReceipts for EACH file if multiple files.
+  // Wait, the Inventory.tsx code says: `files.map(file => ocrApi.analyzeMultipleReceipts(file))`.
+  // It iterates and calls the API for each file.
+  // So I should point THIS also to `/ocr/receipt` and use the same response type.
+  analyzeMultipleReceipts: (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post<OCRResponse>('/ocr/receipt', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+  }
+};
 
 export interface SalesByDate {
   date: string;
@@ -97,8 +134,14 @@ export const inventoryApi = {
 
 // ==================== Stock Intake API ====================
 
+export interface StockIntakeRecord extends StockIntake {
+  timestamp: string; // 문서 ID (타임스탬프)
+}
+
 export const stockIntakeApi = {
+  getAll: (limit: number = 100) => api.get<StockIntakeRecord[]>('/stock-intakes', { params: { limit } }),
   create: (data: StockIntake) => api.post('/stock-intake', data),
+  delete: (timestamp: string) => api.delete(`/stock-intake/${timestamp}`),
 };
 
 // ==================== 레시피 원가 타입 ====================
@@ -129,25 +172,7 @@ export const recipeCostApi = {
 
 // ==================== OCR API ====================
 
-export const ocrApi = {
-  // 단일 영수증 이미지 OCR
-  analyzeSingleReceipt: (file: File) => {
-    const formData = new FormData();
-    formData.append('file', file);
-    return api.post<OCRReceiptData>('/ocr/receipt', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    });
-  },
 
-  // 다중 영수증 이미지 OCR
-  analyzeMultipleReceipts: (file: File) => {
-    const formData = new FormData();
-    formData.append('file', file);
-    return api.post<OCRReceiptData[]>('/ocr/receipt/multiple', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    });
-  }
-};
 
 // ==================== Dashboard API ====================
 
