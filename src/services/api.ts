@@ -4,6 +4,7 @@
  */
 
 import axios from 'axios';
+import axiosRetry from 'axios-retry';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://coffee-erp-backend-427178764915.asia-northeast3.run.app/api';
 
@@ -12,6 +13,20 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  timeout: 30000, // 30초 타임아웃 (Cloud Run Cold Start 대응)
+});
+
+// 지수 백오프 재시도 설정 (네트워크 오류 및 503 에러 대응)
+axiosRetry(api, {
+  retries: 3,
+  retryDelay: axiosRetry.exponentialDelay,
+  retryCondition: (error) => {
+    return axiosRetry.isNetworkOrIdempotentRequestError(error) ||
+           error.response?.status === 503;
+  },
+  onRetry: (retryCount, error) => {
+    console.log(`[API] Retry attempt ${retryCount} for ${error.config?.url}`);
+  }
 });
 
 // ==================== Types ====================
@@ -180,6 +195,11 @@ export const dashboardApi = {
   getSummary: () => api.get<DashboardSummary>('/dashboard/summary'),
   getSalesByDate: () => api.get<SalesByDate[]>('/dashboard/sales-by-date'),
   getSalesByProduct: () => api.get<SalesByProduct[]>('/dashboard/sales-by-product'),
+  getAll: () => api.get<{
+    summary: DashboardSummary;
+    sales_by_date: SalesByDate[];
+    sales_by_product: SalesByProduct[];
+  }>('/dashboard/all'),
 };
 
 // ==================== Recipes API ====================
