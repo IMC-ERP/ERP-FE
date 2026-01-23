@@ -3,7 +3,8 @@
  * 재고 관리 페이지 (전면 재설계)
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { RefreshCw, ChevronDown, ChevronUp, Plus, X, Trash2 } from 'lucide-react';
 import { inventoryApi, stockIntakeApi, ocrApi, type InventoryItem, type StockIntake, type OCRReceiptData, type StockIntakeRecord } from '../services/api';
 import './Inventory.css';
@@ -68,6 +69,29 @@ export default function Inventory() {
   const [intakeHistory, setIntakeHistory] = useState<StockIntakeRecord[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [historyMessage, setHistoryMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // 자동완성 드롭다운 상태
+  const [activeSearchIndex, setActiveSearchIndex] = useState<number | null>(null);
+  const [dropdownPosition, setDropdownPosition] = useState<{ top: number; left: number } | null>(null);
+
+  const handleInputFocus = (index: number, e: React.FocusEvent<HTMLInputElement> | React.MouseEvent<HTMLInputElement>) => {
+    setActiveSearchIndex(index);
+    const rect = e.currentTarget.getBoundingClientRect();
+    setDropdownPosition({
+      top: rect.bottom + window.scrollY,
+      left: rect.left + window.scrollX
+    });
+  };
+
+  useEffect(() => {
+    const handleScroll = () => {
+      if (activeSearchIndex !== null) {
+        setActiveSearchIndex(null); // 스크롤 시 드롭다운 닫기
+      }
+    };
+    window.addEventListener('scroll', handleScroll, true);
+    return () => window.removeEventListener('scroll', handleScroll, true);
+  }, [activeSearchIndex]);
 
   const fetchInventory = async () => {
     try {
@@ -181,6 +205,7 @@ export default function Inventory() {
     setUploadedImages([]);
     setImagePreviewUrls([]);
     setOcrError(null);
+    setActiveSearchIndex(null);
   };
 
   // ==================== 이미지 업로드 모드 ====================
@@ -365,10 +390,27 @@ export default function Inventory() {
           }
         }
 
+
         return updated;
       }
       return item;
     }));
+  };
+
+  const handleItemSelect = (id: number, invItem: InventoryItem) => {
+    setIntakeItems(prev => prev.map(item => {
+      if (item.id === id) {
+        return {
+          ...item,
+          name: invItem.id,
+          category: invItem.category,
+          uom: invItem.uom,
+          // 가격이나 용량 정보가 있다면 여기서 추가로 설정 가능
+        };
+      }
+      return item;
+    }));
+    setActiveSearchIndex(null);
   };
 
   const handleSubmitIntake = async () => {
@@ -583,7 +625,6 @@ export default function Inventory() {
           <div className="upload-header">
             <div className="upload-header-left">
               <h2>영수증 이미지 통합 업로드</h2>
-              <button className="upload-status-badge">0장 선택됨</button>
             </div>
             <button className="btn-upload-close" onClick={handleCloseManualIntake}>
               <X size={20} />
@@ -684,29 +725,70 @@ export default function Inventory() {
                     <tr key={item.id}>
                       <td className="text-center">{index + 1}</td>
                       <td>
-                        <select
+                        <input
+                          type="text"
                           value={item.category}
-                          onChange={(e) => handleIntakeItemChange(item.id, 'category', e.target.value)}
-                          className="table-select"
-                        >
-                          <option value="">선택</option>
-                          {existingCategories.map(cat => (
-                            <option key={cat} value={cat}>{cat}</option>
-                          ))}
-                        </select>
+                          readOnly
+                          className="table-input bg-slate-100 text-slate-500 cursor-not-allowed text-center"
+                          placeholder="자동"
+                          title="품목 선택 시 자동으로 설정됩니다"
+                        />
                       </td>
-                      <td>
-                        <select
+                      <td className="relative">
+                        <input
+                          type="text"
                           value={item.name}
                           onChange={(e) => handleIntakeItemChange(item.id, 'name', e.target.value)}
-                          className="table-select"
-                        >
-                          <option value="">선택</option>
-                          {/* 카테고리 필터링 없이 모든 inventory 표시 */}
-                          {inventory.map(invItem => (
-                            <option key={invItem.id} value={invItem.id}>{invItem.id}</option>
-                          ))}
-                        </select>
+                          onFocus={(e) => handleInputFocus(index, e)}
+                          onClick={(e) => handleInputFocus(index, e)}
+                          placeholder="품목 검색..."
+                          className="table-input"
+                        />
+                        {activeSearchIndex === index && dropdownPosition && createPortal(
+                          <>
+                            <div
+                              className="fixed inset-0 z-[9998]"
+                              onClick={() => setActiveSearchIndex(null)}
+                            />
+                            <div
+                              className="absolute z-[9999] w-64 bg-white border border-slate-300 rounded-lg shadow-xl max-h-60 overflow-y-auto"
+                              style={{
+                                top: `${dropdownPosition.top}px`,
+                                left: `${dropdownPosition.left}px`,
+                              }}
+                            >
+                              {inventory
+                                .filter(inv =>
+                                  !item.name ||
+                                  (inv.id && inv.id.toLowerCase().includes(item.name.toLowerCase()))
+                                )
+                                .slice(0, 50)
+                                .map(invItem => (
+                                  <button
+                                    key={invItem.id}
+                                    className="w-full text-left px-4 py-3 hover:bg-blue-50 text-sm flex justify-between items-center border-b border-slate-50 last:border-0 transition-colors"
+                                    onClick={() => handleItemSelect(item.id, invItem)}
+                                  >
+                                    <span className="font-medium text-slate-800 whitespace-nowrap overflow-hidden text-ellipsis mr-2">{invItem.id}</span>
+                                    <span className="text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full whitespace-nowrap flex-shrink-0">{invItem.category}</span>
+                                  </button>
+                                ))}
+                              {inventory.filter(inv => !item.name || (inv.id && inv.id.toLowerCase().includes(item.name.toLowerCase()))).length === 0 && (
+                                <div className="px-4 py-4 text-center text-sm text-slate-400">
+                                  검색 결과가 없습니다
+                                </div>
+                              )}
+                            </div>
+                          </>,
+                          document.body
+                        )}
+                        {/* 외부 클릭 종료를 위한 오버레이 */}
+                        {activeSearchIndex === index && (
+                          <div
+                            className="fixed inset-0 z-0"
+                            onClick={() => setActiveSearchIndex(null)}
+                          />
+                        )}
                       </td>
                       <td>
                         <input
@@ -722,8 +804,8 @@ export default function Inventory() {
                         <select
                           value={item.uom}
                           onChange={(e) => handleIntakeItemChange(item.id, 'uom', e.target.value)}
-                          disabled={!!item.name}
-                          className="table-select"
+                          disabled={!!item.name} // 품목이 선택되면 단위도 자동 설정됨 (필요시 해제 가능)
+                          className={`table-select ${!!item.name ? 'bg-slate-100 cursor-not-allowed' : ''}`}
                           title={item.name ? `${item.name}의 재고 단위: ${item.uom}` : '품목 선택 시 자동 설정'}
                         >
                           <option value="g">g</option>
@@ -943,50 +1025,30 @@ export default function Inventory() {
                     </td>
                   </tr>
                 ) : (
-                  intakeHistory.map((record) => {
-                    // 36시간 경과 체크
-                    const intakeTime = new Date(record.timestamp.replace(' ', 'T'));
-                    const now = new Date();
-                    const hoursDiff = (now.getTime() - intakeTime.getTime()) / (1000 * 60 * 60);
-                    const isExpired = hoursDiff > 36;
-
-                    return (
-                      <tr key={record.timestamp}>
-                        <td>{record.timestamp?.replace('T', ' ') || '-'}</td>
-                        <td>{record.category || '-'}</td>
-                        <td className="font-bold">{record.name || '-'}</td>
-                        <td className="text-right">{record.volume ? record.volume.toLocaleString() : '0'}</td>
-                        <td className="text-center">{record.uom || '-'}</td>
-                        <td className="text-right">{record.quantity || '0'}</td>
-                        <td className="text-right">{record.price_per_unit ? record.price_per_unit.toLocaleString() : '0'}원</td>
-                        <td className="text-right total-cell">
-                          <span className="total-amount">{record.total_amount ? record.total_amount.toLocaleString() : '0'}원</span>
-                        </td>
-                        <td className="text-center">
-                          {isExpired ? (
-                            <button
-                              className="btn-remove-row"
-                              disabled
-                              title="재고 관리 정확도를 위해 36시간이 지난 뒤에는 삭제할 수 없습니다"
-                              style={{ opacity: 0.3, cursor: 'not-allowed' }}
-                              aria-label="삭제 불가"
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          ) : (
-                            <button
-                              className="btn-remove-row"
-                              onClick={() => handleDeleteIntakeRecord(record.timestamp)}
-                              title="입고 기록 삭제 (재고 수량 및 단가 원상복구)"
-                              aria-label="기록 삭제"
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })
+                  intakeHistory.map((record) => (
+                    <tr key={record.timestamp}>
+                      <td>{record.timestamp?.replace('T', ' ') || '-'}</td>
+                      <td>{record.category || '-'}</td>
+                      <td className="font-bold">{record.name || '-'}</td>
+                      <td className="text-right">{record.volume ? record.volume.toLocaleString() : '0'}</td>
+                      <td className="text-center">{record.uom || '-'}</td>
+                      <td className="text-right">{record.quantity || '0'}</td>
+                      <td className="text-right">{record.price_per_unit ? record.price_per_unit.toLocaleString() : '0'}원</td>
+                      <td className="text-right total-cell">
+                        <span className="total-amount">{record.total_amount ? record.total_amount.toLocaleString() : '0'}원</span>
+                      </td>
+                      <td className="text-center">
+                        <button
+                          className="btn-remove-row"
+                          onClick={() => handleDeleteIntakeRecord(record.timestamp)}
+                          title="입고 기록 삭제 (재고 수량 및 단가 원상복구)"
+                          aria-label="기록 삭제"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))
                 )}
               </tbody>
             </table>
@@ -995,6 +1057,10 @@ export default function Inventory() {
       </div>
     );
   };
+
+
+
+
 
   return (
     <div className="inventory-page-new">

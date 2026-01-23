@@ -7,9 +7,9 @@ import axios from 'axios';
 import axiosRetry from 'axios-retry';
 
 // 개발 환경에서는 localhost, 프로덕션에서는 Cloud Run 백엔드 사용
-const API_BASE_URL = import.meta.env.VITE_API_URL 
-  || (import.meta.env.DEV 
-    ? 'http://localhost:8000/api' 
+const API_BASE_URL = import.meta.env.VITE_API_URL
+  || (import.meta.env.DEV
+    ? 'http://localhost:8000/api'
     : 'https://coffee-erp-backend-427178764915.asia-northeast3.run.app/api');
 
 const api = axios.create({
@@ -26,7 +26,7 @@ axiosRetry(api, {
   retryDelay: axiosRetry.exponentialDelay,
   retryCondition: (error) => {
     return axiosRetry.isNetworkOrIdempotentRequestError(error) ||
-           error.response?.status === 503;
+      error.response?.status === 503;
   },
   onRetry: (retryCount, error) => {
     console.log(`[API] Retry attempt ${retryCount} for ${error.config?.url}`);
@@ -336,6 +336,12 @@ export const dailySalesApi = {
       headers: { 'Content-Type': 'multipart/form-data' }
     });
   }
+};
+
+// ==================== Auth API ====================
+
+export const authApi = {
+  verifyPasscode: (passcode: string) => api.post<{ valid: boolean }>('/auth/verify-passcode', { passcode }),
 };
 
 export default api;
