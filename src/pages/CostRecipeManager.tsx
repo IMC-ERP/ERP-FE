@@ -246,6 +246,272 @@ const AddMaterialModal = ({
     );
 };
 
+// Modal Component for Adding Recipe
+const AddRecipeModal = ({
+    isOpen,
+    onClose,
+    onSave,
+    existingCategories,
+    materials
+}: {
+    isOpen: boolean;
+    onClose: () => void;
+    onSave: (recipe: Omit<MenuRecipe, 'id'>) => void;
+    existingCategories: string[];
+    materials: RawMaterial[];
+}) => {
+    const [mode, setMode] = useState<'existing' | 'new'>('existing');
+    const [category, setCategory] = useState(existingCategories[0] || '');
+    const [newCategoryName, setNewCategoryName] = useState('');
+    const [menuName, setMenuName] = useState('');
+    const [salePrice, setSalePrice] = useState<number | ''>('');
+    const [ingredients, setIngredients] = useState<RecipeIngredient[]>([]);
+
+    if (!isOpen) return null;
+
+    const handleAddIngredient = () => {
+        const firstMat = materials[0];
+        if (!firstMat) {
+            alert('재료가 없습니다. 먼저 원재료를 추가해주세요.');
+            return;
+        }
+        setIngredients(prev => [...prev, {
+            id: Math.random().toString(36).substr(2, 9),
+            materialId: firstMat.id,
+            qty: 0
+        }]);
+    };
+
+    const handleRemoveIngredient = (id: string) => {
+        setIngredients(prev => prev.filter(ing => ing.id !== id));
+    };
+
+    const handleUpdateIngredient = (id: string, field: keyof RecipeIngredient, value: string | number) => {
+        setIngredients(prev => prev.map(ing =>
+            ing.id === id ? { ...ing, [field]: value } : ing
+        ));
+    };
+
+    const totalCost = ingredients.reduce((sum, ing) => {
+        const mat = materials.find(m => m.id === ing.materialId);
+        if (!mat) return sum;
+        const unitPrice = getUnitPrice(mat);
+        return sum + (unitPrice * ing.qty);
+    }, 0);
+
+    const handleSave = () => {
+        if (!menuName.trim()) {
+            alert('메뉴명을 입력해주세요.');
+            return;
+        }
+        if (salePrice === '' || salePrice <= 0) {
+            alert('판매가를 입력해주세요.');
+            return;
+        }
+
+        const finalCategory = mode === 'new'
+            ? (newCategoryName.trim() || 'Uncategorized')
+            : category;
+
+        const newRecipe: Omit<MenuRecipe, 'id'> = {
+            category: finalCategory,
+            name: menuName.trim(),
+            salePrice: Number(salePrice),
+            ingredients: ingredients
+        };
+
+        onSave(newRecipe);
+
+        // Reset form
+        setMode('existing');
+        setCategory(existingCategories[0] || '');
+        setNewCategoryName('');
+        setMenuName('');
+        setSalePrice('');
+        setIngredients([]);
+        onClose();
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 animate-fade-in">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden max-h-[90vh] flex flex-col">
+                <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                    <h3 className="font-bold text-slate-800 text-lg flex items-center gap-2">
+                        <Plus size={20} className="text-indigo-600" /> 새 메뉴 추가
+                    </h3>
+                    <button onClick={onClose} className="p-1 rounded-full hover:bg-slate-200 text-slate-500 transition-colors">
+                        <X size={20} />
+                    </button>
+                </div>
+
+                <div className="p-6 space-y-5 overflow-y-auto flex-1">
+                    {/* Category Selection */}
+                    <div>
+                        <label className="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide">카테고리 선택</label>
+                        <div className="flex gap-4 mb-3">
+                            <label className="flex items-center gap-2 cursor-pointer group">
+                                <input
+                                    type="radio"
+                                    checked={mode === 'existing'}
+                                    onChange={() => setMode('existing')}
+                                    className="text-indigo-600 focus:ring-indigo-500"
+                                />
+                                <span className="text-sm text-slate-700 group-hover:text-indigo-600 transition-colors">기존 카테고리</span>
+                            </label>
+                            <label className="flex items-center gap-2 cursor-pointer group">
+                                <input
+                                    type="radio"
+                                    checked={mode === 'new'}
+                                    onChange={() => setMode('new')}
+                                    className="text-indigo-600 focus:ring-indigo-500"
+                                />
+                                <span className="text-sm text-slate-700 group-hover:text-indigo-600 transition-colors">새 카테고리</span>
+                            </label>
+                        </div>
+
+                        {mode === 'existing' ? (
+                            <select
+                                value={category}
+                                onChange={(e) => setCategory(e.target.value)}
+                                className="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                            >
+                                {existingCategories.map(c => <option key={c} value={c}>{c}</option>)}
+                            </select>
+                        ) : (
+                            <input
+                                type="text"
+                                placeholder="새 카테고리 이름 (예: Dessert)"
+                                value={newCategoryName}
+                                onChange={(e) => setNewCategoryName(e.target.value)}
+                                className="w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                                autoFocus
+                            />
+                        )}
+                    </div>
+
+                    {/* Menu Info */}
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wide">메뉴명</label>
+                            <input
+                                type="text"
+                                value={menuName}
+                                onChange={(e) => setMenuName(e.target.value)}
+                                placeholder="예: 아메리카노"
+                                className="w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wide">판매가 (원)</label>
+                            <input
+                                type="number"
+                                value={salePrice}
+                                onChange={(e) => setSalePrice(e.target.value === '' ? '' : Number(e.target.value))}
+                                placeholder="0"
+                                className="w-full p-2.5 border border-slate-300 rounded-lg text-sm text-right focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                            />
+                        </div>
+                    </div>
+
+                    {/* Ingredients Section */}
+                    <div>
+                        <label className="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide">레시피 구성</label>
+                        <div className="bg-slate-50 rounded-lg border border-slate-200 overflow-hidden">
+                            <table className="w-full text-sm text-left">
+                                <thead className="bg-slate-100 text-slate-600 font-semibold">
+                                    <tr>
+                                        <th className="px-4 py-2">원재료 선택</th>
+                                        <th className="px-4 py-2 text-right">사용 용량</th>
+                                        <th className="px-4 py-2 text-right">단위</th>
+                                        <th className="px-4 py-2 text-right">단위당 원가</th>
+                                        <th className="px-4 py-2 text-right">재료비</th>
+                                        <th className="px-4 py-2 text-center">삭제</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100 bg-white">
+                                    {ingredients.map(ing => {
+                                        const mat = materials.find(m => m.id === ing.materialId);
+                                        const unitPrice = mat ? getUnitPrice(mat) : 0;
+                                        const cost = unitPrice * ing.qty;
+
+                                        return (
+                                            <tr key={ing.id} className="hover:bg-slate-50">
+                                                <td className="px-4 py-2">
+                                                    <select
+                                                        value={ing.materialId}
+                                                        onChange={(e) => handleUpdateIngredient(ing.id, 'materialId', e.target.value)}
+                                                        className="w-full p-1 border border-slate-300 rounded text-sm"
+                                                    >
+                                                        {materials.map(m => (
+                                                            <option key={m.id} value={m.id}>{m.name} ({m.category})</option>
+                                                        ))}
+                                                    </select>
+                                                </td>
+                                                <td className="px-4 py-2 text-right">
+                                                    <input
+                                                        type="number"
+                                                        value={ing.qty}
+                                                        onChange={(e) => handleUpdateIngredient(ing.id, 'qty', parseFloat(e.target.value) || 0)}
+                                                        className="w-24 p-1 border border-slate-300 rounded text-right text-sm inline-block"
+                                                    />
+                                                </td>
+                                                <td className="px-4 py-2 text-right text-slate-500">{mat?.unit}</td>
+                                                <td className="px-4 py-2 text-right text-slate-400 font-mono">{unitPrice.toFixed(1)}원</td>
+                                                <td className="px-4 py-2 text-right font-bold text-slate-700 font-mono">{Math.round(cost).toLocaleString()}원</td>
+                                                <td className="px-4 py-2 text-center">
+                                                    <button
+                                                        onClick={() => handleRemoveIngredient(ing.id)}
+                                                        className="text-slate-400 hover:text-red-500"
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                    {ingredients.length === 0 && (
+                                        <tr>
+                                            <td colSpan={6} className="p-4 text-center text-slate-400">등록된 재료가 없습니다. 재료를 추가해주세요.</td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                                <tfoot className="bg-slate-50 font-bold border-t border-slate-200 text-slate-800">
+                                    <tr>
+                                        <td colSpan={4} className="px-4 py-3 text-right">총 원가 합계</td>
+                                        <td className="px-4 py-3 text-right text-blue-600">{Math.round(totalCost).toLocaleString()}원</td>
+                                        <td></td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                        <button
+                            onClick={handleAddIngredient}
+                            className="mt-3 flex items-center gap-2 text-sm font-bold text-blue-600 hover:text-blue-700 px-2 py-1 rounded hover:bg-blue-50 transition-colors"
+                        >
+                            <Plus size={16} /> 재료 추가하기
+                        </button>
+                    </div>
+                </div>
+
+                <div className="p-4 bg-slate-50 flex justify-end gap-3 border-t border-slate-100">
+                    <button
+                        onClick={onClose}
+                        className="px-5 py-2.5 text-slate-600 font-bold hover:bg-slate-200 rounded-lg text-sm transition-colors"
+                    >
+                        취소
+                    </button>
+                    <button
+                        onClick={handleSave}
+                        className="px-5 py-2.5 bg-indigo-600 text-white font-bold rounded-lg text-sm hover:bg-indigo-700 shadow-md shadow-indigo-200 transition-colors"
+                    >
+                        저장하기
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 interface RecipeRowProps {
     recipe: MenuRecipe;
     materials: RawMaterial[];
@@ -589,12 +855,17 @@ export default function CostRecipeManager() {
     // 여기서는 다수의 카테고리를 열고 닫을 수 있게 Set 또는 배열로 관리
     const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
 
-    const isAddModalOpenState = useState(false); // 기존 state 사용 
-    const [isAddModalOpen, setIsAddModalOpen] = isAddModalOpenState;
+    const [isAddMaterialModalOpen, setIsAddMaterialModalOpen] = useState(false);
+    const [isAddRecipeModalOpen, setIsAddRecipeModalOpen] = useState(false);
 
-    const uniqueCategories = useMemo(() => {
+    const uniqueMaterialCategories = useMemo(() => {
         return Array.from(new Set(materials.map(m => m.category))).sort();
     }, [materials]);
+
+    const uniqueRecipeCategories = useMemo(() => {
+        const categories = Array.from(new Set(recipes.map(r => r.category || 'Uncategorized')));
+        return categories.sort();
+    }, [recipes]);
 
     const handleSort = (key: 'name' | 'cogs') => {
         setSortConfig(current => ({
@@ -683,7 +954,7 @@ export default function CostRecipeManager() {
 
     const handleOpenAddMaterialModal = () => {
         setActiveTab('material');
-        setIsAddModalOpen(true);
+        setIsAddMaterialModalOpen(true);
     };
 
     const handleSaveNewMaterial = async (data: Omit<RawMaterial, 'id'>) => {
@@ -728,17 +999,40 @@ export default function CostRecipeManager() {
     };
 
     const handleAddRecipe = () => {
-        const newRecipe: MenuRecipe = {
-            id: Math.random().toString(36).substr(2, 9),
-            category: 'Uncategorized',
-            name: '새 메뉴',
-            salePrice: 0,
-            ingredients: []
-        };
-        setRecipes(prev => [...prev, newRecipe]);
-        setExpandedRecipeId(newRecipe.id);
-        // 새 메뉴의 카테고리를 자동으로 펼침
-        setExpandedCategories(prev => new Set(prev).add('Uncategorized'));
+        setIsAddRecipeModalOpen(true);
+    };
+
+    const handleSaveNewRecipe = async (data: Omit<MenuRecipe, 'id'>) => {
+        try {
+            // Transform to API format
+            const apiData = {
+                menu_name: data.name,
+                category: data.category,
+                selling_price: data.salePrice,
+                ingredients: data.ingredients.map(ing => {
+                    const mat = materials.find(m => m.id === ing.materialId);
+                    return {
+                        name: ing.materialId,
+                        cost_per_unit: mat ? getUnitPrice(mat) : 0,
+                        usage: ing.qty,
+                        cost: mat ? getUnitPrice(mat) * ing.qty : 0
+                    };
+                })
+            };
+
+            await recipeCostApi.create(apiData);
+
+            // Refresh data from backend
+            await fetchData();
+
+            // Expand the category of the new recipe
+            setExpandedCategories(prev => new Set(prev).add(data.category));
+
+            alert('메뉴가 성공적으로 추가되었습니다.');
+        } catch (error) {
+            console.error('Failed to create recipe:', error);
+            alert('메뉴 추가에 실패했습니다. 다시 시도해주세요.');
+        }
     };
 
     const handleSaveRecipe = async (recipe: MenuRecipe) => {
@@ -824,12 +1118,19 @@ export default function CostRecipeManager() {
 
     return (
         <div className="space-y-6 animate-fade-in relative">
-            {/* Modal */}
+            {/* Modals */}
             <AddMaterialModal
-                isOpen={isAddModalOpen}
-                onClose={() => setIsAddModalOpen(false)}
+                isOpen={isAddMaterialModalOpen}
+                onClose={() => setIsAddMaterialModalOpen(false)}
                 onSave={handleSaveNewMaterial}
-                existingCategories={uniqueCategories}
+                existingCategories={uniqueMaterialCategories}
+            />
+            <AddRecipeModal
+                isOpen={isAddRecipeModalOpen}
+                onClose={() => setIsAddRecipeModalOpen(false)}
+                onSave={handleSaveNewRecipe}
+                existingCategories={uniqueRecipeCategories}
+                materials={materials}
             />
 
             <header className="flex justify-between items-center">

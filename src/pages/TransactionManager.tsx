@@ -6,7 +6,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useData } from '../contexts/DataContext';
 import type { SaleItem } from '../types';
-import { FileText, PlusCircle, Search, Filter, RotateCcw, Calendar, Clock, Save, X, AlertTriangle, ArrowRight, Check, Camera, Upload, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import { FileText, PlusCircle, Search, Filter, RotateCcw, Calendar, Clock, Save, X, AlertTriangle, ArrowRight, Check, Camera, Upload, Trash2, ChevronDown, ChevronUp, Plus } from 'lucide-react';
 import { dailySalesApi, recipeCostApi, type RecipeCost, type DailySales, type OCRSalesResponse } from '../services/api';
 
 // --- Sub-component: Transaction History ---
@@ -702,6 +702,42 @@ const DailySalesAddView = () => {
         setOcrResult(updated);
     };
 
+    // OCR 결과에 항목 추가
+    const handleAddOcrRow = () => {
+        if (!ocrResult) return;
+        const updated = { ...ocrResult };
+        updated.sales_by_menu.push({
+            menu: '',
+            quantity: 1,
+            sales_amount: 0
+        });
+        setOcrResult(updated);
+    };
+
+    // OCR 결과에서 항목 삭제
+    const handleDeleteOcrRow = (index: number) => {
+        if (!ocrResult) return;
+        const updated = { ...ocrResult };
+        updated.sales_by_menu = updated.sales_by_menu.filter((_, i) => i !== index);
+        setOcrResult(updated);
+    };
+
+    // OCR 메뉴 선택
+    const handleOcrMenuSelect = (index: number, recipe: RecipeCost) => {
+        if (!ocrResult) return;
+        const updated = { ...ocrResult };
+        const currentItem = updated.sales_by_menu[index];
+
+        updated.sales_by_menu[index] = {
+            menu: recipe.menu_name,
+            quantity: currentItem.quantity,
+            sales_amount: recipe.selling_price * currentItem.quantity
+        };
+
+        setOcrResult(updated);
+        setActiveMenuIndex(null);
+    };
+
     // OCR 데이터 저장
     const handleSaveOcrData = async () => {
         if (!ocrResult) return;
@@ -812,64 +848,74 @@ const DailySalesAddView = () => {
             <div className="animate-fade-in">
                 <h3 className="text-lg font-bold text-slate-800 mb-6">매출 데이터 입력 방식을 선택해주세요</h3>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* OCR Scan Card */}
-                    <div className="bg-white p-8 rounded-2xl border border-slate-200 hover:border-blue-500 hover:shadow-xl transition-all group relative overflow-hidden">
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-blue-50 rounded-bl-full -mr-10 -mt-10 transition-transform group-hover:scale-110"></div>
+                {isOcrLoading && (
+                    <div className="bg-white p-12 rounded-2xl border border-slate-200 text-center mb-6">
+                        <div className="animate-spin rounded-full h-20 w-20 border-4 border-blue-600 border-t-transparent mx-auto mb-6"></div>
+                        <p className="text-lg font-bold text-slate-800 mb-2">이미지 인식 중...</p>
+                        <p className="text-sm text-slate-500">잠시만 기다려주세요</p>
+                    </div>
+                )}
 
-                        <div className="relative z-10">
-                            <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                                <Camera size={32} />
+                {!isOcrLoading && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {/* OCR Scan Card */}
+                        <div className="bg-white p-8 rounded-2xl border border-slate-200 hover:border-blue-500 hover:shadow-xl transition-all group relative overflow-hidden">
+                            <div className="absolute top-0 right-0 w-32 h-32 bg-blue-50 rounded-bl-full -mr-10 -mt-10 transition-transform group-hover:scale-110"></div>
+
+                            <div className="relative z-10">
+                                <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                                    <Camera size={32} />
+                                </div>
+
+                                <h4 className="text-xl font-bold text-slate-800 mb-2">메뉴별 매출 사진 스캔</h4>
+                                <p className="text-slate-500 mb-6 leading-relaxed">
+                                    메뉴별 매출 사진을 촬영하거나 업로드하여<br />
+                                    자동으로 매출 목록을 생성합니다.
+                                </p>
+
+                                <div className="relative">
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={(e) => handleOcrFileChange(e.target.files?.[0] || null)}
+                                        className="hidden"
+                                        id="ocr-upload"
+                                    />
+                                    <label
+                                        htmlFor="ocr-upload"
+                                        className="block w-full py-3 bg-blue-600 text-white font-bold text-center rounded-xl hover:bg-blue-700 cursor-pointer transition-colors shadow-lg shadow-blue-200"
+                                    >
+                                        스캔 시작하기
+                                    </label>
+                                </div>
                             </div>
+                        </div>
 
-                            <h4 className="text-xl font-bold text-slate-800 mb-2">메뉴별 매출 사진 스캔</h4>
-                            <p className="text-slate-500 mb-6 leading-relaxed">
-                                메뉴별 매출 사진을 촬영하거나 업로드하여<br />
-                                자동으로 매출 목록을 생성합니다.
-                            </p>
+                        {/* Manual Entry Card */}
+                        <div className="bg-white p-8 rounded-2xl border border-slate-200 hover:border-green-500 hover:shadow-xl transition-all group relative overflow-hidden">
+                            <div className="absolute top-0 right-0 w-32 h-32 bg-green-50 rounded-bl-full -mr-10 -mt-10 transition-transform group-hover:scale-110"></div>
 
-                            <div className="relative">
-                                <input
-                                    type="file"
-                                    accept="image/*"
-                                    onChange={(e) => handleOcrFileChange(e.target.files?.[0] || null)}
-                                    className="hidden"
-                                    id="ocr-upload"
-                                />
-                                <label
-                                    htmlFor="ocr-upload"
-                                    className="block w-full py-3 bg-blue-600 text-white font-bold text-center rounded-xl hover:bg-blue-700 cursor-pointer transition-colors shadow-lg shadow-blue-200"
+                            <div className="relative z-10">
+                                <div className="w-16 h-16 bg-green-100 text-green-600 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                                    <PlusCircle size={32} />
+                                </div>
+
+                                <h4 className="text-xl font-bold text-slate-800 mb-2">수기 직접 입력</h4>
+                                <p className="text-slate-500 mb-8">
+                                    상품명, 수량, 판매 금액을<br />
+                                    직접 입력하여 매출을 등록합니다.
+                                </p>
+
+                                <button
+                                    onClick={() => setMode('manual')}
+                                    className="w-full py-3 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 transition-colors shadow-lg shadow-green-200"
                                 >
-                                    스캔 시작하기
-                                </label>
+                                    직접 입력하기
+                                </button>
                             </div>
                         </div>
                     </div>
-
-                    {/* Manual Entry Card */}
-                    <div className="bg-white p-8 rounded-2xl border border-slate-200 hover:border-green-500 hover:shadow-xl transition-all group relative overflow-hidden">
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-green-50 rounded-bl-full -mr-10 -mt-10 transition-transform group-hover:scale-110"></div>
-
-                        <div className="relative z-10">
-                            <div className="w-16 h-16 bg-green-100 text-green-600 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                                <PlusCircle size={32} />
-                            </div>
-
-                            <h4 className="text-xl font-bold text-slate-800 mb-2">수기 직접 입력</h4>
-                            <p className="text-slate-500 mb-8">
-                                상품명, 수량, 판매 금액을<br />
-                                직접 입력하여 매출을 등록합니다.
-                            </p>
-
-                            <button
-                                onClick={() => setMode('manual')}
-                                className="w-full py-3 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 transition-colors shadow-lg shadow-green-200"
-                            >
-                                직접 입력하기
-                            </button>
-                        </div>
-                    </div>
-                </div>
+                )}
                 <AlertModal />
             </div>
         );
@@ -917,9 +963,10 @@ const DailySalesAddView = () => {
                 )}
 
                 {isOcrLoading && (
-                    <div className="text-center py-12">
-                        <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                        <p className="text-slate-600">이미지 인식 중...</p>
+                    <div className="bg-white p-12 rounded-2xl border border-slate-200 text-center">
+                        <div className="animate-spin rounded-full h-20 w-20 border-4 border-blue-600 border-t-transparent mx-auto mb-6"></div>
+                        <p className="text-lg font-bold text-slate-800 mb-2">이미지 인식 중...</p>
+                        <p className="text-sm text-slate-500">잠시만 기다려주세요</p>
                     </div>
                 )}
 
@@ -951,37 +998,81 @@ const DailySalesAddView = () => {
                                     <th className="p-3 text-right">수량</th>
                                     <th className="p-3 text-right">판매 단가</th>
                                     <th className="p-3 text-right">합계</th>
+                                    <th className="p-3 text-center">삭제</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {ocrResult.sales_by_menu.map((item, index) => (
-                                    <tr key={index} className="border-t border-slate-100">
-                                        <td className="p-3">
-                                            <input
-                                                type="text"
-                                                value={item.menu}
-                                                onChange={(e) => handleOcrResultChange(index, 'menu', e.target.value)}
-                                                className="w-full p-2 border border-slate-200 rounded"
-                                            />
-                                        </td>
-                                        <td className="p-3">
-                                            <input
-                                                type="number"
-                                                value={item.quantity}
-                                                onChange={(e) => handleOcrResultChange(index, 'quantity', e.target.value)}
-                                                className="w-full p-2 border border-slate-200 rounded text-right"
-                                            />
-                                        </td>
-                                        <td className="p-3 text-right text-blue-600 font-mono">
-                                            {item.sales_amount ? (item.sales_amount / item.quantity).toLocaleString() : '0'}원
-                                        </td>
-                                        <td className="p-3 text-right font-bold text-slate-800">
-                                            {item.sales_amount?.toLocaleString() || '0'}원
-                                        </td>
-                                    </tr>
-                                ))}
+                                {ocrResult.sales_by_menu.map((item, index) => {
+                                    const filteredRecipes = recipes.filter(r =>
+                                        r.menu_name.toLowerCase().includes(item.menu.toLowerCase())
+                                    );
+                                    const showDropdown = activeMenuIndex === index &&
+                                        (item.menu.length === 0 || filteredRecipes.length > 0);
+
+                                    return (
+                                        <tr key={index} className="border-t border-slate-100">
+                                            <td className="p-3 relative">
+                                                <input
+                                                    type="text"
+                                                    value={item.menu}
+                                                    onChange={(e) => handleOcrResultChange(index, 'menu', e.target.value)}
+                                                    onFocus={() => setActiveMenuIndex(index)}
+                                                    onMouseDown={(e) => e.stopPropagation()}
+                                                    placeholder="메뉴 선택"
+                                                    className="w-full p-2 border border-slate-200 rounded"
+                                                />
+                                                {showDropdown && (
+                                                    <div
+                                                        className="absolute z-10 w-full mt-1 bg-white border border-slate-300 rounded-lg shadow-lg max-h-48 overflow-y-auto"
+                                                        onMouseDown={(e) => e.stopPropagation()}
+                                                    >
+                                                        {(item.menu.length === 0 ? recipes : filteredRecipes).map((recipe) => (
+                                                            <button
+                                                                key={recipe.menu_name}
+                                                                type="button"
+                                                                onClick={() => handleOcrMenuSelect(index, recipe)}
+                                                                className="w-full text-left px-3 py-2 hover:bg-blue-50 text-sm"
+                                                            >
+                                                                {recipe.menu_name} ({recipe.selling_price.toLocaleString()}원)
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </td>
+                                            <td className="p-3">
+                                                <input
+                                                    type="number"
+                                                    value={item.quantity}
+                                                    onChange={(e) => handleOcrResultChange(index, 'quantity', e.target.value)}
+                                                    className="w-full p-2 border border-slate-200 rounded text-right"
+                                                />
+                                            </td>
+                                            <td className="p-3 text-right text-blue-600 font-mono">
+                                                {item.sales_amount ? (item.sales_amount / item.quantity).toLocaleString() : '0'}원
+                                            </td>
+                                            <td className="p-3 text-right font-bold text-slate-800">
+                                                {item.sales_amount?.toLocaleString() || '0'}원
+                                            </td>
+                                            <td className="p-3 text-center">
+                                                <button
+                                                    onClick={() => handleDeleteOcrRow(index)}
+                                                    className="text-slate-400 hover:text-red-500 transition-colors"
+                                                >
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
                             </tbody>
                         </table>
+
+                        <button
+                            onClick={handleAddOcrRow}
+                            className="mt-3 flex items-center gap-2 text-sm font-bold text-blue-600 hover:text-blue-700 px-3 py-2 rounded hover:bg-blue-50 transition-colors"
+                        >
+                            <Plus size={16} /> 항목 추가
+                        </button>
 
                         <button
                             onClick={handleSaveOcrData}

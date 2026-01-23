@@ -9,9 +9,10 @@ import { useAuth } from '../contexts/AuthContext';
 
 interface ProtectedRouteProps {
     children: React.ReactNode;
+    checkRegistration?: boolean;
 }
 
-const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
+const ProtectedRoute = ({ children, checkRegistration = true }: ProtectedRouteProps) => {
     const { user, loading, needsRegistration } = useAuth();
     const location = useLocation();
 
@@ -33,7 +34,7 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
     }
 
     // 회원가입 필요한 경우 등록 페이지로 리다이렉트
-    if (needsRegistration && location.pathname !== '/register') {
+    if (checkRegistration && needsRegistration && location.pathname !== '/register') {
         return <Navigate to="/register" replace />;
     }
 

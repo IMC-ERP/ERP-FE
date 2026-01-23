@@ -1,6 +1,6 @@
 /**
  * App.tsx - Main Application with React Router
- * GCP-ERP 스타일 적용 + Google 로그인
+ * GCP-ERP 스타일 적용 + Google 로그인 + 멀티유저 대응
  */
 
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
@@ -21,7 +21,6 @@ import CostRecipeManager from './pages/CostRecipeManager';
 import SettingsPage from './pages/SettingsPage';
 import './index.css';
 
-// Home Page (GCP 스타일)
 const HomePage = () => (
   <div className="space-y-6 animate-fade-in">
     <div className="bg-gradient-to-r from-amber-500 to-orange-600 p-8 rounded-2xl text-white">
@@ -49,8 +48,6 @@ const HomePage = () => (
   </div>
 );
 
-// Placeholder Pages
-
 const HelpPage = () => (
   <div className="p-8 text-center bg-white rounded-xl border border-slate-200 shadow-sm min-h-[400px] flex flex-col justify-center items-center animate-fade-in">
     <div className="text-6xl mb-4">📖</div>
@@ -62,8 +59,6 @@ const HelpPage = () => (
   </div>
 );
 
-
-
 function App() {
   return (
     <AuthProvider>
@@ -73,9 +68,9 @@ function App() {
             {/* 로그인 페이지 (보호 안 함) */}
             <Route path="/login" element={<LoginPage />} />
 
-            {/* 회원가입 페이지 (로그인 후 접근) */}
+            {/* 회원가입 페이지 (인증된 상태에서만 접근) */}
             <Route path="/register" element={
-              <ProtectedRoute>
+              <ProtectedRoute checkRegistration={false}>
                 <RegisterPage />
               </ProtectedRoute>
             } />
@@ -104,5 +99,4 @@ function App() {
     </AuthProvider>
   );
 }
-
 export default App;
