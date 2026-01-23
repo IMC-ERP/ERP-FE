@@ -1025,50 +1025,30 @@ export default function Inventory() {
                     </td>
                   </tr>
                 ) : (
-                  intakeHistory.map((record) => {
-                    // 36시간 경과 체크
-                    const intakeTime = new Date(record.timestamp.replace(' ', 'T'));
-                    const now = new Date();
-                    const hoursDiff = (now.getTime() - intakeTime.getTime()) / (1000 * 60 * 60);
-                    const isExpired = hoursDiff > 36;
-
-                    return (
-                      <tr key={record.timestamp}>
-                        <td>{record.timestamp?.replace('T', ' ') || '-'}</td>
-                        <td>{record.category || '-'}</td>
-                        <td className="font-bold">{record.name || '-'}</td>
-                        <td className="text-right">{record.volume ? record.volume.toLocaleString() : '0'}</td>
-                        <td className="text-center">{record.uom || '-'}</td>
-                        <td className="text-right">{record.quantity || '0'}</td>
-                        <td className="text-right">{record.price_per_unit ? record.price_per_unit.toLocaleString() : '0'}원</td>
-                        <td className="text-right total-cell">
-                          <span className="total-amount">{record.total_amount ? record.total_amount.toLocaleString() : '0'}원</span>
-                        </td>
-                        <td className="text-center">
-                          {isExpired ? (
-                            <button
-                              className="btn-remove-row"
-                              disabled
-                              title="재고 관리 정확도를 위해 36시간이 지난 뒤에는 삭제할 수 없습니다"
-                              style={{ opacity: 0.3, cursor: 'not-allowed' }}
-                              aria-label="삭제 불가"
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          ) : (
-                            <button
-                              className="btn-remove-row"
-                              onClick={() => handleDeleteIntakeRecord(record.timestamp)}
-                              title="입고 기록 삭제 (재고 수량 및 단가 원상복구)"
-                              aria-label="기록 삭제"
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })
+                  intakeHistory.map((record) => (
+                    <tr key={record.timestamp}>
+                      <td>{record.timestamp?.replace('T', ' ') || '-'}</td>
+                      <td>{record.category || '-'}</td>
+                      <td className="font-bold">{record.name || '-'}</td>
+                      <td className="text-right">{record.volume ? record.volume.toLocaleString() : '0'}</td>
+                      <td className="text-center">{record.uom || '-'}</td>
+                      <td className="text-right">{record.quantity || '0'}</td>
+                      <td className="text-right">{record.price_per_unit ? record.price_per_unit.toLocaleString() : '0'}원</td>
+                      <td className="text-right total-cell">
+                        <span className="total-amount">{record.total_amount ? record.total_amount.toLocaleString() : '0'}원</span>
+                      </td>
+                      <td className="text-center">
+                        <button
+                          className="btn-remove-row"
+                          onClick={() => handleDeleteIntakeRecord(record.timestamp)}
+                          title="입고 기록 삭제 (재고 수량 및 단가 원상복구)"
+                          aria-label="기록 삭제"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))
                 )}
               </tbody>
             </table>
@@ -1077,6 +1057,10 @@ export default function Inventory() {
       </div>
     );
   };
+
+
+
+
 
   return (
     <div className="inventory-page-new">
