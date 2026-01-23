@@ -6,7 +6,11 @@
 import axios from 'axios';
 import axiosRetry from 'axios-retry';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://coffee-erp-backend-427178764915.asia-northeast3.run.app/api';
+// 개발 환경에서는 localhost, 프로덕션에서는 Cloud Run 백엔드 사용
+const API_BASE_URL = import.meta.env.VITE_API_URL 
+  || (import.meta.env.DEV 
+    ? 'http://localhost:8000/api' 
+    : 'https://coffee-erp-backend-427178764915.asia-northeast3.run.app/api');
 
 const api = axios.create({
   baseURL: API_BASE_URL,
