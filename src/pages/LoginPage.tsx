@@ -14,7 +14,7 @@ const LoginPage = () => {
     const [error, setError] = useState<string | null>(null);
     const [mode, setMode] = useState<'select' | 'login' | 'signup'>('select');
 
-    const handleGoogleAuth = async (intent: 'login' | 'signup') => {
+    const handleGoogleAuth = async (_intent: 'login' | 'signup') => {
         setIsLoading(true);
         setError(null);
 
