@@ -27,6 +27,7 @@ interface RecipeIngredient {
 
 interface MenuRecipe {
     id: string;
+    category: string;
     name: string;
     salePrice: number;
     ingredients: RecipeIngredient[];
@@ -566,6 +567,7 @@ export default function CostRecipeManager() {
             // Transform RecipeCost to MenuRecipe
             const loadedRecipes: MenuRecipe[] = recipesRes.data.map(r => ({
                 id: r.menu_name,
+                category: r.category || 'Uncategorized',
                 name: r.menu_name,
                 salePrice: r.selling_price,
                 ingredients: r.ingredients.map((ing, idx) => ({
@@ -583,7 +585,12 @@ export default function CostRecipeManager() {
 
     const [sortConfig, setSortConfig] = useState<{ key: 'name' | 'cogs'; direction: 'asc' | 'desc' }>({ key: 'name', direction: 'asc' });
     const [expandedRecipeId, setExpandedRecipeId] = useState<string | null>(null);
-    const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+    // 카테고리 확장 상태 관리 (초기값: 빈 배열=모두 닫힘, 혹은 'ALL' 로직 필요. 일단 1개만 열리거나 다 열리거나)
+    // 여기서는 다수의 카테고리를 열고 닫을 수 있게 Set 또는 배열로 관리
+    const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
+
+    const isAddModalOpenState = useState(false); // 기존 state 사용 
+    const [isAddModalOpen, setIsAddModalOpen] = isAddModalOpenState;
 
     const uniqueCategories = useMemo(() => {
         return Array.from(new Set(materials.map(m => m.category))).sort();
@@ -596,8 +603,22 @@ export default function CostRecipeManager() {
         }));
     };
 
-    const sortedRecipes = useMemo(() => {
-        return [...recipes].sort((a, b) => {
+    const handleToggleCategory = (category: string) => {
+        setExpandedCategories(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(category)) {
+                newSet.delete(category);
+            } else {
+                newSet.add(category);
+            }
+            return newSet;
+        });
+    };
+
+    // 카테고리별 그룹화 및 정렬
+    const groupedRecipes = useMemo(() => {
+        // 먼저 전체 정렬
+        const sorted = [...recipes].sort((a, b) => {
             if (sortConfig.key === 'name') {
                 return sortConfig.direction === 'asc'
                     ? a.name.localeCompare(b.name)
@@ -612,6 +633,16 @@ export default function CostRecipeManager() {
                 return sortConfig.direction === 'asc' ? cogsA - cogsB : cogsB - cogsA;
             }
         });
+
+        // 그룹화
+        const groups: Record<string, MenuRecipe[]> = {};
+        sorted.forEach(recipe => {
+            const cat = recipe.category || 'Uncategorized';
+            if (!groups[cat]) groups[cat] = [];
+            groups[cat].push(recipe);
+        });
+
+        return groups;
     }, [recipes, materials, sortConfig]);
 
     // --- Handlers: Materials ---
@@ -698,13 +729,16 @@ export default function CostRecipeManager() {
 
     const handleAddRecipe = () => {
         const newRecipe: MenuRecipe = {
-            id: Math.random().toString(36).substr(2, 9), // 임시 ID
+            id: Math.random().toString(36).substr(2, 9),
+            category: 'Uncategorized',
             name: '새 메뉴',
             salePrice: 0,
             ingredients: []
         };
         setRecipes(prev => [...prev, newRecipe]);
         setExpandedRecipeId(newRecipe.id);
+        // 새 메뉴의 카테고리를 자동으로 펼침
+        setExpandedCategories(prev => new Set(prev).add('Uncategorized'));
     };
 
     const handleSaveRecipe = async (recipe: MenuRecipe) => {
@@ -776,6 +810,18 @@ export default function CostRecipeManager() {
         setRecipes(prev => prev.map(r => r.id === recipeId ? { ...r, [field]: value } : r));
     };
 
+
+    // 원가율 33% 이상인 위험 메뉴 필터링
+    const dangerRecipes = useMemo(() => {
+        return recipes.filter(r => {
+            const cost = calculateRecipeCost(r.ingredients, materials);
+            const ratio = r.salePrice > 0 ? (cost / r.salePrice) * 100 : 0;
+            return ratio >= 33;
+        });
+    }, [recipes, materials]);
+
+    const [isDangerSectionExpanded, setIsDangerSectionExpanded] = useState(true);
+
     return (
         <div className="space-y-6 animate-fade-in relative">
             {/* Modal */}
@@ -841,6 +887,46 @@ export default function CostRecipeManager() {
             <div className="min-h-[500px]">
                 {activeTab === 'recipe' && (
                     <div className="space-y-4">
+                        {/* Danger Section (Cost Ratio >= 33%) */}
+                        {dangerRecipes.length > 0 && (
+                            <div className="mb-8 bg-red-50 rounded-xl border border-red-200 shadow-sm overflow-hidden">
+                                <div
+                                    onClick={() => setIsDangerSectionExpanded(!isDangerSectionExpanded)}
+                                    className="px-6 py-4 flex justify-between items-center cursor-pointer hover:bg-red-100/50 transition-colors"
+                                >
+                                    <div className="flex items-center gap-3">
+                                        {isDangerSectionExpanded ? <ChevronDown size={20} className="text-red-400" /> : <ChevronRight size={20} className="text-red-400" />}
+                                        <div className="flex items-center gap-2">
+                                            <AlertCircle className="text-red-500" size={20} />
+                                            <h3 className="font-bold text-red-800 text-lg">원가율 주의 항목 (33% 이상)</h3>
+                                        </div>
+                                        <span className="bg-red-200 text-red-800 text-xs px-2 py-0.5 rounded-full font-bold">{dangerRecipes.length}개</span>
+                                    </div>
+                                    <span className="text-xs text-red-600 font-medium">이 메뉴들은 원가율 관리가 시급합니다.</span>
+                                </div>
+
+                                {isDangerSectionExpanded && (
+                                    <div className="p-4 space-y-3 bg-white/50">
+                                        {dangerRecipes.map(recipe => (
+                                            <RecipeRow
+                                                key={`danger-${recipe.id}`}
+                                                recipe={recipe}
+                                                materials={materials}
+                                                expandedRecipeId={expandedRecipeId}
+                                                setExpandedRecipeId={setExpandedRecipeId}
+                                                onDelete={handleDeleteRecipe}
+                                                onUpdateMeta={handleUpdateRecipeMeta}
+                                                onUpdateIngredient={handleUpdateIngredient}
+                                                onRemoveIngredient={handleRemoveIngredient}
+                                                onAddIngredient={handleAddIngredient}
+                                                onSave={handleSaveRecipe}
+                                            />
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
                         {/* Sort Controls */}
                         <div className="flex justify-end gap-2 mb-2">
                             <span className="text-xs text-slate-400 flex items-center mr-1">정렬 기준:</span>
@@ -864,38 +950,68 @@ export default function CostRecipeManager() {
                             </button>
                         </div>
 
-                        {sortedRecipes.map(recipe => (
-                            <RecipeRow
-                                key={recipe.id}
-                                recipe={recipe}
-                                materials={materials}
-                                expandedRecipeId={expandedRecipeId}
-                                setExpandedRecipeId={setExpandedRecipeId}
-                                onDelete={handleDeleteRecipe}
-                                onUpdateMeta={handleUpdateRecipeMeta}
-                                onUpdateIngredient={handleUpdateIngredient}
-                                onRemoveIngredient={handleRemoveIngredient}
-                                onAddIngredient={handleAddIngredient}
-                                onSave={handleSaveRecipe}
-                            />
-                        ))}
-                        {recipes.length === 0 && (
-                            <div className="text-center p-12 bg-slate-50 rounded-xl border border-dashed border-slate-300 text-slate-400">
-                                등록된 메뉴가 없습니다. 우측 상단 버튼을 눌러 메뉴를 추가하세요.
-                            </div>
-                        )}
-                    </div>
-                )}
+                        {Object.entries(groupedRecipes).map(([category, categoryRecipes]) => {
+                            const isCategoryExpanded = expandedCategories.has(category);
 
-                {activeTab === 'material' && (
-                    <MaterialTable
-                        materials={materials}
-                        onUpdate={handleUpdateMaterial}
-                        onDelete={handleDeleteMaterial}
-                        onSave={handleSaveExistingMaterial}
-                    />
-                )}
-            </div>
-        </div>
+                            return (
+                                <div key={category} className="mb-4 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                                    {/* Category Header */}
+                                    <div
+                                        onClick={() => handleToggleCategory(category)}
+                                        className="flex items-center justify-between p-4 bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors border-b border-slate-100"
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            {isCategoryExpanded ? <ChevronDown size={20} className="text-slate-500" /> : <ChevronRight size={20} className="text-slate-500" />}
+                                            <h3 className="font-bold text-slate-800 text-lg uppercase tracking-wide">{category}</h3>
+                                            <span className="bg-slate-200 text-slate-600 text-xs px-2 py-0.5 rounded-full font-bold">{categoryRecipes.length}</span>
+                                        </div>
+                                    </div>
+
+                                    {/* Recipes List (Collapsed by default) */}
+                                    {isCategoryExpanded && (
+                                        <div className="p-4 bg-slate-50/50 space-y-3">
+                                            {categoryRecipes.map(recipe => (
+                                                <RecipeRow
+                                                    key={recipe.id}
+                                                    recipe={recipe}
+                                                    materials={materials}
+                                                    expandedRecipeId={expandedRecipeId}
+                                                    setExpandedRecipeId={setExpandedRecipeId}
+                                                    onDelete={handleDeleteRecipe}
+                                                    onUpdateMeta={handleUpdateRecipeMeta}
+                                                    onUpdateIngredient={handleUpdateIngredient}
+                                                    onRemoveIngredient={handleRemoveIngredient}
+                                                    onAddIngredient={handleAddIngredient}
+                                                    onSave={handleSaveRecipe}
+                                                />
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
+                        {
+                            recipes.length === 0 && (
+                                <div className="text-center p-12 bg-slate-50 rounded-xl border border-dashed border-slate-300 text-slate-400">
+                                    등록된 메뉴가 없습니다. 우측 상단 버튼을 눌러 메뉴를 추가하세요.
+                                </div>
+                            )
+                        }
+                    </div >
+                )
+                }
+
+                {
+                    activeTab === 'material' && (
+                        <MaterialTable
+                            materials={materials}
+                            onUpdate={handleUpdateMaterial}
+                            onDelete={handleDeleteMaterial}
+                            onSave={handleSaveExistingMaterial}
+                        />
+                    )
+                }
+            </div >
+        </div >
     );
 }
