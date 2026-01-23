@@ -1,6 +1,6 @@
 /**
  * AuthContext.tsx
- * Firebase Google 인증 상태 관리
+ * Firebase Google 인증 상태 관리 + 사용자 프로필 관리
  */
 
 import { createContext, useContext, useEffect, useState } from 'react';
@@ -12,21 +12,16 @@ import {
 } from 'firebase/auth';
 import type { User } from 'firebase/auth';
 import { auth, googleProvider } from '../firebase';
-
-// 매장 매핑 (이메일 → 매장 ID)
-// 필요에 따라 수정하세요
-const STORE_MAPPING: Record<string, string> = {
-    // 예시: 이메일별 매장 할당
-    // 'store1@gmail.com': 'store1',
-    // 'store2@gmail.com': 'store2',
-};
+import { userApi, type UserProfile } from '../services/api';
 
 interface AuthContextType {
     user: User | null;
+    userProfile: UserProfile | null;
     loading: boolean;
-    storeId: string | null;
+    needsRegistration: boolean;
     signInWithGoogle: () => Promise<void>;
     logout: () => Promise<void>;
+    refreshProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -45,8 +40,38 @@ interface AuthProviderProps {
 
 export const AuthProvider = ({ children }: AuthProviderProps) => {
     const [user, setUser] = useState<User | null>(null);
+    const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
     const [loading, setLoading] = useState(true);
-    const [storeId, setStoreId] = useState<string | null>(null);
+    const [needsRegistration, setNeedsRegistration] = useState(false);
+
+    // 사용자 프로필 로드
+    const loadUserProfile = async () => {
+        try {
+            const response = await userApi.getProfile();
+            setUserProfile(response.data);
+            setNeedsRegistration(false);
+            console.log('[AUTH] User profile loaded:', response.data.store_name);
+        } catch (error: any) {
+            console.error('[AUTH] Failed to load profile:', error);
+
+            if (error.response?.status === 403) {
+                // 등록 필요
+                console.log('[AUTH] User needs registration');
+                setNeedsRegistration(true);
+                setUserProfile(null);
+            } else {
+                // 기타 에러
+                setNeedsRegistration(false);
+                setUserProfile(null);
+            }
+        }
+    };
+
+    // 프로필 새로고침 (등록 후 호출)
+    const refreshProfile = async () => {
+        if (!user) return;
+        await loadUserProfile();
+    };
 
     // Google 로그인
     const signInWithGoogle = async () => {
@@ -62,7 +87,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     const logout = async () => {
         try {
             await signOut(auth);
-            setStoreId(null);
+            setUserProfile(null);
+            setNeedsRegistration(false);
         } catch (error) {
             console.error('로그아웃 실패:', error);
             throw error;
@@ -71,15 +97,16 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
     // 인증 상태 감시
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
             setUser(currentUser);
 
-            // 매장 ID 설정
-            if (currentUser?.email) {
-                const mappedStore = STORE_MAPPING[currentUser.email];
-                setStoreId(mappedStore || 'default');
+            if (currentUser) {
+                // 사용자 로그인 상태 - 프로필 로드
+                await loadUserProfile();
             } else {
-                setStoreId(null);
+                // 로그아웃 상태
+                setUserProfile(null);
+                setNeedsRegistration(false);
             }
 
             setLoading(false);
@@ -90,10 +117,12 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
     const value: AuthContextType = {
         user,
+        userProfile,
         loading,
-        storeId,
+        needsRegistration,
         signInWithGoogle,
-        logout
+        logout,
+        refreshProfile
     };
 
     return (

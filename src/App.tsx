@@ -9,6 +9,7 @@ import { AuthProvider } from './contexts/AuthContext';
 import Layout from './components/Layout/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 import LoginPage from './pages/LoginPage';
+import RegisterPage from './pages/RegisterPage';
 import Dashboard from './pages/Dashboard';
 import Sales from './pages/Sales';
 import Inventory from './pages/Inventory';
@@ -71,6 +72,13 @@ function App() {
           <Routes>
             {/* 로그인 페이지 (보호 안 함) */}
             <Route path="/login" element={<LoginPage />} />
+
+            {/* 회원가입 페이지 (로그인 후 접근) */}
+            <Route path="/register" element={
+              <ProtectedRoute>
+                <RegisterPage />
+              </ProtectedRoute>
+            } />
 
             {/* 보호된 라우트들 */}
             <Route path="/" element={

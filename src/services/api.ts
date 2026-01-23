@@ -355,4 +355,47 @@ export const dailySalesApi = {
   }
 };
 
+// ==================== User API ====================
+
+export interface UserRegistration {
+  email: string;
+  store_name: string;
+  owner_name: string;
+  phone?: string;
+  address?: string;
+}
+
+export interface UserProfile {
+  uid: string;
+  email: string;
+  store_id: string;
+  store_name: string;
+  owner_name: string;
+  phone?: string;
+  address?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UserProfileUpdate {
+  store_name?: string;
+  owner_name?: string;
+  phone?: string;
+  address?: string;
+}
+
+export interface RegistrationStatus {
+  is_registered: boolean;
+  email: string;
+  uid: string;
+  profile: UserProfile | null;
+}
+
+export const userApi = {
+  register: (data: UserRegistration) => api.post<UserProfile>('/users/register', data),
+  getProfile: () => api.get<UserProfile>('/users/profile'),
+  updateProfile: (data: UserProfileUpdate) => api.put<UserProfile>('/users/profile', data),
+  checkRegistration: () => api.get<RegistrationStatus>('/users/check-registration'),
+};
+
 export default api;
