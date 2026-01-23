@@ -47,23 +47,24 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     // 사용자 프로필 로드
     const loadUserProfile = async () => {
         try {
-            const response = await userApi.getProfile();
-            setUserProfile(response.data);
-            setNeedsRegistration(false);
-            console.log('[AUTH] User profile loaded:', response.data.store_name);
-        } catch (error: any) {
-            console.error('[AUTH] Failed to load profile:', error);
+            // check-registration 엔드포인트 사용 (미등록 사용자도 호출 가능)
+            const response = await userApi.checkRegistration();
 
-            if (error.response?.status === 403) {
+            if (response.data.is_registered && response.data.profile) {
+                setUserProfile(response.data.profile);
+                setNeedsRegistration(false);
+                console.log('[AUTH] User profile loaded:', response.data.profile.store_name);
+            } else {
                 // 등록 필요
                 console.log('[AUTH] User needs registration');
                 setNeedsRegistration(true);
                 setUserProfile(null);
-            } else {
-                // 기타 에러
-                setNeedsRegistration(false);
-                setUserProfile(null);
             }
+        } catch (error: any) {
+            console.error('[AUTH] Failed to check registration:', error);
+            // 에러 시 안전하게 등록 필요로 설정
+            setNeedsRegistration(true);
+            setUserProfile(null);
         }
     };
 

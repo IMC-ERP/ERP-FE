@@ -9,7 +9,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { userApi } from '../services/api';
 
 export default function RegisterPage() {
-    const { user } = useAuth();
+    const { user, refreshProfile } = useAuth();
     const navigate = useNavigate();
 
     const [formData, setFormData] = useState({
@@ -65,7 +65,8 @@ export default function RegisterPage() {
                 address: formData.address
             });
 
-            // 등록 성공 - 대시보드로 이동
+            // 등록 성공 - 프로필 새로고침 후 대시보드로 이동
+            await refreshProfile();
             navigate('/dashboard');
         } catch (err: any) {
             console.error('Registration failed:', err);

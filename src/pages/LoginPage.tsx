@@ -1,6 +1,6 @@
 /**
  * LoginPage.tsx
- * 구글 로그인 페이지
+ * 구글 로그인 페이지 - 로그인/회원가입 선택
  */
 
 import { useState } from 'react';
@@ -12,22 +12,64 @@ const LoginPage = () => {
     const navigate = useNavigate();
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [mode, setMode] = useState<'select' | 'login' | 'signup'>('select');
 
-    const handleGoogleLogin = async () => {
+    const handleGoogleAuth = async (intent: 'login' | 'signup') => {
         setIsLoading(true);
         setError(null);
 
         try {
             await signInWithGoogle();
+            // 로그인 후 AuthContext가 자동으로 등록 여부를 확인하고 리다이렉트
             navigate('/');
         } catch (err) {
-            setError('로그인에 실패했습니다. 다시 시도해주세요.');
+            setError('인증에 실패했습니다. 다시 시도해주세요.');
             console.error(err);
         } finally {
             setIsLoading(false);
         }
     };
 
+    // 선택 화면
+    if (mode === 'select') {
+        return (
+            <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-amber-100 flex items-center justify-center p-4">
+                <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
+                    {/* 로고 & 타이틀 */}
+                    <div className="text-center mb-8">
+                        <div className="text-6xl mb-4">☕</div>
+                        <h1 className="text-2xl font-bold text-slate-800 mb-2">
+                            Coffee ERP
+                        </h1>
+                        <p className="text-slate-500">
+                            매장 관리 시스템에 오신 것을 환영합니다
+                        </p>
+                    </div>
+
+                    {/* 선택 버튼들 */}
+                    <div className="space-y-4">
+                        <button
+                            onClick={() => setMode('login')}
+                            className="w-full bg-gradient-to-r from-amber-500 to-orange-600 text-white font-semibold py-4 rounded-xl hover:from-amber-600 hover:to-orange-700 transition-all shadow-md hover:shadow-lg">
+                            기존 계정으로 로그인
+                        </button>
+
+                        <button
+                            onClick={() => setMode('signup')}
+                            className="w-full bg-white border-2 border-amber-500 text-amber-600 font-semibold py-4 rounded-xl hover:bg-amber-50 transition-all">
+                            새 매장 등록 (회원가입)
+                        </button>
+                    </div>
+
+                    <p className="text-center text-xs text-slate-400 mt-6">
+                        Google 계정으로 간편하게 시작하세요
+                    </p>
+                </div>
+            </div>
+        );
+    }
+
+    // 로그인/회원가입 화면
     return (
         <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-amber-100 flex items-center justify-center p-4">
             <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
@@ -35,10 +77,12 @@ const LoginPage = () => {
                 <div className="text-center mb-8">
                     <div className="text-6xl mb-4">☕</div>
                     <h1 className="text-2xl font-bold text-slate-800 mb-2">
-                        Coffee ERP
+                        {mode === 'login' ? '로그인' : '회원가입'}
                     </h1>
                     <p className="text-slate-500">
-                        매장 관리 시스템에 로그인하세요
+                        {mode === 'login'
+                            ? '기존 계정으로 로그인하세요'
+                            : '새 매장을 등록하세요'}
                     </p>
                 </div>
 
@@ -49,15 +93,21 @@ const LoginPage = () => {
                     </div>
                 )}
 
+                {/* 안내 메시지 */}
+                {mode === 'signup' && (
+                    <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg text-blue-700 text-sm">
+                        💡 Google 인증 후 매장 정보를 입력하시면 됩니다
+                    </div>
+                )}
+
                 {/* 구글 로그인 버튼 */}
                 <button
-                    onClick={handleGoogleLogin}
+                    onClick={() => handleGoogleAuth(mode)}
                     disabled={isLoading}
                     className="w-full flex items-center justify-center gap-3 bg-white border-2 border-slate-200 
                      hover:border-slate-300 hover:bg-slate-50 text-slate-700 font-medium py-3 px-4 
                      rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed
-                     shadow-sm hover:shadow-md"
-                >
+                     shadow-sm hover:shadow-md">
                     {isLoading ? (
                         <div className="w-5 h-5 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin" />
                     ) : (
@@ -80,13 +130,19 @@ const LoginPage = () => {
                             />
                         </svg>
                     )}
-                    <span>{isLoading ? '로그인 중...' : 'Google로 로그인'}</span>
+                    <span>
+                        {isLoading
+                            ? '인증 중...'
+                            : `Google로 ${mode === 'login' ? '로그인' : '회원가입'}`}
+                    </span>
                 </button>
 
-                {/* 하단 안내 */}
-                <p className="text-center text-sm text-slate-400 mt-6">
-                    승인된 계정만 로그인할 수 있습니다
-                </p>
+                {/* 뒤로 가기 */}
+                <button
+                    onClick={() => setMode('select')}
+                    className="w-full mt-4 text-sm text-slate-500 hover:text-slate-700 py-2">
+                    ← 뒤로 가기
+                </button>
             </div>
         </div>
     );
