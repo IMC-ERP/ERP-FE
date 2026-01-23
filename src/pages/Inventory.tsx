@@ -3,7 +3,7 @@
  * 재고 관리 페이지 (전면 재설계)
  */
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { RefreshCw, ChevronDown, ChevronUp, Plus, X, Trash2 } from 'lucide-react';
 import { inventoryApi, stockIntakeApi, ocrApi, type InventoryItem, type StockIntake, type OCRReceiptData, type StockIntakeRecord } from '../services/api';
