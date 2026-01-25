@@ -329,9 +329,17 @@ export const dailySalesApi = {
   deleteDate: (date: string) =>
     api.delete(`/daily-sales/${date}`),
 
-  ocr: (file: File) => {
+  ocr: (files: FileList | File[]) => {
     const formData = new FormData();
-    formData.append('file', file);
+    if (files instanceof FileList) {
+      Array.from(files).forEach((file) => {
+        formData.append('files', file);
+      });
+    } else {
+      files.forEach((file) => {
+        formData.append('files', file);
+      });
+    }
     return api.post<OCRSalesResponse>('/daily-sales/ocr', formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     });

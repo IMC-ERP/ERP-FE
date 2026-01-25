@@ -625,12 +625,12 @@ const DailySalesAddView = () => {
     };
 
     // OCR 파일 업로드 핸들러
-    const handleOcrFileChange = async (file: File | null) => {
-        if (!file) return;
+    const handleOcrFileChange = async (files: FileList | null) => {
+        if (!files || files.length === 0) return;
         setIsOcrLoading(true);
 
         try {
-            const response = await dailySalesApi.ocr(file);
+            const response = await dailySalesApi.ocr(files);
             const data = response.data;
 
             // success 체크
@@ -877,7 +877,8 @@ const DailySalesAddView = () => {
                                     <input
                                         type="file"
                                         accept="image/*"
-                                        onChange={(e) => handleOcrFileChange(e.target.files?.[0] || null)}
+                                        multiple
+                                        onChange={(e) => handleOcrFileChange(e.target.files)}
                                         className="hidden"
                                         id="ocr-upload"
                                     />
@@ -948,7 +949,8 @@ const DailySalesAddView = () => {
                             <input
                                 type="file"
                                 accept="image/jpeg,image/png"
-                                onChange={(e) => handleOcrFileChange(e.target.files?.[0] || null)}
+                                multiple
+                                onChange={(e) => handleOcrFileChange(e.target.files)}
                                 className="hidden"
                                 id="ocr-file-input"
                             />
