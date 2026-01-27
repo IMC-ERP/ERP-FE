@@ -6,6 +6,7 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import type { SaleItem, InventoryItem, StoreProfile, AppSettings } from '../types';
 import { salesApi, inventoryApi, type Sale, type InventoryItem as APIInventoryItem } from '../services/api';
+import { auth } from '../firebase';
 
 interface DataContextType {
     sales: SaleItem[];
@@ -106,7 +107,19 @@ export const DataProvider = ({ children }: { children?: ReactNode }) => {
     };
 
     useEffect(() => {
-        fetchData();
+        // Auth 상태 변경 감지
+        const unsubscribe = auth.onAuthStateChanged((user) => {
+            if (user) {
+                fetchData();
+            } else {
+                // 로그아웃 시 데이터 초기화
+                setSales([]);
+                setInventory([]);
+                setIsLoading(false);
+            }
+        });
+
+        return () => unsubscribe();
     }, []);
 
     const addSale = (newSale: SaleItem) => {
