@@ -3,16 +3,36 @@
  * 구글 로그인 페이지 - 로그인/회원가입 선택
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
 const LoginPage = () => {
-    const { signInWithGoogle } = useAuth();
+    const { signInWithGoogle, user, loading, needsRegistration } = useAuth();
     const navigate = useNavigate();
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [mode, setMode] = useState<'select' | 'login' | 'signup'>('select');
+
+    // Google 로그인 후 돌아왔을 때 자동 리다이렉트
+    useEffect(() => {
+        console.log('[LoginPage] State changed:', {
+            loading,
+            user: user?.email || null,
+            needsRegistration
+        });
+
+        if (!loading && user) {
+            console.log('[LoginPage] User logged in, redirecting...');
+            if (needsRegistration) {
+                console.log('[LoginPage] -> /register');
+                navigate('/register', { replace: true });
+            } else {
+                console.log('[LoginPage] -> /');
+                navigate('/', { replace: true });
+            }
+        }
+    }, [user, loading, needsRegistration, navigate]);
 
     const handleGoogleAuth = async (_intent: 'login' | 'signup') => {
         setIsLoading(true);
@@ -29,6 +49,21 @@ const LoginPage = () => {
             setIsLoading(false);
         }
     };
+
+    // 로딩 중 또는 이미 로그인된 경우
+    if (loading || user) {
+        return (
+            <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-amber-100 flex items-center justify-center">
+                <div className="text-center">
+                    <div className="w-12 h-12 border-4 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+                    <p className="text-slate-600">로그인 확인 중...</p>
+                    <p className="text-xs text-slate-400 mt-2">
+                        loading: {String(loading)} | user: {user?.email || 'null'} | needsReg: {String(needsRegistration)}
+                    </p>
+                </div>
+            </div>
+        );
+    }
 
     // 선택 화면
     if (mode === 'select') {

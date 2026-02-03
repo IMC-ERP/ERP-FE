@@ -41,13 +41,18 @@ api.interceptors.request.use(async (config) => {
   await auth.authStateReady();
 
   const user = auth.currentUser;
+  console.log('[API Interceptor] currentUser:', user?.email || 'null');
+
   if (user) {
     try {
       const token = await user.getIdToken();
+      console.log('[API Interceptor] Token obtained:', token ? 'YES (length: ' + token.length + ')' : 'NO');
       config.headers.Authorization = `Bearer ${token}`;
     } catch (error) {
-      console.error('Failed to get Firebase token:', error);
+      console.error('[API Interceptor] Failed to get Firebase token:', error);
     }
+  } else {
+    console.warn('[API Interceptor] No user, request without token:', config.url);
   }
   return config;
 }, (error) => {

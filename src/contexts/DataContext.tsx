@@ -108,9 +108,16 @@ export const DataProvider = ({ children }: { children?: ReactNode }) => {
 
     useEffect(() => {
         // Auth 상태 변경 감지
-        const unsubscribe = auth.onAuthStateChanged((user) => {
+        const unsubscribe = auth.onAuthStateChanged(async (user) => {
             if (user) {
-                fetchData();
+                // 토큰이 준비될 때까지 대기 후 데이터 fetch
+                try {
+                    await user.getIdToken();
+                    fetchData();
+                } catch (error) {
+                    console.error('[DataContext] Failed to get token:', error);
+                    setIsLoading(false);
+                }
             } else {
                 // 로그아웃 시 데이터 초기화
                 setSales([]);
