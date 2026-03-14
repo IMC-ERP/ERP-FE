@@ -95,3 +95,122 @@ button {
 .animate-fade-in {
   animation: fadeIn 0.3s ease-out;
 }
+
+/* ========== 모바일 반응형 Layout ========== */
+
+/* 사이드바 공통 */
+.sidebar-container {
+  width: 16rem; /* w-64 */
+  background: white;
+  border-right: 1px solid #e2e8f0;
+  flex-shrink: 0;
+  position: fixed;
+  height: 100%;
+  z-index: 10;
+  transition: all 0.3s;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 모바일 사이드바 */
+.mobile-sidebar {
+  z-index: 60;
+  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.15);
+}
+
+.mobile-sidebar-closed {
+  transform: translateX(-100%);
+}
+
+.mobile-sidebar-open {
+  transform: translateX(0);
+}
+
+/* 모바일 오버레이 */
+.mobile-sidebar-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.4);
+  backdrop-filter: blur(2px);
+  z-index: 55;
+  animation: fadeIn 0.2s ease-out;
+}
+
+/* 모바일 상단 헤더 */
+.mobile-top-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 56px;
+  background: white;
+  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  z-index: 45;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.mobile-hamburger-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: none;
+  background: none;
+  color: #475569;
+  border-radius: 10px;
+  transition: all 0.2s;
+}
+
+.mobile-hamburger-btn:hover,
+.mobile-hamburger-btn:active {
+  background: #f1f5f9;
+  color: #1e293b;
+}
+
+.mobile-header-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: #1e293b;
+}
+
+.mobile-header-logo {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid #e2e8f0;
+}
+
+.mobile-ai-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: none;
+  background: linear-gradient(135deg, #3b82f6, #6366f1);
+  color: white;
+  border-radius: 10px;
+  transition: all 0.2s;
+  box-shadow: 0 2px 6px rgba(99, 102, 241, 0.3);
+}
+
+.mobile-ai-btn:active {
+  transform: scale(0.95);
+}
+
+/* safe-area 대응 (iPhone 노치 등) */
+@supports (padding-top: env(safe-area-inset-top)) {
+  .mobile-top-header {
+    padding-top: env(safe-area-inset-top);
+    height: calc(56px + env(safe-area-inset-top));
+  }
+}

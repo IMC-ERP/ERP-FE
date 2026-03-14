@@ -120,11 +120,11 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 animate-fade-in overflow-visible">
+    <div className="max-w-4xl mx-auto space-y-4 md:space-y-6 animate-fade-in overflow-visible">
 
       {/* 1. Profitability Section */}
       <div className="bg-white rounded-2xl shadow-lg border border-slate-200">
-        <div className={`relative ${theme.gradient} p-8 text-white transition-colors duration-500 rounded-t-2xl ${!showProfitDetails ? 'rounded-b-2xl' : ''}`}>
+        <div className={`relative ${theme.gradient} p-5 md:p-8 text-white transition-colors duration-500 rounded-t-2xl ${!showProfitDetails ? 'rounded-b-2xl' : ''}`}>
           <div className="flex items-start justify-between">
             <div>
               <div className="flex items-center gap-2 mb-2">
@@ -137,9 +137,9 @@ export default function Dashboard() {
                   </div>
                 </div>
               </div>
-              <div className="flex items-end gap-4">
-                <h1 className="text-3xl font-light">
-                  현재 이달 수익률은 <span className="font-bold text-5xl">{financialMetrics.profitMargin.toFixed(1)}%</span> 입니다.
+              <div className="flex items-end gap-2 md:gap-4">
+                <h1 className="text-xl md:text-3xl font-light">
+                  현재 이달 수익률은 <span className="font-bold text-3xl md:text-5xl">{financialMetrics.profitMargin.toFixed(1)}%</span> 입니다.
                 </h1>
                 <button
                   onClick={() => setShowProfitDetails(!showProfitDetails)}
@@ -153,8 +153,8 @@ export default function Dashboard() {
         </div>
 
         {showProfitDetails && (
-          <div className="p-8 bg-slate-50 border-t border-slate-100 rounded-b-2xl">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="p-4 md:p-8 bg-slate-50 border-t border-slate-100 rounded-b-2xl">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8">
               <div className="space-y-4">
                 <div className="flex justify-between items-center mb-2">
                   <h3 className="text-slate-500 font-semibold text-sm uppercase tracking-wider">Total Cost Analysis</h3>
@@ -200,7 +200,7 @@ export default function Dashboard() {
                 </div>
               </div>
             </div>
-            <div className="mt-8 pt-6 border-t border-slate-200 flex justify-between items-center">
+            <div className="mt-6 md:mt-8 pt-4 md:pt-6 border-t border-slate-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
               <div className="text-slate-600 font-medium">총 순수익 (Net Profit)</div>
               <div className="text-right">
                 <div className={`text-3xl font-extrabold ${theme.textMain}`}>{Math.round(financialMetrics.netProfit).toLocaleString()}원</div>
@@ -247,11 +247,11 @@ export default function Dashboard() {
                 </tbody>
               </table>
             </div>
-            <div className="bg-slate-100 p-4 rounded-xl flex flex-col md:flex-row gap-4 items-end">
-              <div className="flex-1 w-full"><label className="block text-xs font-medium text-slate-500 mb-1">항목 이름</label><input type="text" placeholder="예: 인터넷비" value={newItemName} onChange={(e) => setNewItemName(e.target.value)} className="w-full p-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-blue-500 text-slate-900 shadow-sm" /></div>
-              <div className="w-full md:w-32"><label className="block text-xs font-medium text-slate-500 mb-1">금액 (원)</label><input type="number" placeholder="0" value={newItemAmount} onChange={(e) => setNewItemAmount(e.target.value)} className="w-full p-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-blue-500 text-right text-slate-900 shadow-sm" /></div>
+            <div className="bg-slate-100 p-3 md:p-4 rounded-xl flex flex-col md:flex-row gap-3 md:gap-4 items-end">
+              <div className="flex-1 w-full"><label className="block text-xs font-medium text-slate-500 mb-1">항목 이름</label><input type="text" placeholder="예: 인터넷비" value={newItemName} onChange={(e) => setNewItemName(e.target.value)} className="w-full p-2.5 md:p-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-blue-500 text-slate-900 shadow-sm" /></div>
+              <div className="w-full md:w-32"><label className="block text-xs font-medium text-slate-500 mb-1">금액 (원)</label><input type="number" placeholder="0" value={newItemAmount} onChange={(e) => setNewItemAmount(e.target.value)} className="w-full p-2.5 md:p-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-blue-500 text-right text-slate-900 shadow-sm" /></div>
               <div className="w-full md:w-40"><label className="block text-xs font-medium text-slate-500 mb-1">반복 여부</label><div className="flex bg-white rounded-lg border border-slate-300 p-1 shadow-sm"><button onClick={() => setNewItemType('recurring')} className={`flex-1 text-xs py-1.5 rounded-md ${newItemType === 'recurring' ? 'bg-indigo-100 text-indigo-700 font-bold' : 'text-slate-400'}`}>매달</button><button onClick={() => setNewItemType('onetime')} className={`flex-1 text-xs py-1.5 rounded-md ${newItemType === 'onetime' ? 'bg-orange-100 text-orange-700 font-bold' : 'text-slate-400'}`}>이번달</button></div></div>
-              <button onClick={addUtilityItem} disabled={!newItemName || !newItemAmount} className="w-full md:w-auto px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-50 transition-all shadow-md active:scale-95"><Plus size={16} />추가</button>
+              <button onClick={addUtilityItem} disabled={!newItemName || !newItemAmount} className="w-full md:w-auto px-4 py-2.5 md:py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-50 transition-all shadow-md active:scale-95"><Plus size={16} />추가</button>
             </div>
           </div>
         )}

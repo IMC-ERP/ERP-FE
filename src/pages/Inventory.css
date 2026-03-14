@@ -1387,3 +1387,107 @@
   transform: translateY(-1px);
   box-shadow: 0 6px 8px rgba(79, 70, 229, 0.3);
 }
+
+/* ========== 모바일 업로드 옵션 ========== */
+.mobile-upload-options {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px;
+}
+
+.mobile-upload-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 28px 20px;
+  border: 2px dashed #cbd5e1;
+  border-radius: 16px;
+  background: #f8fafc;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.2s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.mobile-upload-btn:active {
+  transform: scale(0.98);
+  border-color: #94a3b8;
+  background: #f1f5f9;
+}
+
+.mobile-upload-btn.camera-btn {
+  border-color: #93c5fd;
+  background: linear-gradient(135deg, #eff6ff, #dbeafe);
+  color: #2563eb;
+}
+
+.mobile-upload-btn.camera-btn:active {
+  background: linear-gradient(135deg, #dbeafe, #bfdbfe);
+}
+
+.mobile-upload-btn.gallery-btn {
+  border-color: #a5b4fc;
+  background: linear-gradient(135deg, #eef2ff, #e0e7ff);
+  color: #4f46e5;
+}
+
+.mobile-upload-btn.gallery-btn:active {
+  background: linear-gradient(135deg, #e0e7ff, #c7d2fe);
+}
+
+.mobile-upload-label {
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.mobile-upload-desc {
+  font-size: 0.8rem;
+  opacity: 0.65;
+  font-weight: 400;
+}
+
+/* 모바일 반응형 보정 */
+@media (max-width: 768px) {
+  .inventory-page {
+    padding: 0;
+  }
+
+  .inventory-page header {
+    padding: 0 4px;
+  }
+
+  .inventory-page header h1 {
+    font-size: 1.4rem;
+  }
+
+  .inventory-page header p {
+    font-size: 0.75rem;
+  }
+
+  .tab-container {
+    margin: 0;
+  }
+
+  .tab-header {
+    padding: 0 8px;
+    gap: 4px;
+  }
+
+  .tab-btn {
+    font-size: 0.82rem;
+    padding: 8px 10px;
+  }
+
+  .upload-header h2 {
+    font-size: 1.1rem;
+  }
+
+  .intake-table th,
+  .intake-table td {
+    padding: 8px 6px;
+    font-size: 0.78rem;
+  }
+}

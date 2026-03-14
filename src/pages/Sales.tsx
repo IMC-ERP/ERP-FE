@@ -4,7 +4,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { Plus, Trash2, RefreshCw, ShoppingCart } from 'lucide-react';
+import { Plus, Trash2, RefreshCw, ShoppingCart, Calendar } from 'lucide-react';
 import { salesApi, type Sale } from '../services/api';
 
 const MENU_OPTIONS = [
@@ -23,6 +23,14 @@ export default function Sales() {
   const [sales, setSales] = useState<Sale[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
 
   const [formData, setFormData] = useState({
     상품상세: MENU_OPTIONS[0],
@@ -69,25 +77,25 @@ export default function Sales() {
   };
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="space-y-4 md:space-y-6 animate-fade-in">
+      <header className="flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <span className="text-blue-600"><ShoppingCart size={32} /></span>
+          <span className="text-blue-600"><ShoppingCart size={isMobile ? 24 : 32} /></span>
           <div>
-            <h1 className="text-3xl font-extrabold text-slate-800">판매 관리</h1>
-            <p className="text-slate-500 text-sm">판매 데이터 조회 및 입력</p>
+            <h1 className="text-2xl md:text-3xl font-extrabold text-slate-800">판매 관리</h1>
+            <p className="text-slate-500 text-xs md:text-sm">판매 데이터 조회 및 입력</p>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 w-full md:w-auto">
           <button
             onClick={fetchSales}
-            className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-300 rounded-lg text-sm text-slate-600 hover:bg-slate-50 shadow-sm transition-colors"
+            className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2.5 md:py-2 bg-white border border-slate-300 rounded-lg text-sm text-slate-600 hover:bg-slate-50 shadow-sm transition-colors"
           >
             <RefreshCw size={16} /> 새로고침
           </button>
           <button
             onClick={() => setShowForm(!showForm)}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700 shadow-sm transition-colors"
+            className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2.5 md:py-2 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700 shadow-sm transition-colors"
           >
             <Plus size={16} /> 판매 입력
           </button>
@@ -99,7 +107,7 @@ export default function Sales() {
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 animate-fade-in">
           <h3 className="text-lg font-bold text-slate-800 mb-4">📝 새 판매 입력</h3>
           <form onSubmit={handleSubmit}>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3 md:gap-4 mb-4">
               <div>
                 <label className="block text-xs font-bold text-slate-500 mb-1">상품</label>
                 <select
@@ -163,8 +171,8 @@ export default function Sales() {
 
       {/* 판매 목록 */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="p-4 bg-slate-50 border-b border-slate-200">
-          <h3 className="font-bold text-slate-700">📋 판매 내역 ({sales.length}건)</h3>
+        <div className="p-3 md:p-4 bg-slate-50 border-b border-slate-200">
+          <h3 className="font-bold text-slate-700 text-sm md:text-base">📋 판매 내역 ({sales.length}건)</h3>
         </div>
         {loading ? (
           <div className="flex items-center justify-center h-32">
@@ -174,7 +182,38 @@ export default function Sales() {
           <div className="flex items-center justify-center h-32 text-slate-400">
             판매 데이터가 없습니다.
           </div>
+        ) : isMobile ? (
+          /* ===== 모바일: 카드 뷰 ===== */
+          <div className="divide-y divide-slate-100 max-h-[60vh] overflow-y-auto">
+            {sales.slice(0, 100).map((sale) => (
+              <div key={sale.id} className="p-4 hover:bg-slate-50 transition-colors">
+                <div className="flex justify-between items-start mb-2">
+                  <div className="flex-1">
+                    <div className="font-semibold text-slate-800 text-sm">{sale.상품상세}</div>
+                    <div className="flex items-center gap-1 text-xs text-slate-400 mt-0.5">
+                      <Calendar size={12} />
+                      {sale.날짜?.slice(0, 10) || '-'}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => sale.id && handleDelete(sale.id)}
+                    className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+                <div className="flex justify-between items-center">
+                  <div className="flex gap-3 text-xs text-slate-500">
+                    <span>단가 {formatKRW(sale.단가 || 0)}</span>
+                    <span>×{sale.수량}</span>
+                  </div>
+                  <span className="font-mono font-bold text-emerald-600 text-sm">{formatKRW(sale.수익 || 0)}</span>
+                </div>
+              </div>
+            ))}
+          </div>
         ) : (
+          /* ===== 데스크탑: 테이블 뷰 ===== */
           <div className="overflow-x-auto max-h-[500px]">
             <table className="w-full text-sm text-left">
               <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200 sticky top-0">

@@ -5,7 +5,7 @@
 
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { RefreshCw, ChevronDown, ChevronUp, Plus, X, Trash2 } from 'lucide-react';
+import { RefreshCw, ChevronDown, ChevronUp, Plus, X, Trash2, Camera, ImageIcon } from 'lucide-react';
 import { inventoryApi, stockIntakeApi, ocrApi, type InventoryItem, type StockIntake, type OCRReceiptData, type StockIntakeRecord } from '../services/api';
 import './Inventory.css';
 
@@ -64,6 +64,14 @@ export default function Inventory() {
   const [isOCRProcessing, setIsOCRProcessing] = useState(false);
   const [ocrError, setOcrError] = useState<{ message: string; suggestion: string } | null>(null);
   const [isDragging, setIsDragging] = useState(false); // 드래그 상태
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
 
   // 재고 입고 기록 관련 상태
   const [intakeHistory, setIntakeHistory] = useState<StockIntakeRecord[]>([]);
@@ -624,7 +632,7 @@ export default function Inventory() {
           {/* 헤더 */}
           <div className="upload-header">
             <div className="upload-header-left">
-              <h2>영수증 이미지 통합 업로드</h2>
+              <h2>{isMobile ? '영수증 촬영/업로드' : '영수증 이미지 통합 업로드'}</h2>
             </div>
             <button className="btn-upload-close" onClick={handleCloseManualIntake}>
               <X size={20} />
@@ -642,35 +650,76 @@ export default function Inventory() {
             </div>
           )}
 
-          {/* 드래그 앤 드롭 영역 */}
-          <div
-            className={`drag-drop-zone ${isDragging ? 'dragging' : ''}`}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-          >
-            <div className="upload-icon-wrapper">
-              <div className="upload-icon">📤</div>
+          {isMobile ? (
+            /* ===== 모바일: 카메라/갤러리 버튼 ===== */
+            <div className="mobile-upload-options">
+              <button
+                className="mobile-upload-btn camera-btn"
+                onClick={() => document.getElementById('camera-capture-input')?.click()}
+              >
+                <Camera size={32} />
+                <span className="mobile-upload-label">카메라로 촬영</span>
+                <span className="mobile-upload-desc">영수증을 직접 촬영합니다</span>
+              </button>
+              <button
+                className="mobile-upload-btn gallery-btn"
+                onClick={() => document.getElementById('gallery-file-input')?.click()}
+              >
+                <ImageIcon size={32} />
+                <span className="mobile-upload-label">갤러리에서 선택</span>
+                <span className="mobile-upload-desc">저장된 이미지를 선택합니다</span>
+              </button>
+
+              {/* 카메라 캡처 전용 input */}
+              <input
+                type="file"
+                id="camera-capture-input"
+                accept="image/*"
+                capture="environment"
+                onChange={handleFileInputChange}
+                style={{ display: 'none' }}
+              />
+              {/* 갤러리 선택 전용 input */}
+              <input
+                type="file"
+                id="gallery-file-input"
+                accept="image/*"
+                multiple
+                onChange={handleFileInputChange}
+                style={{ display: 'none' }}
+              />
             </div>
-            <h3>여기를 클릭하여 영수증 이미지(들)을 추가하세요</h3>
-            <p className="upload-instruction">드래그 앤 드롭으로도 업로드 가능합니다</p>
-
-            <input
-              type="file"
-              id="drag-drop-file-input"
-              accept="image/*"
-              multiple
-              onChange={handleFileInputChange}
-              style={{ display: 'none' }}
-            />
-
-            <button
-              className="btn-file-browse"
-              onClick={() => document.getElementById('drag-drop-file-input')?.click()}
+          ) : (
+            /* ===== 데스크탑: 드래그 앤 드롭 ===== */
+            <div
+              className={`drag-drop-zone ${isDragging ? 'dragging' : ''}`}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
             >
-              파일 찾기
-            </button>
-          </div>
+              <div className="upload-icon-wrapper">
+                <div className="upload-icon">📤</div>
+              </div>
+              <h3>여기를 클릭하여 영수증 이미지(들)을 추가하세요</h3>
+              <p className="upload-instruction">드래그 앤 드롭으로도 업로드 가능합니다</p>
+
+              <input
+                type="file"
+                id="drag-drop-file-input"
+                accept="image/*"
+                multiple
+                onChange={handleFileInputChange}
+                style={{ display: 'none' }}
+              />
+
+              <button
+                className="btn-file-browse"
+                onClick={() => document.getElementById('drag-drop-file-input')?.click()}
+              >
+                파일 찾기
+              </button>
+            </div>
+          )}
         </div>
       );
     }
