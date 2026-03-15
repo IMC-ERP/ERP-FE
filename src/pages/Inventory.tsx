@@ -628,7 +628,7 @@ export default function Inventory() {
     // 이미지 업로드 전용 페이지
     if (isImageUploadMode) {
       return (
-        <div className="receiving-tab image-upload-view">
+        <div className={`receiving-tab image-upload-view ${isMobile ? 'mobile-upload-page' : ''}`}>
           {/* 헤더 */}
           <div className="upload-header">
             <div className="upload-header-left">
@@ -651,43 +651,64 @@ export default function Inventory() {
           )}
 
           {isMobile ? (
-            /* ===== 모바일: 카메라/갤러리 버튼 ===== */
-            <div className="mobile-upload-options">
-              <button
-                className="mobile-upload-btn camera-btn"
-                onClick={() => document.getElementById('camera-capture-input')?.click()}
-              >
-                <Camera size={32} />
-                <span className="mobile-upload-label">카메라로 촬영</span>
-                <span className="mobile-upload-desc">영수증을 직접 촬영합니다</span>
-              </button>
-              <button
-                className="mobile-upload-btn gallery-btn"
-                onClick={() => document.getElementById('gallery-file-input')?.click()}
-              >
-                <ImageIcon size={32} />
-                <span className="mobile-upload-label">갤러리에서 선택</span>
-                <span className="mobile-upload-desc">저장된 이미지를 선택합니다</span>
-              </button>
+            /* ===== 모바일: 풀스크린 히어로 업로드 UI ===== */
+            <div className="mobile-upload-hero">
+              {/* 상단 일러스트 영역 */}
+              <div className="mobile-upload-hero-top">
+                <div className="mobile-upload-icon-ring">
+                  <Camera size={40} className="mobile-upload-hero-icon" />
+                </div>
+                <h3 className="mobile-upload-hero-title">영수증을 스캔하세요</h3>
+                <p className="mobile-upload-hero-desc">
+                  AI가 품목·수량·단가를 자동으로 인식합니다
+                </p>
+              </div>
 
-              {/* 카메라 캡처 전용 input */}
-              <input
-                type="file"
-                id="camera-capture-input"
-                accept="image/*"
-                capture="environment"
-                onChange={handleFileInputChange}
-                style={{ display: 'none' }}
-              />
-              {/* 갤러리 선택 전용 input */}
-              <input
-                type="file"
-                id="gallery-file-input"
-                accept="image/*"
-                multiple
-                onChange={handleFileInputChange}
-                style={{ display: 'none' }}
-              />
+              {/* 버튼 영역 */}
+              <div className="mobile-upload-actions">
+                <button
+                  className="mobile-action-btn primary-action"
+                  onClick={() => document.getElementById('camera-capture-input')?.click()}
+                >
+                  <div className="mobile-action-icon-wrap">
+                    <Camera size={26} />
+                  </div>
+                  <div className="mobile-action-text">
+                    <span className="mobile-action-title">카메라로 촬영</span>
+                    <span className="mobile-action-sub">영수증에 카메라를 대고 찍어주세요</span>
+                  </div>
+                  <div className="mobile-action-arrow">›</div>
+                </button>
+
+                <div className="mobile-upload-divider">
+                  <span>또는</span>
+                </div>
+
+                <button
+                  className="mobile-action-btn secondary-action"
+                  onClick={() => document.getElementById('gallery-file-input')?.click()}
+                >
+                  <div className="mobile-action-icon-wrap">
+                    <ImageIcon size={24} />
+                  </div>
+                  <div className="mobile-action-text">
+                    <span className="mobile-action-title">갤러리에서 선택</span>
+                    <span className="mobile-action-sub">저장된 영수증 사진을 불러옵니다</span>
+                  </div>
+                  <div className="mobile-action-arrow">›</div>
+                </button>
+              </div>
+
+              {/* 하단 팁 */}
+              <div className="mobile-upload-tip">
+                💡 <strong>잘 찍는 팁</strong>: 영수증을 평평하게 펴고, 밝은 곳에서 촬영하세요
+              </div>
+
+              {/* hidden inputs */}
+              <input type="file" id="camera-capture-input" accept="image/*"
+                capture="environment" onChange={handleFileInputChange} style={{ display: 'none' }} />
+              <input type="file" id="gallery-file-input" accept="image/*"
+                multiple onChange={handleFileInputChange} style={{ display: 'none' }} />
             </div>
           ) : (
             /* ===== 데스크탑: 드래그 앤 드롭 ===== */
@@ -703,19 +724,11 @@ export default function Inventory() {
               <h3>여기를 클릭하여 영수증 이미지(들)을 추가하세요</h3>
               <p className="upload-instruction">드래그 앤 드롭으로도 업로드 가능합니다</p>
 
-              <input
-                type="file"
-                id="drag-drop-file-input"
-                accept="image/*"
-                multiple
-                onChange={handleFileInputChange}
-                style={{ display: 'none' }}
-              />
+              <input type="file" id="drag-drop-file-input" accept="image/*" multiple
+                onChange={handleFileInputChange} style={{ display: 'none' }} />
 
-              <button
-                className="btn-file-browse"
-                onClick={() => document.getElementById('drag-drop-file-input')?.click()}
-              >
+              <button className="btn-file-browse"
+                onClick={() => document.getElementById('drag-drop-file-input')?.click()}>
                 파일 찾기
               </button>
             </div>
