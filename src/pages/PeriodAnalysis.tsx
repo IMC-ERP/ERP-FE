@@ -27,7 +27,7 @@ const CustomTreemapContent = (props: any) => {
 };
 
 export default function PeriodAnalysis() {
-    const { sales } = useData();
+    const { sales, isLoading } = useData();
     const [activeTab, setActiveTab] = useState("trend");
 
     // Trend Tab State
@@ -260,6 +260,30 @@ export default function PeriodAnalysis() {
             />
         );
     };
+
+    if (isLoading) {
+        return (
+            <div className="flex h-96 items-center justify-center">
+                <div className="text-lg font-semibold text-slate-500 animate-pulse">데이터를 불러오는 중입니다...</div>
+            </div>
+        );
+    }
+
+    if (!sales || sales.length === 0) {
+        return (
+            <div className="space-y-6 animate-fade-in">
+                <header>
+                    <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                        📈 매출 분석
+                    </h2>
+                </header>
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-8 text-center">
+                    <h3 className="text-lg font-bold text-blue-800 mb-2">데이터가 없습니다</h3>
+                    <p className="text-blue-600">아직 등록된 매출 데이터가 없거나, 데이터를 불러오지 못했습니다.</p>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-6 animate-fade-in">
