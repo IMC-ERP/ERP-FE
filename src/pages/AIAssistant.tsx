@@ -44,7 +44,7 @@ export default function AIAssistant({ isWidget = false }: AIAssistantProps) {
 
     // Prepare Context for AI - include business data
     const salesSummary = `Total Sales Count: ${sales.length}, Total Revenue: ${sales.reduce((a, b) => a + b.revenue, 0).toLocaleString()}원`;
-    const lowStockItems = inventory.filter(i => i.currentStock < i.safetyStock).map(i => i.name_ko).join(", ");
+    const lowStockItems = inventory.filter(i => i.currentStock < i.safety_stock).map(i => i.name).join(", ");
 
     const context = `
 [현재 ERP 데이터]
