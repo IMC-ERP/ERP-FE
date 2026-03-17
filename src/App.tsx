@@ -15,38 +15,15 @@ import Sales from './pages/Sales';
 import Inventory from './pages/Inventory';
 import Recipes from './pages/Recipes';
 import AIAssistant from './pages/AIAssistant';
-import PeriodAnalysis from './pages/PeriodAnalysis';
+import SalesAnalysis from './pages/SalesAnalysis';
 import TransactionManager from './pages/TransactionManager';
 import CostRecipeManager from './pages/CostRecipeManager';
+import Home from './pages/Home';
 import SettingsPage from './pages/SettingsPage';
+import InvitePage from './pages/InvitePage';
 import './index.css';
 
-const HomePage = () => (
-  <div className="space-y-6 animate-fade-in">
-    <div className="bg-gradient-to-r from-amber-500 to-orange-600 p-8 rounded-2xl text-white">
-      <h1 className="text-3xl font-bold mb-2">☕ Coffee ERP에 오신 것을 환영합니다!</h1>
-      <p className="text-amber-100">좌측 메뉴에서 원하시는 기능을 선택해주세요.</p>
-    </div>
-
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
-        <div className="text-3xl mb-3">📊</div>
-        <h3 className="font-bold text-slate-800 mb-2">경영 현황</h3>
-        <p className="text-sm text-slate-500">실시간 수익성 분석과 공과금 관리</p>
-      </div>
-      <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
-        <div className="text-3xl mb-3">📈</div>
-        <h3 className="font-bold text-slate-800 mb-2">매출 분석</h3>
-        <p className="text-sm text-slate-500">기간별, 상품별 매출 트렌드 분석</p>
-      </div>
-      <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
-        <div className="text-3xl mb-3">📦</div>
-        <h3 className="font-bold text-slate-800 mb-2">재고 관리</h3>
-        <p className="text-sm text-slate-500">AI 기반 재고 예측 및 발주 관리</p>
-      </div>
-    </div>
-  </div>
-);
+// HomePage 삭제됨 (Home.tsx로 대체)
 
 const HelpPage = () => (
   <div className="p-8 text-center bg-white rounded-xl border border-slate-200 shadow-sm min-h-[400px] flex flex-col justify-center items-center animate-fade-in">
@@ -76,14 +53,16 @@ function App() {
             } />
 
             {/* 보호된 라우트들 */}
+            <Route path="/invite" element={<InvitePage />} />
+
             <Route path="/" element={
               <ProtectedRoute>
                 <Layout />
               </ProtectedRoute>
             }>
-              <Route index element={<HomePage />} />
+              <Route index element={<Home />} />
               <Route path="dashboard" element={<Dashboard />} />
-              <Route path="period" element={<PeriodAnalysis />} />
+              <Route path="period" element={<SalesAnalysis />} />
               <Route path="transactions" element={<TransactionManager />} />
               <Route path="sales" element={<Sales />} />
               <Route path="inventory" element={<Inventory />} />

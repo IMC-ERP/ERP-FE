@@ -1,9 +1,61 @@
 @import "tailwindcss";
 
+/* ===== Tailwind v4 dark mode: class strategy ===== */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /**
  * Global CSS
- * Tailwind v4 + 커스텀 스타일
+ * Tailwind v4 + 테마 시스템 + 다크모드 + 커스텀 스타일
  */
+
+/* ==================== CSS 변수 (테마 시스템) ==================== */
+
+:root {
+  /* 기본 테마: blue */
+  --color-primary: 59 130 246;   /* blue-500 */
+  --color-primary-dark: 37 99 235; /* blue-600 */
+  --color-primary-light: 96 165 250; /* blue-400 */
+
+  /* 폰트 사이즈 */
+  --text-base: 16px;
+
+  /* 전환 */
+  --theme-transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
+
+/* ===== 테마 색상 ===== */
+[data-theme="blue"] {
+  --color-primary: 59 130 246;
+  --color-primary-dark: 37 99 235;
+  --color-primary-light: 96 165 250;
+}
+[data-theme="indigo"] {
+  --color-primary: 99 102 241;
+  --color-primary-dark: 79 70 229;
+  --color-primary-light: 129 140 248;
+}
+[data-theme="rose"] {
+  --color-primary: 244 63 94;
+  --color-primary-dark: 225 29 72;
+  --color-primary-light: 251 113 133;
+}
+[data-theme="amber"] {
+  --color-primary: 245 158 11;
+  --color-primary-dark: 217 119 6;
+  --color-primary-light: 251 191 36;
+}
+[data-theme="green"] {
+  --color-primary: 34 197 94;
+  --color-primary-dark: 22 163 74;
+  --color-primary-light: 74 222 128;
+}
+
+/* ===== 폰트 사이즈 ===== */
+html.text-small { --text-base: 14px; font-size: 14px; }
+html.text-medium { --text-base: 16px; font-size: 16px; }
+html.text-large { --text-base: 18px; font-size: 18px; }
+
+/* ==================== 라이트 모드 (기본) ==================== */
 
 * {
   box-sizing: border-box;
@@ -16,82 +68,99 @@ body {
   -moz-osx-font-smoothing: grayscale;
   background-color: #f8fafc;
   color: #1e293b;
+  transition: var(--theme-transition);
 }
 
-h1, h2, h3, h4, h5, h6 {
-  margin: 0;
-  font-weight: 600;
+h1, h2, h3, h4, h5, h6 { margin: 0; font-weight: 600; }
+p { margin: 0; }
+a { text-decoration: none; color: inherit; }
+button { font-family: inherit; cursor: pointer; }
+
+/* ==================== 다크 모드 ==================== */
+
+html.dark body {
+  background-color: #0f172a;
+  color: #e2e8f0;
 }
 
-p {
-  margin: 0;
+/* 카드, 패널 */
+html.dark .bg-white {
+  background-color: #1e293b !important;
+  border-color: #334155 !important;
+  color: #e2e8f0;
 }
 
-a {
-  text-decoration: none;
-  color: inherit;
+/* 입력 필드 */
+html.dark input,
+html.dark select,
+html.dark textarea {
+  background-color: #1e293b;
+  border-color: #475569;
+  color: #e2e8f0;
+}
+html.dark input::placeholder,
+html.dark textarea::placeholder {
+  color: #64748b;
 }
 
-button {
-  font-family: inherit;
-  cursor: pointer;
+/* 텍스트 색상 오버라이드 */
+html.dark .text-slate-800 { color: #f1f5f9 !important; }
+html.dark .text-slate-700 { color: #e2e8f0 !important; }
+html.dark .text-slate-600 { color: #cbd5e1 !important; }
+html.dark .text-slate-500 { color: #94a3b8 !important; }
+html.dark .text-slate-400 { color: #64748b !important; }
+
+/* 배경 색상 오버라이드 */
+html.dark .bg-slate-50 { background-color: #1e293b !important; }
+html.dark .bg-slate-100 { background-color: #1e293b !important; }
+html.dark .bg-slate-200 { background-color: #334155 !important; }
+
+/* 보더 */
+html.dark .border-slate-200 { border-color: #334155 !important; }
+html.dark .border-slate-100 { border-color: #1e293b !important; }
+html.dark .border-slate-300 { border-color: #475569 !important; }
+
+/* 호버 */
+html.dark .hover\:bg-slate-50:hover { background-color: #334155 !important; }
+
+/* 스크롤바 (다크) */
+html.dark ::-webkit-scrollbar-track { background: #1e293b; }
+html.dark ::-webkit-scrollbar-thumb { background: #475569; }
+html.dark ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+
+/* ==================== Primary 색상 유틸리티 ==================== */
+
+.bg-primary { background-color: rgb(var(--color-primary)); }
+.bg-primary-dark { background-color: rgb(var(--color-primary-dark)); }
+.text-primary { color: rgb(var(--color-primary)); }
+.border-primary { border-color: rgb(var(--color-primary)); }
+.ring-primary { --tw-ring-color: rgb(var(--color-primary) / 0.5); }
+
+/* 설정 사이드바 활성 탭: 테마 색상 적용 */
+html[data-theme] .settings-tab-active {
+  background-color: rgb(var(--color-primary) / 0.1);
+  color: rgb(var(--color-primary));
+  border-left-color: rgb(var(--color-primary));
 }
 
-/* Custom scrollbar */
-.custom-scrollbar::-webkit-scrollbar {
-  height: 6px;
-  width: 6px;
-}
+/* ==================== 스크롤바 ==================== */
 
-.custom-scrollbar::-webkit-scrollbar-track {
-  background: #f1f5f9;
-}
+.custom-scrollbar::-webkit-scrollbar { height: 6px; width: 6px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
 
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 3px;
-}
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: #f1f5f9; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 
-/* Global scrollbar */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
 
-::-webkit-scrollbar-track {
-  background: #f1f5f9;
-}
+/* ==================== 애니메이션 ==================== */
 
-::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
-}
-
-/* Hide scrollbar utility */
-.scrollbar-hide::-webkit-scrollbar {
-  display: none;
-}
-.scrollbar-hide {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
-
-/* Fade-in animation */
 @keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
-
-.animate-fade-in {
-  animation: fadeIn 0.3s ease-out;
-}
+.animate-fade-in { animation: fadeIn 0.3s ease-out; }

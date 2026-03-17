@@ -60,20 +60,16 @@ export default function Layout() {
   };
 
   return (
-    <div className="flex min-h-screen bg-slate-50 relative overflow-x-hidden">
+    <div className="flex min-h-screen bg-slate-50 relative">
       {/* Sidebar */}
       <div className="w-64 bg-white border-r border-slate-200 flex-shrink-0 fixed h-full z-10 transition-all duration-300 flex flex-col">
         {/* Sidebar Header */}
         <div className="p-6 border-b border-slate-100 flex items-center gap-3">
-          {storeProfile.logoUrl ? (
-            <img src={storeProfile.logoUrl} alt="Logo" className="w-10 h-10 rounded-full object-cover border border-slate-200" />
-          ) : (
-            <div className="bg-amber-100 p-2 rounded-full">
-              <Coffee className="text-amber-700" size={24} />
-            </div>
-          )}
+          <div className="bg-amber-100 p-2 rounded-full">
+            <Coffee className="text-amber-700" size={24} />
+          </div>
           <div>
-            <h1 className="text-base font-bold text-slate-800 tracking-tight leading-tight">{storeProfile.name}</h1>
+            <h1 className="text-base font-bold text-slate-800 tracking-tight leading-tight">{storeProfile.store_name}</h1>
             <p className="text-[10px] text-slate-400">Coffee ERP v2.5.4</p>
           </div>
         </div>

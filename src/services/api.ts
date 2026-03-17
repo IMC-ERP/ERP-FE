@@ -7,6 +7,16 @@
 import axios from 'axios';
 import axiosRetry from 'axios-retry';
 import { auth } from '../firebase';
+import type {
+  InventoryItem,
+  StoreProfile,
+  OCRSalesResponse,
+  StockIntake,
+  RecipeCost,
+  SaleItem,
+  ManualSaleRequest,
+  ManualSaleResponse
+} from '../types';
 
 // 개발 환경에서는 localhost, 프로덕션에서는 Cloud Run 백엔드 사용
 const API_BASE_URL = import.meta.env.VITE_API_URL
@@ -68,26 +78,9 @@ export interface Sale {
   시간?: string;
 }
 
-export interface InventoryItem {
-  id: string;
-  category: string;
-  max_stock_level: number;
-  quantity_on_hand: number;
-  safety_stock: number;
-  needs_reorder: boolean;
-  unit_cost: number;
-  uom: string;
-}
+// InventoryItem is now imported from types.ts
 
-export interface StockIntake {
-  category: string;
-  name: string;
-  price_per_unit: number;
-  quantity: number;
-  total_amount: number;
-  volume: number;
-  uom?: string;
-}
+// StockIntake is now imported from types.ts
 
 
 export interface OCRReceiptData {
@@ -184,29 +177,13 @@ export const stockIntakeApi = {
   delete: (timestamp: string) => api.delete(`/stock-intake/${timestamp}`),
 };
 
-// ==================== 레시피 원가 타입 ====================
-export interface Ingredient {
-  name: string;
-  cost_per_unit: number;
-  usage: number;
-  cost: number;
-}
-
-export interface RecipeCost {
-  menu_name: string;
-  category: string;
-  selling_price: number;
-  total_cost: number;
-  cost_ratio: number;
-  status: 'safe' | 'needs_check' | 'danger';
-  ingredients: Ingredient[];
-}
+// 레시피 원가 관련 타입들은 types.ts에서 임포트합니다.
 
 // ==================== 레시피 원가 API ====================
 export const recipeCostApi = {
   getAll: () => api.get<RecipeCost[]>('/recipe-costs'),
   getByName: (menuName: string) => api.get<RecipeCost>(`/recipe-costs/${encodeURIComponent(menuName)}`),
-  create: (data: Omit<RecipeCost, 'total_cost' | 'cost_ratio' | 'status'>) => api.post('/recipe-costs', data),
+  create: (data: Omit<RecipeCost, 'totalCost' | 'marginRate' | 'status'>) => api.post('/recipe-costs', data),
   delete: (menuName: string) => api.delete(`/recipe-costs/${encodeURIComponent(menuName)}`),
 };
 
@@ -225,6 +202,127 @@ export const dashboardApi = {
     sales_by_date: SalesByDate[];
     sales_by_product: SalesByProduct[];
   }>('/dashboard/all'),
+};
+// ==================== Analytics API ====================
+
+export interface WeekdaySales { weekday: string; weekdayEn: string; sales: number; }
+export interface HourlySales { hour: string; sales: number; }
+export interface MenuTreemapItem { name: string; category: string; qty: number; revenue: number; cost: number; percentage: number; }
+export interface CategorySales { category: string; revenue: number; percentage: number; }
+export interface DailySalesItem { date: string; sales: number; }
+
+export interface SalesAnalyticsResponse {
+  totalRevenue: number;
+  previousTotalRevenue: number;
+  changeRate: number;
+  openHour: number;
+  closeHour: number;
+  dailySales: DailySalesItem[];
+  salesByWeekday: WeekdaySales[];
+  salesByHour: HourlySales[];
+  menuTreemap: MenuTreemapItem[];
+  menuTop5: MenuTreemapItem[];
+  salesByCategory: CategorySales[];
+}
+
+export interface ComparisonMetric { periodA: number; periodB: number; variance: number; diff: number; }
+export interface ComparisonSummary { revenue: ComparisonMetric; orderCount: ComparisonMetric; aov: ComparisonMetric; }
+export interface CompareCategoryShare { category: string; periodA: number; periodB: number; variance: number; }
+export interface RankingItem { rank: number; name: string; qty: number; revenue: number; status?: 'up' | 'down' | 'new' | 'unchanged' | '-'; rankChange?: number; }
+export interface CompareRankings { periodA: RankingItem[]; periodB: RankingItem[]; }
+export interface SalesComparisonResponse {
+  summary: ComparisonSummary;
+  categoryShare: CompareCategoryShare[];
+  rankings: CompareRankings;
+}
+
+export const analyticsApi = {
+  getSales: (startDate: string, endDate: string) =>
+    api.get<SalesAnalyticsResponse>('/analytics/sales', { params: { start_date: startDate, end_date: endDate } }),
+
+  getAvailableDates: () =>
+    api.get<{ min_date: string; max_date: string }>('/analytics/available-dates'),
+
+  getCompareSales: (period_a_start: string, period_a_end: string, period_b_start: string, period_b_end: string, category?: string) =>
+    api.get<SalesComparisonResponse>('/analytics/compare', { params: { period_a_start, period_a_end, period_b_start, period_b_end, category } }),
+};
+
+// ==================== Profit Dashboard API ====================
+
+export interface ProfitDashboardSummary {
+  accumulated_sales: number;
+  accumulated_cogs: number;
+  accumulated_gross_profit: number;
+}
+
+export interface ProfitDashboardExpenses {
+  total_expenses: number;
+  fixed_expenses: number;
+  variable_expenses: number;
+}
+
+export interface ProfitDailyStats {
+  date: string;
+  sales: number;
+  cogs: number;
+  gross_profit: number;
+}
+
+export interface ProfitDashboardResponse {
+  period: { start_date: string; end_date: string };
+  summary: ProfitDashboardSummary;
+  monthly_expenses: ProfitDashboardExpenses;
+  daily_stats: ProfitDailyStats[];
+}
+
+export const profitDashboardApi = {
+  get: (yearMonth: string) => api.get<ProfitDashboardResponse>(`/dashboard/profit/${yearMonth}`),
+};
+
+// ==================== Home API ====================
+
+export interface HomeSummary {
+  todaySales: number;
+  salesTrend: number;
+  todayProfit: number;
+  profitTrend: number;
+  todayOrders: number;
+  orderTrend: number;
+}
+
+export interface HomeHourlyData {
+  hour: string;
+  amount: number;
+}
+
+export interface HomeStockWarning {
+  id: string;
+  name: string;
+  current: number;
+  safety: number;
+  unit: string;
+}
+
+export interface HomeMarginWarning {
+  id: string;
+  name: string;
+  margin: number;
+  price: number;
+}
+
+export interface HomeDataResponse {
+  summary: HomeSummary;
+  hourlySales: HomeHourlyData[];
+  topMenus: any[];
+  stockWarnings: HomeStockWarning[];
+  marginWarnings: HomeMarginWarning[];
+  openHour: number;
+  closeHour: number;
+  updatedAt: string;
+}
+
+export const homeApi = {
+  get: () => api.get<HomeDataResponse>('/home'),
 };
 
 // ==================== Recipes API ====================
@@ -313,43 +411,9 @@ export const stockMovesApi = {
 
 // ==================== Daily Sales API ====================
 
-export interface DailySalesMenuItem {
-  menu: string;
-  quantity: number;
-  sales_amount?: number;
-}
-
-export interface DailySales {
-  date: string;
-  sales_by_menu: DailySalesMenuItem[];
-  total_amount: number;
-}
-
-export interface OCRSalesResponse {
-  success: boolean;
-  date: string;
-  sales_by_menu: DailySalesMenuItem[];
-  warnings: string[];
-  error: string | null;
-}
+// DailySalesMenuItem, DailySales, OCRSalesResponse are now imported from types.ts
 
 export const dailySalesApi = {
-  create: (data: { date: string; sales_by_menu: DailySalesMenuItem[] }) =>
-    api.post<DailySales>('/daily-sales', data),
-
-  getAll: () => api.get<DailySales[]>('/daily-sales'),
-
-  getByDate: (date: string) => api.get<DailySales>(`/daily-sales/${date}`),
-
-  addMenu: (date: string, menu: DailySalesMenuItem) =>
-    api.post<DailySales>(`/daily-sales/${date}/menu`, menu),
-
-  deleteMenu: (date: string, menuName: string) =>
-    api.delete<DailySales>(`/daily-sales/${date}/menu/${encodeURIComponent(menuName)}`),
-
-  deleteDate: (date: string) =>
-    api.delete(`/daily-sales/${date}`),
-
   ocr: (files: FileList | File[]) => {
     const formData = new FormData();
     if (files instanceof FileList) {
@@ -367,14 +431,22 @@ export const dailySalesApi = {
   }
 };
 
+// ==================== Manual Sales API ====================
+
+export const manualSalesApi = {
+  create: (data: ManualSaleRequest) =>
+    api.post<ManualSaleResponse>('/sales/manual', data),
+};
+
 // ==================== User API ====================
 
 export interface UserRegistration {
   email: string;
   store_name: string;
-  owner_name: string;
+  name: string;
   phone?: string;
   address?: string;
+  established_year?: number;
 }
 
 export interface UserProfile {
@@ -382,18 +454,26 @@ export interface UserProfile {
   email: string;
   store_id: string;
   store_name: string;
-  owner_name: string;
+  name: string;
   phone?: string;
-  address?: string;
+  role: string;
   created_at: string;
   updated_at: string;
 }
 
+export interface MemberResponse {
+  uid: string;
+  email: string;
+  name: string;
+  phone?: string;
+  role: string;
+  created_at?: string;
+}
+
 export interface UserProfileUpdate {
   store_name?: string;
-  owner_name?: string;
+  name?: string;
   phone?: string;
-  address?: string;
 }
 
 export interface RegistrationStatus {
@@ -408,12 +488,125 @@ export const userApi = {
   getProfile: () => api.get<UserProfile>('/users/profile'),
   updateProfile: (data: UserProfileUpdate) => api.put<UserProfile>('/users/profile', data),
   checkRegistration: () => api.get<RegistrationStatus>('/users/check-registration'),
+  getMe: () => api.get<{ name: string; email: string; phone: string; store_name: string; role: string }>('/users/me'),
+  patchMe: (data: { name?: string; phone?: string }) => api.patch<{ name: string; email: string; phone: string; store_name: string; role: string }>('/users/me', data),
+  deleteMe: () => api.delete<{ status: string; message: string }>('/users/me'),
+};
+
+// ==================== Store Profile API ====================
+
+// StoreProfile is now imported from types.ts
+
+export interface StoreProfileUpdate {
+  store_name?: string;
+  ownerName?: string;
+  establishedYear?: number;
+  contactNumber?: string;
+  address?: string;
+}
+
+// ==================== Expenses API ====================
+
+export interface ExpenseItemCreate {
+  name: string;
+  category: string;
+  type: 'fixed' | 'variable';
+  amount: number;
+  paymentDate: string;
+  status: string;
+  description?: string;
+}
+
+export interface ExpenseItem extends ExpenseItemCreate {
+  id: string;
+}
+
+export interface MonthlyExpensesResponse {
+  period: string;
+  isSettled: boolean;
+  totalAmount: number;
+  totalFixed: number;
+  totalVariable: number;
+  items: Record<string, ExpenseItem>;
+}
+
+export const expensesApi = {
+  getMonthly: (storeId: string, yearMonth: string) =>
+    api.get<MonthlyExpensesResponse>(`/v1/expenses/${storeId}/${yearMonth}`),
+  addItem: (storeId: string, yearMonth: string, item: ExpenseItemCreate) =>
+    api.post(`/v1/expenses/${storeId}/${yearMonth}/items`, item),
+  updateItem: (storeId: string, yearMonth: string, itemId: string, data: Partial<ExpenseItemCreate>) =>
+    api.put(`/v1/expenses/${storeId}/${yearMonth}/items/${itemId}`, data),
+  deleteItem: (storeId: string, yearMonth: string, itemId: string) =>
+    api.delete(`/v1/expenses/${storeId}/${yearMonth}/items/${itemId}`),
+};
+
+export const storeProfileApi = {
+  get: () => api.get<StoreProfile>('/store-profile'),
+  update: (data: StoreProfileUpdate) => api.put<StoreProfile>('/store-profile', data),
+  getMembers: () => api.get<MemberResponse[]>('/store-profile/members'),
+  removeMember: (userId: string) => api.delete<{ status: string; message: string }>(`/store-profile/members/${userId}`),
+};
+
+// ==================== TOSS 가맹점 API ====================
+
+export interface TossMerchantSetup {
+  merchant_id: string;
+}
+
+export const tossApi = {
+  setup: (data: TossMerchantSetup) => api.post('/toss/setup', data),
+};
+
+// ==================== 매장 운영시간 API ====================
+
+export interface StoreHoursData {
+  [day: string]: { open: string; close: string };
+}
+
+export const storeHoursApi = {
+  get: () => api.get<{ store_id: string; storeHours: StoreHoursData | null }>('/toss/hours'),
+  update: (store_hours: StoreHoursData) => api.post('/toss/hours', { store_hours }),
 };
 
 // ==================== Auth API ====================
 
 export const authApi = {
   verifyPasscode: (passcode: string) => api.post<{ valid: boolean }>('/auth/verify-passcode', { passcode }),
+};
+
+// ==================== Invitations API ====================
+
+export interface InvitationResponse {
+  code: string;
+  store_id: string;
+  role: string;
+  expires_at: string;
+  status: string;
+}
+
+export interface InvitationConsumeResponse {
+  store_id: string;
+  role: string;
+  message: string;
+}
+
+export const invitationApi = {
+  create: () => api.post<InvitationResponse>('/invitations'),
+  consume: (code: string) => api.post<InvitationConsumeResponse>('/invitations/consume', { code }),
+};
+
+// ==================== Transactions API ====================
+export const transactionsApi = {
+  getAll: (params: {
+    start_date?: string;
+    end_date?: string;
+    start_time?: string;
+    end_time?: string;
+    category?: string;
+    menu_name?: string;
+    order_state?: string;
+  }) => api.get<SaleItem[]>('/transactions', { params }),
 };
 
 export default api;

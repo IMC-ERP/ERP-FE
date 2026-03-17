@@ -6,7 +6,8 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { RefreshCw, ChevronDown, ChevronUp, Plus, X, Trash2 } from 'lucide-react';
-import { inventoryApi, stockIntakeApi, ocrApi, type InventoryItem, type StockIntake, type OCRReceiptData, type StockIntakeRecord } from '../services/api';
+import { inventoryApi, stockIntakeApi, ocrApi, type OCRReceiptData } from '../services/api';
+import type { InventoryItem, StockIntake } from '../types';
 import './Inventory.css';
 
 type TabType = 'overview' | 'pricing' | 'receiving' | 'forecast' | 'history';
@@ -35,11 +36,11 @@ export default function Inventory() {
   const [formData, setFormData] = useState({
     id: '',
     category: '',
-    quantity_on_hand: 0,
+    currentStock: 0,
     uom: 'g' as 'g' | 'kg' | 'ml' | 'L' | 'ea',
     safety_stock: 0,
     max_stock_level: 0,
-    unit_cost: 0,
+    unitPrice: 0,
   });
   const [submitMessage, setSubmitMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -66,7 +67,7 @@ export default function Inventory() {
   const [isDragging, setIsDragging] = useState(false); // 드래그 상태
 
   // 재고 입고 기록 관련 상태
-  const [intakeHistory, setIntakeHistory] = useState<StockIntakeRecord[]>([]);
+  const [intakeHistory, setIntakeHistory] = useState<StockIntake[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [historyMessage, setHistoryMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -97,7 +98,12 @@ export default function Inventory() {
     try {
       setLoading(true);
       const res = await inventoryApi.getAll();
-      setInventory(res.data);
+      // category 필드 방어: 없거나 빈 문자열이면 '미분류'로 fallback
+      const items = res.data.map(item => ({
+        ...item,
+        category: item.category || '미분류',
+      }));
+      setInventory(items);
     } catch (err) {
       console.error('Failed to fetch inventory:', err);
     } finally {
@@ -124,11 +130,11 @@ export default function Inventory() {
     setFormData({
       id: '',
       category: '',
-      quantity_on_hand: 0,
+      currentStock: 0,
       uom: 'g',
       safety_stock: 0,
       max_stock_level: 0,
-      unit_cost: 0,
+      unitPrice: 0,
     });
     setIsNewCategory(false);
     setSubmitMessage(null);
@@ -139,11 +145,11 @@ export default function Inventory() {
     setFormData({
       id: '',
       category: '',
-      quantity_on_hand: 0,
+      currentStock: 0,
       uom: 'g',
       safety_stock: 0,
       max_stock_level: 0,
-      unit_cost: 0,
+      unitPrice: 0,
     });
     setIsNewCategory(false);
     setSubmitMessage(null);
@@ -158,7 +164,7 @@ export default function Inventory() {
     setSubmitMessage(null);
 
     try {
-      const newItem: Omit<InventoryItem, 'id'> & { id: string } = {
+      const newItem: any = {
         ...formData,
         needs_reorder: false,
       };
@@ -429,16 +435,20 @@ export default function Inventory() {
     try {
       const results = await Promise.allSettled(
         intakeItems.map(item => {
-          const intakeData: StockIntake = {
-            category: item.category,
-            name: item.name,
-            price_per_unit: item.price_per_unit,
-            quantity: item.quantity,
-            total_amount: item.total_amount,
-            volume: item.volume,
-            uom: item.uom, // uom 필드 추가 (수동 입력 데이터나 OCR 데이터 포함)
+          const intakeData: any = {
+            source: 'manual',
+            status: 'completed',
+            items: [{
+              ingredientId: item.name,
+              name: item.name,
+              capacity: item.volume,
+              unitPricePerItem: item.price_per_unit,
+              quantity: item.quantity,
+              itemTotalAmount: item.total_amount
+            }],
+            totalPurchaseAmount: item.total_amount
           };
-          return stockIntakeApi.create(intakeData);
+          return stockIntakeApi.create(intakeData as StockIntake);
         })
       );
 
@@ -496,8 +506,10 @@ export default function Inventory() {
     return colors[category] || '#7F8C8D';
   };
 
-  // 발주 필요 아이템
-  const needsReorderItems = inventory.filter(item => item.needs_reorder);
+  // 발주 필요 아이템 (needs_reorder true이거나 안전재고 미만이거나)
+  const needsReorderItems = inventory.filter(item =>
+    item.needs_reorder || (item.safety_stock > 0 && item.currentStock <= item.safety_stock)
+  );
 
   // 카테고리별 그룹핑 (모든 아이템 포함)
   const groupedByCategory = inventory.reduce((acc, item) => {
@@ -509,7 +521,7 @@ export default function Inventory() {
   }, {} as Record<string, InventoryItem[]>);
 
   const renderInventoryCard = (item: InventoryItem) => {
-    const percentage = getStockPercentage(item.quantity_on_hand, item.max_stock_level);
+    const percentage = getStockPercentage(item.currentStock, item.max_stock_level);
     const status = getStockStatus(percentage);
     const categoryColor = getCategoryColor(item.category);
 
@@ -522,8 +534,8 @@ export default function Inventory() {
           <span className="percentage-badge">{percentage}%</span>
         </div>
         <div className="card-content">
-          <h4 className="item-name">{item.id}</h4>
-          <p className="current-stock">현재고: {item.quantity_on_hand}{item.uom}</p>
+          <h4 className="item-name">{item.name || item.id}</h4>
+          <p className="current-stock">현재고: {item.currentStock}{item.uom}</p>
           <div className="gauge-bar">
             <div
               className={`gauge-fill ${status}`}
@@ -556,7 +568,7 @@ export default function Inventory() {
       {/* 전체 품목 리스트 */}
       <section className="category-list">
         <h3 className="section-title">전체 품목 리스트</h3>
-        {Object.entries(groupedByCategory)
+        {(Object.entries(groupedByCategory) as [string, InventoryItem[]][])
           .sort(([catA], [catB]) => catA.localeCompare(catB, 'ko-KR'))
           .map(([category, items]) => {
             const isExpanded = expandedCategories.has(category);
@@ -582,7 +594,7 @@ export default function Inventory() {
                   </div>
                   <div className="category-badge-group">
                     <span className="category-items-badge">
-                      부족 {items.filter(i => i.needs_reorder).length}
+                      부족 {items.filter(i => i.needs_reorder || (i.safety_stock > 0 && i.currentStock <= i.safety_stock)).length}
                     </span>
                     {isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
                   </div>
@@ -935,18 +947,20 @@ export default function Inventory() {
   };
 
   const handleDeleteIntakeRecord = async (timestamp: string) => {
-    if (!window.confirm('이 입고 기록을 삭제하시겠습니까?\n\n✓ 재고 수량이 차감됩니다\n✓ 평균 단가가 역산됩니다\n\n계속하시겠습니까?')) {
-      return;
-    }
+    setTimeout(async () => {
+      if (!window.confirm('이 입고 기록을 삭제하시겠습니까?\n\n✓ 재고 수량이 차감됩니다\n✓ 평균 단가가 역산됩니다\n\n계속하시겠습니까?')) {
+        return;
+      }
 
-    try {
-      await stockIntakeApi.delete(timestamp);
-      setHistoryMessage({ type: 'success', text: '입고 기록이 삭제되었습니다.' });
-      fetchIntakeHistory(); // 목록 새로고침
-    } catch (err: any) {
-      const errorMsg = err.response?.data?.detail || '입고 기록 삭제에 실패했습니다.';
-      setHistoryMessage({ type: 'error', text: errorMsg });
-    }
+      try {
+        await stockIntakeApi.delete(timestamp);
+        setHistoryMessage({ type: 'success', text: '입고 기록이 삭제되었습니다.' });
+        fetchIntakeHistory(); // 목록 새로고침
+      } catch (err: any) {
+        const errorMsg = err.response?.data?.detail || '입고 기록 삭제에 실패했습니다.';
+        setHistoryMessage({ type: 'error', text: errorMsg });
+      }
+    }, 10);
   };
 
   // 탭 변경 시 입고 기록 로드
@@ -1025,30 +1039,33 @@ export default function Inventory() {
                     </td>
                   </tr>
                 ) : (
-                  intakeHistory.map((record) => (
-                    <tr key={record.timestamp}>
-                      <td>{record.timestamp?.replace('T', ' ') || '-'}</td>
-                      <td>{record.category || '-'}</td>
-                      <td className="font-bold">{record.name || '-'}</td>
-                      <td className="text-right">{record.volume ? record.volume.toLocaleString() : '0'}</td>
-                      <td className="text-center">{record.uom || '-'}</td>
-                      <td className="text-right">{record.quantity || '0'}</td>
-                      <td className="text-right">{record.price_per_unit ? record.price_per_unit.toLocaleString() : '0'}원</td>
-                      <td className="text-right total-cell">
-                        <span className="total-amount">{record.total_amount ? record.total_amount.toLocaleString() : '0'}원</span>
-                      </td>
-                      <td className="text-center">
-                        <button
-                          className="btn-remove-row"
-                          onClick={() => handleDeleteIntakeRecord(record.timestamp)}
-                          title="입고 기록 삭제 (재고 수량 및 단가 원상복구)"
-                          aria-label="기록 삭제"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </td>
-                    </tr>
-                  ))
+                  intakeHistory.flatMap((record) =>
+                    record.items.map((item: any, index: number) => (
+                      <tr key={`${record.timestamp}-${index}`}>
+                        <td>{index === 0 ? (record.timestamp?.replace('T', ' ') || '-') : ''}</td>
+                        <td>{item.category || '-'}</td>
+                        <td className="font-bold">{item.name || '-'}</td>
+                        <td className="text-right">{item.capacity ? item.capacity.toLocaleString() : '0'}</td>
+                        <td className="text-center">{item.uom || '-'}</td>
+                        <td className="text-right">{item.quantity || '0'}</td>
+                        <td className="text-right">{item.unitPricePerItem ? item.unitPricePerItem.toLocaleString() : '0'}원</td>
+                        <td className="text-right total-cell">
+                          <span className="total-amount">{item.itemTotalAmount ? item.itemTotalAmount.toLocaleString() : '0'}원</span>
+                        </td>
+                        <td className="text-center">
+                          {index === 0 && (
+                            <button
+                              className="btn-remove-row"
+                              onClick={() => handleDeleteIntakeRecord(record.timestamp)}
+                              title="입고 기록 삭제 (재고 수량 및 단가 원상복구)"
+                              aria-label="기록 삭제"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    )))
                 )}
               </tbody>
             </table>
@@ -1205,8 +1222,8 @@ export default function Inventory() {
                     <label>현재 재고</label>
                     <input
                       type="number"
-                      value={formData.quantity_on_hand || ''}
-                      onChange={(e) => handleInputChange('quantity_on_hand', Number(e.target.value))}
+                      value={formData.currentStock || ''}
+                      onChange={(e) => handleInputChange('currentStock', Number(e.target.value))}
                       required
                       min="0"
                     />
@@ -1232,8 +1249,8 @@ export default function Inventory() {
                   <label>단위당 단가 (원)</label>
                   <input
                     type="number"
-                    value={formData.unit_cost || ''}
-                    onChange={(e) => handleInputChange('unit_cost', Number(e.target.value))}
+                    value={formData.unitPrice || ''}
+                    onChange={(e) => handleInputChange('unitPrice', Number(e.target.value))}
                     required
                     min="0"
                     step="0.01"

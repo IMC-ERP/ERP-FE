@@ -3,7 +3,7 @@
  * GCP-ERP 스타일 원가 및 레시피 관리 - Migrated from GCP-ERP-web-build-2.0-main
  */
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { ChevronDown, ChevronRight, Plus, Trash2, DollarSign, Calculator, Archive, AlertCircle, ArrowUp, ArrowDown, X, Save } from 'lucide-react';
 import { recipeCostApi, inventoryApi } from '../services/api';
 
@@ -56,6 +56,96 @@ const calculateRecipeCost = (ingredients: RecipeIngredient[], materials: RawMate
 };
 
 // --- Sub Components ---
+
+// Searchable Material Select (Combobox)
+const SearchableMaterialSelect = ({
+    value,
+    onChange,
+    materials
+}: {
+    value: string;
+    onChange: (val: string) => void;
+    materials: RawMaterial[];
+}) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
+    const wrapperRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
+                setIsOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    const selectedMaterial = materials.find(m => m.id === value);
+
+    const handleOpen = () => {
+        setSearchTerm('');
+        setIsOpen(true);
+    };
+
+    const filteredMaterials = useMemo(() => {
+        if (!searchTerm) return materials;
+        return materials.filter(m =>
+            m.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (m.category && m.category.toLowerCase().includes(searchTerm.toLowerCase()))
+        );
+    }, [materials, searchTerm]);
+
+    return (
+        <div className="relative w-full" ref={wrapperRef}>
+            <div
+                onClick={handleOpen}
+                className="w-full p-1.5 border border-slate-300 rounded text-sm bg-white cursor-pointer flex justify-between items-center"
+            >
+                <span className="truncate">
+                    {selectedMaterial ? `${selectedMaterial.name} (${selectedMaterial.category})` : '재료 선택'}
+                </span>
+                <ChevronDown size={14} className="text-slate-400" />
+            </div>
+
+            {isOpen && (
+                <div className="absolute z-[100] w-[280px] mt-1 bg-white border border-slate-200 rounded-lg shadow-xl max-h-60 flex flex-col overflow-hidden">
+                    <div className="p-2 border-b border-slate-100 shrink-0">
+                        <input
+                            type="text"
+                            autoFocus
+                            placeholder="이름 또는 카테고리로 재료 검색..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="w-full p-2 text-sm bg-slate-50 border border-slate-200 rounded focus:outline-none focus:border-indigo-400"
+                        />
+                    </div>
+                    <div className="overflow-y-auto flex-1 p-1">
+                        {filteredMaterials.length === 0 ? (
+                            <div className="p-3 text-center text-xs text-slate-500">
+                                일치하는 재료가 없습니다.
+                            </div>
+                        ) : (
+                            filteredMaterials.map(m => (
+                                <div
+                                    key={m.id}
+                                    onClick={() => {
+                                        onChange(m.id);
+                                        setIsOpen(false);
+                                    }}
+                                    className={`px-3 py-2 text-sm cursor-pointer rounded-md hover:bg-slate-50 transition-colors flex justify-between items-center ${value === m.id ? 'bg-indigo-50 text-indigo-700 font-bold' : 'text-slate-700'}`}
+                                >
+                                    <span className="truncate mr-2 font-medium">{m.name}</span>
+                                    <span className="text-xs text-slate-400 whitespace-nowrap">{m.category}</span>
+                                </div>
+                            ))
+                        )}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
 
 // Modal Component for Adding Material
 const AddMaterialModal = ({
@@ -437,15 +527,11 @@ const AddRecipeModal = ({
                                         return (
                                             <tr key={ing.id} className="hover:bg-slate-50">
                                                 <td className="px-4 py-2">
-                                                    <select
+                                                    <SearchableMaterialSelect
                                                         value={ing.materialId}
-                                                        onChange={(e) => handleUpdateIngredient(ing.id, 'materialId', e.target.value)}
-                                                        className="w-full p-1 border border-slate-300 rounded text-sm"
-                                                    >
-                                                        {materials.map(m => (
-                                                            <option key={m.id} value={m.id}>{m.name} ({m.category})</option>
-                                                        ))}
-                                                    </select>
+                                                        onChange={(val) => handleUpdateIngredient(ing.id, 'materialId', val)}
+                                                        materials={materials}
+                                                    />
                                                 </td>
                                                 <td className="px-4 py-2 text-right">
                                                     <input
@@ -623,15 +709,11 @@ const RecipeRow = ({
                                     return (
                                         <tr key={ing.id} className="hover:bg-slate-50">
                                             <td className="px-4 py-2">
-                                                <select
+                                                <SearchableMaterialSelect
                                                     value={ing.materialId}
-                                                    onChange={(e) => onUpdateIngredient(recipe.id, ing.id, 'materialId', e.target.value)}
-                                                    className="w-full p-1 border border-slate-300 rounded text-sm"
-                                                >
-                                                    {materials.map(m => (
-                                                        <option key={m.id} value={m.id}>{m.name} ({m.category})</option>
-                                                    ))}
-                                                </select>
+                                                    onChange={(val) => onUpdateIngredient(recipe.id, ing.id, 'materialId', val)}
+                                                    materials={materials}
+                                                />
                                             </td>
                                             <td className="px-4 py-2 text-right">
                                                 <input
@@ -822,24 +904,24 @@ export default function CostRecipeManager() {
             const loadedMaterials: RawMaterial[] = inventoryRes.data.map(item => ({
                 id: item.id,
                 category: item.category,
-                name: item.id, // Using id as name for now based on schema
-                purchasePrice: item.unit_cost * (item.quantity_on_hand > 0 ? 1 : 1), // Approximate
+                name: item.name,
+                purchasePrice: item.unitPrice * (item.currentStock > 0 ? 1 : 1), // Approximate
                 purchaseUnitQty: 1, // Default to 1 unit
                 unit: item.uom || 'ea',
-                currentStock: item.quantity_on_hand
+                currentStock: item.currentStock
             }));
             setMaterials(loadedMaterials);
 
             // Transform RecipeCost to MenuRecipe
             const loadedRecipes: MenuRecipe[] = recipesRes.data.map(r => ({
-                id: r.menu_name,
+                id: r.name,
                 category: r.category || 'Uncategorized',
-                name: r.menu_name,
-                salePrice: r.selling_price,
+                name: r.name,
+                salePrice: r.price,
                 ingredients: r.ingredients.map((ing, idx) => ({
-                    id: `${r.menu_name}-${idx}`,
-                    materialId: ing.name,
-                    qty: ing.usage
+                    id: `${r.name}-${idx}`,
+                    materialId: ing.ingredientId || ing.name,
+                    qty: ing.quantity
                 }))
             }));
             setRecipes(loadedRecipes);
@@ -925,9 +1007,9 @@ export default function CostRecipeManager() {
         try {
             await inventoryApi.update(material.id, {
                 category: material.category,
-                quantity_on_hand: material.currentStock,
+                currentStock: material.currentStock,
                 uom: material.unit,
-                unit_cost: material.purchasePrice / (material.purchaseUnitQty || 1),
+                unitPrice: material.purchasePrice / (material.purchaseUnitQty || 1),
                 safety_stock: 0,
                 max_stock_level: 0,
                 needs_reorder: false
@@ -940,16 +1022,18 @@ export default function CostRecipeManager() {
     };
 
     const handleDeleteMaterial = async (id: string) => {
-        if (window.confirm("이 원재료를 삭제하시겠습니까? (사용 중인 레시피에 영향을 줄 수 있습니다.)")) {
-            try {
-                // API 호출 지원 여부에 따라 주석 해제 (inventoryApi에 delete가 있다고 가정하거나 추가 필요)
-                // await inventoryApi.delete(id); 
-                setMaterials(prev => prev.filter(m => m.id !== id));
-            } catch (error) {
-                console.error("Failed to delete material", error);
-                alert("삭제 실패");
+        setTimeout(async () => {
+            if (window.confirm("이 원재료를 삭제하시겠습니까? (사용 중인 레시피에 영향을 줄 수 있습니다.)")) {
+                try {
+                    // API 호출 지원 여부에 따라 주석 해제 (inventoryApi에 delete가 있다고 가정하거나 추가 필요)
+                    // await inventoryApi.delete(id); 
+                    setMaterials(prev => prev.filter(m => m.id !== id));
+                } catch (error) {
+                    console.error("Failed to delete material", error);
+                    alert("삭제 실패");
+                }
             }
-        }
+        }, 10);
     };
 
     const handleOpenAddMaterialModal = () => {
@@ -964,13 +1048,18 @@ export default function CostRecipeManager() {
 
             await inventoryApi.create({
                 id: newItemId,
+                name: newItemId,
+                type: 'RAW',
                 category: data.category,
-                quantity_on_hand: data.currentStock,
+                currentStock: data.currentStock,
                 uom: data.unit,
-                unit_cost: data.purchasePrice / (data.purchaseUnitQty || 1), // 단가 계산
+                unitPrice: data.purchasePrice / (data.purchaseUnitQty || 1), // 단가 계산
                 safety_stock: 0,
                 max_stock_level: 0,
-                needs_reorder: false
+                needs_reorder: false,
+                lastUpdated: new Date().toISOString(),
+                prep_yield: 0,
+                prep_recipe: []
             });
 
             const newMat: RawMaterial = {
@@ -987,15 +1076,17 @@ export default function CostRecipeManager() {
 
     // --- Handlers: Recipes ---
     const handleDeleteRecipe = async (id: string) => {
-        if (window.confirm("이 메뉴 레시피를 삭제하시겠습니까?")) {
-            try {
-                await recipeCostApi.delete(id);
-                setRecipes(prev => prev.filter(r => r.id !== id));
-            } catch (error) {
-                console.error("Failed to delete recipe", error);
-                alert("삭제 실패");
+        setTimeout(async () => {
+            if (window.confirm("이 메뉴 레시피를 삭제하시겠습니까?")) {
+                try {
+                    await recipeCostApi.delete(id);
+                    setRecipes(prev => prev.filter(r => r.id !== id));
+                } catch (error) {
+                    console.error("Failed to delete recipe", error);
+                    alert("삭제 실패");
+                }
             }
-        }
+        }, 10);
     };
 
     const handleAddRecipe = () => {
@@ -1006,16 +1097,19 @@ export default function CostRecipeManager() {
         try {
             // Transform to API format
             const apiData = {
-                menu_name: data.name,
+                name: data.name,
+                menuId: data.name,
                 category: data.category,
-                selling_price: data.salePrice,
+                price: data.salePrice,
                 ingredients: data.ingredients.map(ing => {
                     const mat = materials.find(m => m.id === ing.materialId);
                     return {
-                        name: ing.materialId,
-                        cost_per_unit: mat ? getUnitPrice(mat) : 0,
-                        usage: ing.qty,
-                        cost: mat ? getUnitPrice(mat) * ing.qty : 0
+                        name: mat?.name || ing.materialId,
+                        ingredientId: ing.materialId,
+                        unit_cost: mat ? getUnitPrice(mat) : 0,
+                        quantity: ing.qty,
+                        total_ingredient_cost: mat ? getUnitPrice(mat) * ing.qty : 0,
+                        uom: mat?.unit || 'g'
                     };
                 })
             };
@@ -1039,16 +1133,19 @@ export default function CostRecipeManager() {
         try {
             // API payload 변환
             const payload = {
-                menu_name: recipe.name,
-                category: "Uncategorized", // 기본 카테고리 (UI에 카테고리 선택이 없어서)
-                selling_price: recipe.salePrice,
+                name: recipe.name,
+                menuId: recipe.name,
+                category: recipe.category || "Uncategorized", // 기본 카테고리 (UI에 카테고리 선택이 없어서)
+                price: recipe.salePrice,
                 ingredients: recipe.ingredients.map(ing => {
                     const mat = materials.find(m => m.id === ing.materialId);
                     return {
-                        name: ing.materialId, // materialId를 name으로 사용 (백엔드 스키마 확인 필요)
-                        cost_per_unit: mat ? getUnitPrice(mat) : 0,
-                        usage: ing.qty,
-                        cost: (mat ? getUnitPrice(mat) : 0) * ing.qty
+                        name: mat?.name || ing.materialId, // materialId를 name으로 사용 (백엔드 스키마 확인 필요)
+                        ingredientId: ing.materialId,
+                        unit_cost: mat ? getUnitPrice(mat) : 0,
+                        quantity: ing.qty,
+                        total_ingredient_cost: (mat ? getUnitPrice(mat) : 0) * ing.qty,
+                        uom: mat?.unit || 'g'
                     };
                 })
             };
