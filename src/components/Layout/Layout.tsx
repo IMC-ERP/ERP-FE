@@ -136,10 +136,10 @@ export default function Layout() {
         </main>
       </div>
 
-      {/* Floating AI Button (Top Right) */}
+      {/* Floating AI Button (Bottom Right) */}
       <button
         onClick={() => setIsAIDrawerOpen(prev => !prev)}
-        className={`fixed top-6 right-8 z-40 p-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-full shadow-lg hover:shadow-xl hover:scale-110 transition-all duration-200 group border-2 border-white/20 ${isAIDrawerOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
+        className={`fixed bottom-8 right-8 z-40 p-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-full shadow-lg hover:shadow-xl hover:scale-110 transition-all duration-200 group border-2 border-white/20 ${isAIDrawerOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
         title="AI 비서 열기"
       >
         <Bot size={24} className="group-hover:rotate-12 transition-transform" />

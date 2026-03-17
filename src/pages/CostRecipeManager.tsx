@@ -927,7 +927,40 @@ export default function CostRecipeManager() {
             setRecipes(loadedRecipes);
 
         } catch (error) {
-            console.error("Failed to fetch data", error);
+            console.error("Failed to fetch data, injecting dummy data:", error);
+            
+            // 더미 데이터 주입
+            const dummyMaterials: RawMaterial[] = [
+                { id: '원두A', category: '원두', name: '에티오피아 예가체프', purchasePrice: 30000, purchaseUnitQty: 1000, unit: 'g', currentStock: 1500 },
+                { id: '우유', category: '유제품', name: '서울우유 1L', purchasePrice: 2000, purchaseUnitQty: 1, unit: 'L', currentStock: 8 },
+                { id: '바닐라시럽', category: '시럽/소스', name: '바닐라 시럽 1L', purchasePrice: 15000, purchaseUnitQty: 1000, unit: 'ml', currentStock: 2500 }
+            ];
+            setMaterials(dummyMaterials);
+
+            const dummyRecipes: MenuRecipe[] = [
+                {
+                    id: '아메리카노', category: '커피', name: '아메리카노', salePrice: 4500,
+                    ingredients: [
+                        { id: '아메리카노-0', materialId: '원두A', qty: 20 }
+                    ]
+                },
+                {
+                    id: '카페라떼', category: '라떼/밀크티', name: '카페라떼', salePrice: 5000,
+                    ingredients: [
+                        { id: '카페라떼-0', materialId: '원두A', qty: 20 },
+                        { id: '카페라떼-1', materialId: '우유', qty: 0.2 }
+                    ]
+                },
+                {
+                    id: '바닐라 라떼', category: '라떼/밀크티', name: '바닐라 라떼', salePrice: 5500,
+                    ingredients: [
+                        { id: '바닐라 라떼-0', materialId: '원두A', qty: 20 },
+                        { id: '바닐라 라떼-1', materialId: '우유', qty: 0.2 },
+                        { id: '바닐라 라떼-2', materialId: '바닐라시럽', qty: 30 }
+                    ]
+                }
+            ];
+            setRecipes(dummyRecipes);
         }
     };
 

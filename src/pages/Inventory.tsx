@@ -105,7 +105,15 @@ export default function Inventory() {
       }));
       setInventory(items);
     } catch (err) {
-      console.error('Failed to fetch inventory:', err);
+      console.error('Failed to fetch inventory, injecting dummy data:', err);
+      const dummyInventory: InventoryItem[] = [
+        { id: '원두A', type: 'RAW', category: '원두', name: '에티오피아 예가체프', currentStock: 1500, uom: 'g', safety_stock: 2000, max_stock_level: 5000, unitPrice: 30, needs_reorder: true, lastUpdated: '2026-03-10T10:00:00Z', prep_yield: 0, prep_recipe: [] },
+        { id: '원두B', type: 'RAW', category: '원두', name: '콜롬비아 수프리모', currentStock: 3500, uom: 'g', safety_stock: 1500, max_stock_level: 5000, unitPrice: 25, needs_reorder: false, lastUpdated: '2026-03-10T10:00:00Z', prep_yield: 0, prep_recipe: [] },
+        { id: '우유', type: 'RAW', category: '유제품', name: '서울우유 1L', currentStock: 8, uom: 'L', safety_stock: 10, max_stock_level: 20, unitPrice: 2000, needs_reorder: true, lastUpdated: '2026-03-10T10:00:00Z', prep_yield: 0, prep_recipe: [] },
+        { id: '바닐라시럽', type: 'RAW', category: '시럽/소스', name: '바닐라 시럽 1L', currentStock: 2500, uom: 'ml', safety_stock: 1000, max_stock_level: 3000, unitPrice: 15, needs_reorder: false, lastUpdated: '2026-03-10T10:00:00Z', prep_yield: 0, prep_recipe: [] },
+        { id: '종이컵', type: 'RAW', category: '소모품', name: '14oz 핫컵', currentStock: 250, uom: 'ea', safety_stock: 500, max_stock_level: 1000, unitPrice: 50, needs_reorder: true, lastUpdated: '2026-03-10T10:00:00Z', prep_yield: 0, prep_recipe: [] }
+      ];
+      setInventory(dummyInventory);
     } finally {
       setLoading(false);
     }

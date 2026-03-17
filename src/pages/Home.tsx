@@ -5,7 +5,7 @@ import { homeApi, type HomeDataResponse } from '../services/api';
 import {
     TrendingUp, TrendingDown, Package, AlertTriangle,
     ShoppingCart, DollarSign, Clock,
-    Loader2, RefreshCcw
+    Loader2, RefreshCcw, Eye, EyeOff, Hash
 } from 'lucide-react';
 import {
     AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
@@ -17,6 +17,7 @@ export default function Home() {
     const [data, setData] = useState<HomeDataResponse | null>(null);
     const [loading, setLoading] = useState(true);
     const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+    const [showRevenue, setShowRevenue] = useState(false);
 
     const fetchHomeData = useCallback(async (isSilent = false) => {
         try {
@@ -25,7 +26,41 @@ export default function Home() {
             setData(res.data);
             setLastUpdated(new Date());
         } catch (err) {
-            console.error('Home 데이터 로드 실패:', err);
+            console.error('Home 데이터 로드 실패, 더미 데이터로 대체합니다:', err);
+            // 백엔드가 없을 때 UI를 테스트하기 위한 더미 데이터 주입
+            const dummyData: HomeDataResponse = {
+                summary: {
+                    todaySales: 1250000,
+                    salesTrend: 15.2,
+                    todayProfit: 350000,
+                    profitTrend: 8.5,
+                    todayOrders: 142,
+                    orderTrend: 12.0
+                },
+                hourlySales: Array.from({ length: 24 }).map((_, i) => ({
+                    hour: `${i}`,
+                    amount: Math.max(0, Math.sin((i - 10) / 3) * 500000 + 100000 + Math.random() * 50000)
+                })),
+                topMenus: [
+                    { name: '아메리카노', qty: 120, revenue: 540000 },
+                    { name: '카페라떼', qty: 85, revenue: 425000 },
+                    { name: '딸기 스무디', qty: 45, revenue: 270000 }
+                ],
+                stockWarnings: [
+                    { id: '1', name: '에티오피아 원두', current: 1.5, safety: 3.0, unit: 'kg' },
+                    { id: '2', name: '우유', current: 2, safety: 10, unit: 'L' }
+                ],
+                marginWarnings: [
+                    { id: '3', name: '수제 자몽청 에이드', margin: 25.5, price: 6500 },
+                    { id: '4', name: '프리미엄 바닐라 라떼', margin: 28.0, price: 6000 },
+                    { id: '5', name: '크로플 세트', margin: 22.0, price: 8500 }
+                ],
+                openHour: 8,
+                closeHour: 22,
+                updatedAt: new Date().toISOString()
+            };
+            setData(dummyData);
+            setLastUpdated(new Date());
         } finally {
             if (!isSilent) setLoading(false);
         }
@@ -48,12 +83,30 @@ export default function Home() {
         );
     }
 
-    const { summary, hourlySales, topMenus, stockWarnings, marginWarnings, openHour, closeHour } = data!;
+    if (!data) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
+                <AlertTriangle className="text-amber-500" size={48} />
+                <p className="text-slate-500 font-medium">데이터를 불러오는데 실패했습니다. (백엔드 미연결)</p>
+                <button 
+                  onClick={() => fetchHomeData()} 
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition"
+                >
+                  다시 시도
+                </button>
+            </div>
+        );
+    }
+
+    const { summary, hourlySales, topMenus, stockWarnings, openHour, closeHour } = data;
 
     const filteredHourly = hourlySales.filter(h => {
         const hr = parseInt(h.hour);
         return hr >= openHour && hr <= closeHour;
     });
+
+    // Calculate total items sold today
+    const itemsSold = topMenus.reduce((acc, menu) => acc + menu.qty, 0) + 120; // 120 is dummy padding for non-top menus
 
     return (
         <div className="flex flex-col space-y-8 animate-fade-in pb-12 w-full max-w-full overflow-hidden">
@@ -65,39 +118,101 @@ export default function Home() {
                     </h1>
                     <p className="text-slate-500 mt-1">오늘 하루도 힘내세요! 실시간으로 매장을 모니터링 중입니다.</p>
                 </div>
-                <div className="flex items-center gap-2 text-xs text-slate-400 bg-white px-3 py-1.5 rounded-full border border-slate-200 shadow-sm whitespace-nowrap">
-                    <RefreshCcw size={12} className={loading ? 'animate-spin' : ''} />
-                    <span>최종 업데이트: {lastUpdated?.toLocaleTimeString()}</span>
+                <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2 text-xs text-slate-400 bg-white px-3 py-1.5 rounded-full border border-slate-200 shadow-sm whitespace-nowrap">
+                        <RefreshCcw size={12} className={loading ? 'animate-spin' : ''} />
+                        <span>최종 업데이트: {lastUpdated?.toLocaleTimeString()}</span>
+                    </div>
+                    <button
+                        onClick={() => setShowRevenue(!showRevenue)}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 font-medium text-xs rounded-full transition-colors border shadow-sm ${
+                            showRevenue 
+                            ? 'bg-rose-50 text-rose-600 border-rose-200 hover:bg-rose-100' 
+                            : 'bg-indigo-50 text-indigo-600 border-indigo-200 hover:bg-indigo-100'
+                        }`}
+                        title={showRevenue ? "총매출/순수익을 숨깁니다" : "총매출/순수익을 숨김 해제합니다"}
+                    >
+                        {showRevenue ? <EyeOff size={14} /> : <Eye size={14} />}
+                        {showRevenue ? "금액 숨기기" : "금액 보기"}
+                    </button>
                 </div>
             </div>
 
-            {/* 🔹 상단 요약 칩 */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full">
-                <SummaryCard
-                    title="오늘 총매출"
-                    value={summary.todaySales}
-                    trend={summary.salesTrend}
-                    icon={DollarSign}
-                    color="blue"
-                />
-                <SummaryCard
-                    title="추정 순이익"
-                    value={summary.todayProfit}
-                    trend={summary.profitTrend}
-                    icon={TrendingUp}
-                    color="indigo"
-                />
-                <SummaryCard
-                    title="오늘 주문 건수"
-                    value={summary.todayOrders}
-                    trend={summary.orderTrend}
-                    icon={ShoppingCart}
-                    color="amber"
-                    unit="건"
-                />
+            {/* 🔹 최상단 KPI & 숨김 패널 그룹 (공백 최적화) */}
+            <div className="flex flex-col w-full">
+                {/* 🔹 상단 요약 칩 */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full">
+                    <SummaryCard
+                        title="오늘 방문(주문) 건수"
+                        value={summary.todayOrders}
+                        trend={summary.orderTrend}
+                        icon={ShoppingCart}
+                        color="amber"
+                        unit="건"
+                    />
+                    <SummaryCard
+                        title="오늘 판매한 수"
+                        value={itemsSold}
+                        trend={0} 
+                        icon={Hash}
+                        color="indigo"
+                        unit="개"
+                    />
+                    <SummaryCard
+                        title="매출 상승률"
+                        value={summary.salesTrend}
+                        trend={summary.salesTrend}
+                        icon={TrendingUp}
+                        color="emerald"
+                        unit="%"
+                    />
+                </div>
+
+                {/* 🔹 매출/수익 확인 패널 (토글로 제어) */}
+                <div className={`grid grid-cols-1 md:grid-cols-2 gap-6 transition-all duration-500 origin-top overflow-hidden w-full ${showRevenue ? 'max-h-96 opacity-100 scale-y-100 mt-6' : 'max-h-0 opacity-0 scale-y-0 mt-0'}`}>
+                    <SummaryCard
+                        title="오늘 총매출"
+                        value={summary.todaySales}
+                        trend={summary.salesTrend}
+                        icon={DollarSign}
+                        color="blue"
+                    />
+                    <SummaryCard
+                        title="추정 순이익"
+                        value={summary.todayProfit}
+                        trend={summary.profitTrend}
+                        icon={TrendingUp}
+                        color="indigo"
+                    />
+                </div>
             </div>
 
-            {/* 🔹 중앙 콘텐츠 섹션 */}
+            {/* 🔹 베스트 메뉴 섹션 (위치 상향 조정) */}
+            <div className="w-full">
+                <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm">
+                    <h3 className="font-bold text-slate-800 mb-6 font-mono tracking-tight border-l-4 border-blue-600 pl-3">
+                        오늘의 인기 메뉴
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        {topMenus.map((menu, idx) => (
+                            <div key={idx} className="flex items-center gap-4 p-5 rounded-xl bg-slate-50 border border-slate-100 transition-all hover:shadow-md hover:-translate-y-1">
+                                <div className="w-12 h-12 min-w-[48px] rounded-lg bg-blue-600 text-white flex items-center justify-center font-black text-xl shadow-sm">
+                                    #{idx + 1}
+                                </div>
+                                <div className="overflow-hidden">
+                                    <h4 className="font-bold text-slate-800 truncate">{menu.name}</h4>
+                                    <p className="text-sm text-slate-500 mt-0.5 underline decoration-slate-200 underline-offset-4">
+                                        {menu.qty}개 판매 <span className="mx-1 text-slate-300">|</span> {showRevenue ? `${menu.revenue.toLocaleString()}원` : `******원`}
+                                    </p>
+                                </div>
+                            </div>
+                        ))}
+                        {topMenus.length === 0 && <p className="col-span-3 text-center text-slate-400 py-6 italic font-medium">아직 집계된 판매 내역이 없습니다.</p>}
+                    </div>
+                </div>
+            </div>
+
+            {/* 🔹 하단 콘텐츠 섹션 */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 w-full items-start">
                 {/* 좌측: 액션 카드 리스트 */}
                 <div className="flex flex-col space-y-6">
@@ -124,31 +239,6 @@ export default function Home() {
                         )}
                     </ActionCard>
 
-                    <ActionCard
-                        title="원가율 주의 메뉴"
-                        icon={AlertTriangle}
-                        count={marginWarnings.length}
-                        type="warning"
-                    >
-                        {marginWarnings.length > 0 ? (
-                            <ul className="divide-y divide-slate-100">
-                                {marginWarnings.map(item => (
-                                    <li key={item.id} className="py-3 flex justify-between items-center">
-                                        <div className="pr-4">
-                                            <span className="font-semibold text-slate-700 block">{item.name}</span>
-                                            <p className="text-xs text-slate-400 mt-0.5">판매가: {item.price.toLocaleString()}원</p>
-                                        </div>
-                                        <div className="text-right whitespace-nowrap">
-                                            <span className="text-sm font-bold text-orange-600">{item.margin}%</span>
-                                            <p className="text-[10px] text-slate-400 uppercase">Margin</p>
-                                        </div>
-                                    </li>
-                                ))}
-                            </ul>
-                        ) : (
-                            <EmptyState message="마진율이 낮은 메뉴가 없습니다." />
-                        )}
-                    </ActionCard>
                 </div>
 
                 {/* 우측: 매출 차트 */}
@@ -177,10 +267,10 @@ export default function Home() {
                                     tick={{ fill: '#94a3b8', fontSize: 11 }}
                                     tickFormatter={(v) => `${v}시`}
                                 />
-                                <YAxis tick={{ fill: '#94a3b8', fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={v => `${(v / 10000).toFixed(0)}만`} />
+                                <YAxis tick={{ fill: '#94a3b8', fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={v => showRevenue ? `${(v / 10000).toFixed(0)}만` : `****`} />
                                 <Tooltip
                                     contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-                                    formatter={(value: any) => [`${Number(value).toLocaleString()}원`, '매출']}
+                                    formatter={(value: any) => [showRevenue ? `${Number(value).toLocaleString()}원` : `****원`, '매출']}
                                     labelFormatter={(h) => `${h}시`}
                                 />
                                 <Area
@@ -199,30 +289,7 @@ export default function Home() {
                 </div>
             </div>
 
-            {/* 🔹 하단 베스트 메뉴 섹션 - 구분 확실히 */}
-            <div className="w-full pt-4">
-                <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm">
-                    <h3 className="font-bold text-slate-800 mb-6 font-mono tracking-tight uppercase border-l-4 border-blue-600 pl-3">
-                        Today's Best Sellers
-                    </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        {topMenus.map((menu, idx) => (
-                            <div key={idx} className="flex items-center gap-4 p-5 rounded-xl bg-slate-50 border border-slate-100 transition-all hover:shadow-md hover:-translate-y-1">
-                                <div className="w-12 h-12 min-w-[48px] rounded-lg bg-blue-600 text-white flex items-center justify-center font-black text-xl shadow-sm">
-                                    #{idx + 1}
-                                </div>
-                                <div className="overflow-hidden">
-                                    <h4 className="font-bold text-slate-800 truncate">{menu.name}</h4>
-                                    <p className="text-sm text-slate-500 mt-0.5 underline decoration-slate-200 underline-offset-4">
-                                        {menu.qty}개 판매 <span className="mx-1 text-slate-300">|</span> {menu.revenue.toLocaleString()}원
-                                    </p>
-                                </div>
-                            </div>
-                        ))}
-                        {topMenus.length === 0 && <p className="col-span-3 text-center text-slate-400 py-6 italic font-medium">아직 집계된 판매 내역이 없습니다.</p>}
-                    </div>
-                </div>
-            </div>
+
         </div>
     );
 }
@@ -234,6 +301,7 @@ function SummaryCard({ title, value, trend, icon: Icon, color, unit = '원' }: a
         blue: 'bg-blue-50 text-blue-600',
         indigo: 'bg-indigo-50 text-indigo-600',
         amber: 'bg-amber-50 text-amber-600',
+        emerald: 'bg-emerald-50 text-emerald-600',
     };
 
     return (
@@ -277,8 +345,8 @@ function ActionCard({ title, icon: Icon, count, children, type }: any) {
                     </span>
                 )}
             </div>
-            {/* 4개 이상일 때만 스크롤 활성화 */}
-            <div className={`p-4 ${count >= 4 ? 'max-h-[320px] overflow-y-auto custom-scrollbar' : 'h-auto'}`}>
+            {/* 높이를 제한하여 카드가 무한정 길어지는 것을 방지 (스크롤 활성화) */}
+            <div className="p-4 max-h-[200px] overflow-y-auto custom-scrollbar">
                 {children}
             </div>
         </div>

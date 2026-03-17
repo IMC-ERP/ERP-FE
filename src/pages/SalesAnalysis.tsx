@@ -8,12 +8,10 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-    LineChart, Line, Treemap, Cell
+    LineChart, Line, Cell
 } from 'recharts';
-import { TrendingUp, TrendingDown, Info, ArrowLeft, Loader2, Calendar, LineChart as LineChartIcon, ArrowRightLeft } from 'lucide-react';
+import { Info, Loader2, Calendar } from 'lucide-react';
 import { analyticsApi, storeHoursApi, type SalesAnalyticsResponse } from '../services/api';
-
-import SalesComparisonTab from './SalesComparisonTab';
 
 // ==================== 유틸리티 ====================
 
@@ -56,8 +54,6 @@ export default function SalesAnalysis() {
     const yesterday = new Date(now); yesterday.setDate(now.getDate() - 1);
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
-    const [activeTab, setActiveTab] = useState<'trend' | 'compare'>('trend');
-
     const [startDate, setStartDate] = useState(toYMD(monthStart));
     const [endDate, setEndDate] = useState(toYMD(now));
     const [data, setData] = useState<SalesAnalyticsResponse | null>(null);
@@ -66,8 +62,6 @@ export default function SalesAnalysis() {
 
     // 차트 옵션
     const [fridayWeekend, setFridayWeekend] = useState(false);
-    const [treemapMode, setTreemapMode] = useState<'menu' | 'category'>('menu');
-    const [drillCategory, setDrillCategory] = useState<string | null>(null);
 
     // storeHours
     const [openHour, setOpenHour] = useState(0);
@@ -96,7 +90,58 @@ export default function SalesAnalysis() {
             if (res.data.closeHour !== undefined) setCloseHour(res.data.closeHour);
             setStoreHoursLoaded(true);
         } catch (err) {
-            console.error('Analytics fetch failed:', err);
+            console.error('Analytics fetch failed, loading dummy data instead:', err);
+            const dummyData: SalesAnalyticsResponse = {
+                totalRevenue: 3450000,
+                previousTotalRevenue: 2900000,
+                changeRate: 18.9,
+                salesByWeekday: [
+                    { weekday: '월', weekdayEn: 'Monday', sales: 450000 },
+                    { weekday: '화', weekdayEn: 'Tuesday', sales: 420000 },
+                    { weekday: '수', weekdayEn: 'Wednesday', sales: 480000 },
+                    { weekday: '목', weekdayEn: 'Thursday', sales: 510000 },
+                    { weekday: '금', weekdayEn: 'Friday', sales: 750000 },
+                    { weekday: '토', weekdayEn: 'Saturday', sales: 840000 },
+                    { weekday: '일', weekdayEn: 'Sunday', sales: 0 }
+                ],
+                salesByHour: Array.from({ length: 24 }).map((_, i) => ({
+                    hour: `${i}`,
+                    sales: (i >= 8 && i <= 22) ? Math.max(0, Math.sin((i - 12) / 3) * 60000 + 40000 + Math.random() * 20000) : 0
+                })),
+                salesByCategory: [
+                    { category: '커피', revenue: 2100000, percentage: 60.8 },
+                    { category: '라떼/밀크티', revenue: 850000, percentage: 24.6 },
+                    { category: '에이드/스무디', revenue: 350000, percentage: 10.1 },
+                    { category: '디저트', revenue: 150000, percentage: 4.3 }
+                ],
+                menuTop5: [
+                    { name: '아메리카노', revenue: 1250000, category: '커피', qty: 100, cost: 500, percentage: 30 },
+                    { name: '카페라떼', revenue: 650000, category: '라떼/밀크티', qty: 50, cost: 600, percentage: 15 },
+                    { name: '바닐라 라떼', revenue: 450000, category: '라떼/밀크티', qty: 30, cost: 700, percentage: 12 },
+                    { name: '자몽 에이드', revenue: 320000, category: '에이드/스무디', qty: 25, cost: 1000, percentage: 8 },
+                    { name: '딸기 스무디', revenue: 280000, category: '에이드/스무디', qty: 20, cost: 1200, percentage: 7 }
+                ],
+                menuTreemap: [
+                    { name: '아메리카노', category: '커피', revenue: 1250000, qty: 100, cost: 500, percentage: 30 },
+                    { name: '카페라떼', category: '라떼/밀크티', revenue: 650000, qty: 50, cost: 600, percentage: 15 },
+                    { name: '카라멜 마끼아또', category: '라떼/밀크티', revenue: 150000, qty: 10, cost: 800, percentage: 5 },
+                    { name: '바닐라 라떼', category: '라떼/밀크티', revenue: 450000, qty: 30, cost: 700, percentage: 12 },
+                    { name: '자몽 에이드', category: '에이드/스무디', revenue: 320000, qty: 25, cost: 1000, percentage: 8 },
+                    { name: '레몬 에이드', category: '에이드/스무디', revenue: 120000, qty: 10, cost: 900, percentage: 3 },
+                    { name: '딸기 스무디', category: '에이드/스무디', revenue: 280000, qty: 20, cost: 1200, percentage: 7 },
+                    { name: '크로플', category: '디저트', revenue: 150000, qty: 15, cost: 2000, percentage: 4 }
+                ],
+                dailySales: Array.from({ length: 7 }).map((_, i) => ({
+                    date: `2026-03-${11 + i}`,
+                    sales: Math.max(0, Math.sin(i / 3) * 200000 + 300000 + Math.random() * 50000)
+                })),
+                openHour: 8,
+                closeHour: 22
+            };
+            setData(dummyData);
+            setOpenHour(8);
+            setCloseHour(22);
+            setStoreHoursLoaded(true);
         } finally {
             setLoading(false);
         }
@@ -167,26 +212,6 @@ export default function SalesAnalysis() {
 
     const hourlyYDomain = useMemo(() => smartYDomain(filteredHourly.map(h => h.sales)), [filteredHourly]);
 
-    // Treemap 데이터
-    const treemapData = useMemo(() => {
-        if (!data) return [];
-        if (treemapMode === 'menu' || drillCategory) {
-            const items = drillCategory
-                ? data.menuTreemap.filter(m => m.category === drillCategory)
-                : data.menuTreemap;
-            const totalRev = items.reduce((s, m) => s + m.revenue, 0);
-            return items.map(m => ({
-                name: m.name, size: m.revenue,
-                pct: totalRev > 0 ? ((m.revenue / totalRev) * 100).toFixed(1) : '0',
-                revenue: m.revenue,
-            }));
-        }
-        return data.salesByCategory.map(c => ({
-            name: c.category, size: c.revenue,
-            pct: c.percentage.toString(), revenue: c.revenue,
-        }));
-    }, [data, treemapMode, drillCategory]);
-
     const top5XDomain = useMemo(() => {
         if (!data?.menuTop5.length) return [0, 100];
         const maxRev = Math.max(...data.menuTop5.map(m => m.revenue));
@@ -205,48 +230,17 @@ export default function SalesAnalysis() {
 
     const isPositive = data.changeRate >= 0;
 
-    const TreemapTooltip = ({ active, payload }: any) => {
-        if (active && payload && payload.length) {
-            const d = payload[0].payload;
-            return (
-                <div className="bg-white p-3 rounded-lg shadow-lg border border-slate-200 text-sm">
-                    <div className="font-bold text-slate-800">{d.name}</div>
-                    <div className="text-slate-600">매출: {fmt(d.revenue)}원</div>
-                    <div className="text-indigo-600 font-medium">비중: {d.pct}%</div>
-                </div>
-            );
-        }
-        return null;
-    };
-
     return (
         <div className="max-w-6xl mx-auto space-y-6 animate-fade-in">
 
-            {/* ===== 페이지 타이틀 & 탭 ===== */}
+            {/* ===== 페이지 타이틀 ===== */}
             <div className="flex flex-col gap-2">
                 <h2 className="text-2xl font-black text-slate-800 tracking-tight">매출 분석</h2>
-
-                {/* 탭 컨트롤러 (좌측 정렬) */}
-                <div className="flex bg-slate-100 p-1 rounded-xl w-fit">
-                    <button
-                        onClick={() => setActiveTab('trend')}
-                        className={`flex items-center justify-center gap-2 px-6 py-2 text-sm font-bold rounded-lg transition-all ${activeTab === 'trend' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
-                    >
-                        <LineChartIcon size={16} /> 매출 추이
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('compare')}
-                        className={`flex items-center justify-center gap-2 px-6 py-2 text-sm font-bold rounded-lg transition-all ${activeTab === 'compare' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}
-                    >
-                        <ArrowRightLeft size={16} /> 비교하기
-                    </button>
-                </div>
             </div>
 
-            {activeTab === 'trend' ? (
-                <>
-                    {/* ===== 기간 설정 + Hero Cards (같은 행) ===== */}
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+            <>
+                {/* ===== 기간 설정 + 통합 Hero Card (같은 행) ===== */}
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
 
                         {/* 기간 설정 카드 */}
                         <div className="lg:col-span-4 bg-white rounded-2xl shadow-sm border border-slate-200 p-5 flex flex-col">
@@ -300,22 +294,20 @@ export default function SalesAnalysis() {
                             </div>
                         </div>
 
-                        {/* 총 매출 카드 */}
-                        <div className="lg:col-span-5 bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col justify-center">
-                            <div className="text-sm text-slate-500 mb-1">기간 내 총 매출</div>
-                            <div className="text-4xl font-extrabold text-slate-900">{fmt(data.totalRevenue)}원</div>
-                            <div className={`flex items-center gap-1 mt-2 text-sm font-semibold ${isPositive ? 'text-emerald-600' : 'text-rose-600'}`}>
-                                {isPositive ? <TrendingUp size={18} /> : <TrendingDown size={18} />}
-                                <span>{isPositive ? '+' : ''}{data.changeRate}%</span>
-                                <span className="text-slate-400 font-normal ml-1">전기 대비</span>
+                        {/* 병합된 총 매출 카드 */}
+                        <div className="lg:col-span-8 bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col justify-center relative overflow-hidden">
+                            <div className="absolute top-0 right-0 w-32 h-32 bg-blue-50 rounded-bl-full -z-10 opacity-50" />
+                            <div className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-2">기간 내 총 매출</div>
+                            <div className="flex items-baseline gap-4">
+                                <div className="text-5xl font-extrabold text-slate-900 tracking-tight">{fmt(data.totalRevenue)}<span className="text-3xl font-bold ml-1">원</span></div>
                             </div>
-                        </div>
-
-                        {/* 전기 매출 카드 */}
-                        <div className="lg:col-span-3 bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col justify-center">
-                            <div className="text-sm text-slate-500 mb-1">지난 {periodDays}일 대비 매출 추이</div>
-                            <div className="text-2xl font-bold text-slate-700">{fmt(data.previousTotalRevenue)}원</div>
-                            <div className="text-xs text-slate-400 mt-1">직전 동일 기간 비교</div>
+                            <div className="flex items-center gap-2 mt-4 text-sm font-medium text-slate-600">
+                                지난 {periodDays}일 대비: 
+                                <span className={`flex items-center gap-1 font-bold ${isPositive ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                    {isPositive ? '▲' : '▼'} {Math.abs(data.changeRate)}%
+                                </span>
+                                <span className="text-slate-400 text-xs font-normal ml-1">(직전 동기 {fmt(data.previousTotalRevenue)}원)</span>
+                            </div>
                         </div>
                     </div>
 
@@ -401,118 +393,8 @@ export default function SalesAnalysis() {
                             </div>
                         </div>
 
-                        {/* 3. 메뉴별 / 카테고리별 트리맵 */}
-                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-                            <div className="flex items-center justify-between mb-4">
-                                {drillCategory ? (
-                                    <button onClick={() => setDrillCategory(null)} className="flex items-center gap-1 text-sm text-indigo-600 hover:text-indigo-800 font-medium">
-                                        <ArrowLeft size={16} /> 전체 카테고리 보기
-                                    </button>
-                                ) : (
-                                    <h3 className="font-bold text-slate-800">
-                                        {treemapMode === 'menu' ? '메뉴별 매출' : '카테고리별 매출'}
-                                    </h3>
-                                )}
-                                {!drillCategory && (
-                                    <div className="flex items-center bg-slate-100 rounded-full p-0.5">
-                                        <button
-                                            onClick={() => { setTreemapMode('menu'); setDrillCategory(null); }}
-                                            className={`px-3 py-1 text-xs font-medium rounded-full transition-all ${treemapMode === 'menu' ? 'bg-white shadow text-slate-800' : 'text-slate-500'}`}
-                                        >메뉴별</button>
-                                        <button
-                                            onClick={() => { setTreemapMode('category'); setDrillCategory(null); }}
-                                            className={`px-3 py-1 text-xs font-medium rounded-full transition-all ${treemapMode === 'category' ? 'bg-white shadow text-slate-800' : 'text-slate-500'}`}
-                                        >카테고리별</button>
-                                    </div>
-                                )}
-                            </div>
-                            {treemapData.length > 0 ? (
-                                <ResponsiveContainer width="100%" height={280}>
-                                    <Treemap
-                                        data={treemapData}
-                                        dataKey="size"
-                                        stroke="#fff"
-                                        isAnimationActive={true}
-                                        animationDuration={1200}
-                                        animationEasing="ease-in-out"
-                                        content={({ x, y, width, height, name, index, root }: any) => {
-                                            if (width < 30 || height < 20) return <g />;
-                                            const total = root.value;
-                                            const val = treemapData[index]?.size ?? 0;
-                                            const ratio = total > 0 ? val / total : 0;
-                                            const opacity = 0.4 + (ratio * 0.6);
-                                            const fill = `rgba(99, 102, 241, ${opacity})`;
-                                            const clipId = `treemap-clip-${index}`;
-                                            const fontSize = Math.min(width / 7, 13);
-                                            const pctFontSize = Math.min(width / 10, 11);
-                                            const padding = 6;
-                                            const usableWidth = width - padding * 2;
-
-                                            // 텍스트 줄 바꿈 로직
-                                            const wrapText = (text: string, maxW: number, fSize: number): string[] => {
-                                                if (!text) return [];
-                                                const charWidth = fSize * 0.65;
-                                                const maxChars = Math.max(Math.floor(maxW / charWidth), 1);
-                                                if (text.length <= maxChars) return [text];
-                                                const lines: string[] = [];
-                                                for (let i = 0; i < text.length; i += maxChars) {
-                                                    lines.push(text.substring(i, i + maxChars));
-                                                }
-                                                return lines;
-                                            };
-
-                                            const showName = width > 40 && height > 30;
-                                            const nameLines = showName ? wrapText(name, usableWidth, fontSize) : [];
-                                            const lineHeight = fontSize * 1.3;
-                                            // 최대 표시 줄 수 제한 (블록 높이 기준)
-                                            const maxNameLines = Math.max(Math.floor((height - padding * 2 - (width > 60 && height > 50 ? pctFontSize + 4 : 0)) / lineHeight), 1);
-                                            const clampedLines = nameLines.slice(0, maxNameLines);
-                                            if (clampedLines.length < nameLines.length && clampedLines.length > 0) {
-                                                const last = clampedLines[clampedLines.length - 1];
-                                                clampedLines[clampedLines.length - 1] = last.length > 2 ? last.slice(0, -2) + '…' : last;
-                                            }
-
-                                            const showPct = width > 60 && height > 50;
-                                            const totalTextHeight = clampedLines.length * lineHeight + (showPct ? pctFontSize + 4 : 0);
-                                            const textStartY = y + (height - totalTextHeight) / 2 + lineHeight / 2;
-
-                                            return (
-                                                <g
-                                                    onClick={() => { if (treemapMode === 'category' && !drillCategory) setDrillCategory(name); }}
-                                                    style={{ cursor: treemapMode === 'category' && !drillCategory ? 'pointer' : 'default' }}
-                                                >
-                                                    <defs>
-                                                        <clipPath id={clipId}>
-                                                            <rect x={x} y={y} width={width} height={height} />
-                                                        </clipPath>
-                                                    </defs>
-                                                    <rect x={x} y={y} width={width} height={height} fill={fill} rx={2} stroke="#fff" strokeWidth={1} />
-                                                    <g clipPath={`url(#${clipId})`}>
-                                                        {showName && clampedLines.map((line, li) => (
-                                                            <text key={li} x={x + width / 2} y={textStartY + li * lineHeight} textAnchor="middle" dominantBaseline="central" fill="#fff" fontSize={fontSize} fontWeight={600} style={{ pointerEvents: 'none' }}>
-                                                                {line}
-                                                            </text>
-                                                        ))}
-                                                        {showPct && (
-                                                            <text x={x + width / 2} y={textStartY + clampedLines.length * lineHeight + 4} textAnchor="middle" dominantBaseline="central" fill="rgba(255,255,255,0.9)" fontSize={pctFontSize} style={{ pointerEvents: 'none' }}>
-                                                                {treemapData[index]?.pct}%
-                                                            </text>
-                                                        )}
-                                                    </g>
-                                                </g>
-                                            );
-                                        }}
-                                    >
-                                        <Tooltip content={<TreemapTooltip />} />
-                                    </Treemap>
-                                </ResponsiveContainer>
-                            ) : (
-                                <div className="flex items-center justify-center h-[280px] text-slate-400 text-sm">데이터 없음</div>
-                            )}
-                        </div>
-
-                        {/* 4. 매출 Top 5 (Horizontal Bar) */}
-                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                        {/* 3. 매출 Top 5 (Horizontal Bar) - 트리맵 삭제 후 전체 너비 차지 */}
+                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 lg:col-span-2">
                             <h3 className="font-bold text-slate-800 mb-4">매출 상위 5개 메뉴</h3>
                             {data.menuTop5.length > 0 ? (
                                 <ResponsiveContainer width="100%" height={280}>
@@ -526,13 +408,13 @@ export default function SalesAnalysis() {
                                             axisLine={false}
                                             tickLine={false}
                                         />
-                                        <YAxis type="category" dataKey="name" width={90} tick={{ fontSize: 12, fill: '#475569' }} axisLine={false} tickLine={false} />
+                                        <YAxis type="category" dataKey="name" width={110} tick={{ fontSize: 13, fill: '#475569', fontWeight: 600 }} axisLine={false} tickLine={false} />
                                         <Tooltip
                                             formatter={(v: any) => [`${fmt(Number(v))}원`, '매출']}
                                             contentStyle={{ borderRadius: 10, border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', fontSize: 13 }}
                                             cursor={{ fill: '#f8fafc' }}
                                         />
-                                        <Bar dataKey="revenue" radius={[0, 6, 6, 0]} isAnimationActive={true} animationDuration={1500} animationEasing="ease-out">
+                                        <Bar dataKey="revenue" radius={[0, 6, 6, 0]} isAnimationActive={true} animationDuration={1500} animationEasing="ease-out" barSize={32}>
                                             {data.menuTop5.map((_, i) => (
                                                 <Cell key={i} fill="#6366f1" />
                                             ))}
@@ -545,9 +427,6 @@ export default function SalesAnalysis() {
                         </div>
                     </div>
                 </>
-            ) : (
-                <SalesComparisonTab />
-            )}
 
             {loading && (
                 <div className="fixed inset-0 bg-black/10 flex items-center justify-center z-50 pointer-events-none">

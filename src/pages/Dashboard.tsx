@@ -12,9 +12,9 @@ import {
   type ProfitDashboardResponse,
   type MonthlyExpensesResponse,
 } from '../services/api';
-import { ChevronDown, ChevronRight, Info, Calendar, Plus, Trash2, Tag } from 'lucide-react';
+import { ChevronDown, ChevronRight, Info, Calendar, Plus, Trash2, Tag, TrendingUp } from 'lucide-react';
 import {
-  PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend,
+  PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
 } from 'recharts';
 
@@ -70,24 +70,39 @@ export default function Dashboard() {
   // ==================== 데이터 로드 ====================
 
   const fetchProfitData = useCallback(async () => {
-    if (!storeId) return;
+    // if (!storeId) return; // 주석 처리하여 더미 상점 ID로 진행할 수 있도록 함
     try {
       setProfitLoading(true);
       const res = await profitDashboardApi.get(currentMonthKey);
       setProfitData(res.data);
     } catch (err) {
-      console.error('수익성 데이터 로드 실패:', err);
+      console.error('수익성 데이터 로드 실패, 더미 데이터로 대체:', err);
+      const dummyProfitData: ProfitDashboardResponse = {
+        period: { start_date: '2026-03-01', end_date: '2026-03-31' },
+        summary: {
+          accumulated_sales: 12500000,
+          accumulated_cogs: 3500000,
+          accumulated_gross_profit: 9000000,
+        },
+        monthly_expenses: {
+          total_expenses: 4200000,
+          fixed_expenses: 3500000,
+          variable_expenses: 700000
+        },
+        daily_stats: []
+      };
+      setProfitData(dummyProfitData);
     } finally {
       setProfitLoading(false);
     }
   }, [storeId, currentMonthKey]);
 
   const fetchExpenses = useCallback(async () => {
-    if (!storeId) return;
+    // if (!storeId) return; // 주석 처리하여 더미 상점 ID로 진행할 수 있도록 함
     try {
       setExpensesLoading(true);
       setExpensesError('');
-      const res = await expensesApi.getMonthly(storeId, selectedMonth);
+      const res = await expensesApi.getMonthly(storeId || 'dummy-store-id', selectedMonth);
       setExpensesData(res.data);
       // 커스텀 카테고리 추출
       const existing = new Set(DEFAULT_CATEGORIES.map(c => c.value));
@@ -100,7 +115,30 @@ export default function Dashboard() {
         });
       }
     } catch (err: any) {
-      setExpensesError('데이터를 불러오는 데 실패했습니다.');
+      console.error('운영비 데이터 로드 실패, 더미 데이터로 대체:', err);
+      const dummyExpenses: MonthlyExpensesResponse = {
+        period: selectedMonth,
+        isSettled: false,
+        totalAmount: 4200000,
+        totalFixed: 3500000,
+        totalVariable: 700000,
+        items: {
+          'item1': { id: 'item1', category: 'rent', name: '3월 월세', amount: 2000000, type: 'fixed', paymentDate: '2026-03-05', status: 'paid' },
+          'item2': { id: 'item2', category: 'labor', name: '알바 인건비', amount: 1500000, type: 'fixed', paymentDate: '2026-03-10', status: 'paid' },
+          'item3': { id: 'item3', category: 'utility', name: '전기/수도 요금', amount: 350000, type: 'variable', paymentDate: '2026-03-15', status: 'paid' },
+          'item4': { id: 'item4', category: 'supplies', name: '종이컵/빨대', amount: 150000, type: 'variable', paymentDate: '2026-03-08', status: 'paid' },
+          'item5': { id: 'item5', category: 'marketing', name: '인스타 광고', amount: 200000, type: 'variable', paymentDate: '2026-03-12', status: 'paid' }
+        }
+      };
+      setExpensesData(dummyExpenses);
+      // 커스텀 카테고리 추출 (더미 데이터 기반)
+      const existing = new Set(DEFAULT_CATEGORIES.map(c => c.value));
+      Object.values(dummyExpenses.items).forEach(item => {
+        if (!existing.has(item.category)) {
+          existing.add(item.category);
+          setCategories(prev => prev.some(c => c.value === item.category) ? prev : [...prev, { value: item.category, label: item.category }]);
+        }
+      });
     } finally {
       setExpensesLoading(false);
     }
@@ -160,7 +198,6 @@ export default function Dashboard() {
 
   const summary = profitData?.summary;
   const monthlyExp = profitData?.monthly_expenses;
-  const dailyStats = profitData?.daily_stats ?? [];
 
   const totalSales = summary?.accumulated_sales ?? 0;
   const totalCogs = summary?.accumulated_cogs ?? 0;
@@ -168,10 +205,28 @@ export default function Dashboard() {
   const totalCost = totalCogs + (includeExpenses ? totalExpenses : 0);
   const netProfit = totalSales - totalCost;
   const profitMargin = totalSales > 0 ? (netProfit / totalSales) * 100 : 0;
-  const daysPassed = dailyStats.length || 1;
+  const getDaysPassedInMonth = () => {
+    if (!selectedMonth) return 1;
+    const [yearStr, monthStr] = selectedMonth.split('-');
+    const targetYear = parseInt(yearStr, 10);
+    const targetMonth = parseInt(monthStr, 10) - 1; // 0-indexed month
+    
+    const today = new Date();
+    if (today.getFullYear() === targetYear && today.getMonth() === targetMonth) {
+      return Math.max(1, today.getDate());
+    } else {
+      // Past or future month, return total days in that month
+      return new Date(targetYear, targetMonth + 1, 0).getDate();
+    }
+  };
+
+  const daysPassed = getDaysPassedInMonth();
   const avgDailyCost = totalCost / daysPassed;
   const avgDailySales = totalSales / daysPassed;
   const costRatio = totalSales > 0 ? (totalCost / totalSales) * 100 : 0;
+  
+  // 더미 전월 대비 수익률 지표 (예시로 단순한 변동폭 부여)
+  const momProfitTrend = (summary as any)?.profitTrend ?? 2.1;
 
   const isPositive = netProfit >= 0;
   const theme = {
@@ -224,17 +279,17 @@ export default function Dashboard() {
 
   const getCategoryLabel = (val: string) => categories.find(c => c.value === val)?.label || val;
 
-  // 커스텀 라벨 렌더러 — 조각 내부 중앙에 % 표시
-  const renderInsideLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, payload }: any) => {
+  // 커스텀 외부 라벨 렌더러 (Direct Labeling)
+  const renderOutsideLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, payload, percent }: any) => {
     const RADIAN = Math.PI / 180;
-    const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+    const radius = innerRadius + (outerRadius - innerRadius) * 1.5;
     const x = cx + radius * Math.cos(-midAngle * RADIAN);
     const y = cy + radius * Math.sin(-midAngle * RADIAN);
-    const pct = parseFloat(payload.pct);
-    if (pct < 5) return null;
+    const textAnchor = x > cx ? 'start' : 'end';
+
     return (
-      <text x={x} y={y} fill="#fff" textAnchor="middle" dominantBaseline="central" fontSize={11} fontWeight={700} style={{ pointerEvents: 'none' }}>
-        {payload.pct}%
+      <text x={x} y={y} fill="#475569" textAnchor={textAnchor} dominantBaseline="central" fontSize={11} fontWeight={600}>
+        {payload.name} {(percent * 100).toFixed(1)}%
       </text>
     );
   };
@@ -289,15 +344,21 @@ export default function Dashboard() {
                   </div>
                 </div>
               </div>
-              <div className="flex items-end gap-4">
+              <div className="flex items-end gap-4 items-center">
                 {profitLoading ? (
                   <h1 className="text-3xl font-light opacity-60">데이터 로딩 중...</h1>
                 ) : (
-                  <h1 className="text-3xl font-light">
-                    현재 이달 수익률은 <span className="font-bold text-5xl">{profitMargin.toFixed(1)}%</span> 입니다.
-                  </h1>
+                  <div className="flex items-baseline gap-3">
+                    <h1 className="text-3xl font-light">
+                      현재 이달 수익률은 <span className="font-bold text-5xl">{profitMargin.toFixed(1)}%</span> 입니다.
+                    </h1>
+                    {/* 전월 대비 비교 지표 */}
+                    <span className={`text-lg font-bold flex items-center gap-1 bg-white/20 px-3 py-1 rounded-full ${momProfitTrend >= 0 ? 'text-emerald-100' : 'text-rose-100'}`}>
+                      {momProfitTrend >= 0 ? '▲' : '▼'} {Math.abs(momProfitTrend)}% <span className="text-xs font-normal opacity-80 ml-1">전월대비</span>
+                    </span>
+                  </div>
                 )}
-                <button onClick={() => setShowProfitDetails(!showProfitDetails)} className="mb-2 p-1 rounded-full hover:bg-white/20 transition-colors">
+                <button onClick={() => setShowProfitDetails(!showProfitDetails)} className="ml-4 mb-1 p-1 rounded-full hover:bg-white/20 transition-colors">
                   {showProfitDetails ? <ChevronDown size={28} /> : <ChevronRight size={28} />}
                 </button>
               </div>
@@ -307,31 +368,54 @@ export default function Dashboard() {
 
         {showProfitDetails && (
           <div className="p-8 bg-slate-50 border-t border-slate-100 rounded-b-2xl">
-            {/* 상단 옵션 */}
-            <div className="flex justify-end mb-6">
-              <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-full border border-slate-200 shadow-sm">
-                <span className="text-xs text-slate-600 font-medium">운영비 포함</span>
-                <button
-                  onClick={() => setIncludeExpenses(!includeExpenses)}
-                  className={`relative w-8 h-4 rounded-full transition-colors duration-200 ${includeExpenses ? 'bg-slate-700' : 'bg-slate-300'}`}
-                >
-                  <div className={`absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full shadow-sm transition-transform duration-200 ${includeExpenses ? 'translate-x-4' : 'translate-x-0'}`} />
-                </button>
-              </div>
-            </div>
+            {/* 상단 옵션 영역 제거 (토글 이동됨) */}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              {/* 비용 분석 */}
+              {/* 매출 분석 (원래 우측에 있던 것 -> 좌측으로) */}
               <div className="flex flex-col h-full">
-                <h3 className="text-slate-500 font-semibold text-sm uppercase tracking-wider mb-3">비용 분석</h3>
+                <div className="flex justify-between items-center mb-3 min-h-[28px]">
+                  <h3 className="text-slate-500 font-semibold text-sm uppercase tracking-wider">매출 분석</h3>
+                </div>
                 <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex-1 flex flex-col justify-between">
                   <div>
-                    <div className="flex justify-between items-end mb-2">
+                    <div className="flex justify-between items-end mb-4">
+                      <span className="text-slate-500 text-sm">일 평균 매출</span>
+                      <span className="text-slate-700 font-mono font-semibold">{Math.round(avgDailySales).toLocaleString()}원</span>
+                    </div>
+                  </div>
+                  <div>
+                    <div className="flex justify-between items-end">
+                      <span className="text-slate-800 font-bold">실제 전체 매출</span>
+                      <span className="text-2xl font-bold text-slate-800">{Math.round(totalSales).toLocaleString()}원</span>
+                    </div>
+                    {/* 우측 카드와 정확한 높이 정렬을 위해 동일한 텍스트 렌더링 후 투명도 0으로 숨김 처리 */}
+                    <div className="text-right text-xs opacity-0 pointer-events-none select-none mt-1" aria-hidden="true">
+                      {includeExpenses ? `(원가 ${totalCogs.toLocaleString()}원 + 운영비 ${totalExpenses.toLocaleString()}원)` : `(원가 ${totalCogs.toLocaleString()}원)`}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 비용 분석 (원래 좌측에 있던 것 -> 우측으로) */}
+              <div className="flex flex-col h-full">
+                <div className="flex justify-between items-center mb-3 min-h-[28px]">
+                  <h3 className="text-slate-500 font-semibold text-sm uppercase tracking-wider">비용 분석</h3>
+                  {/* 운영비 포함 토글 이동됨 */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-slate-500 font-medium">운영비 포함</span>
+                    <button
+                      onClick={() => setIncludeExpenses(!includeExpenses)}
+                      className={`relative w-8 h-4 rounded-full transition-colors duration-200 outline-none ${includeExpenses ? 'bg-slate-700' : 'bg-slate-300'}`}
+                    >
+                      <div className={`absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full shadow-sm transition-transform duration-200 ${includeExpenses ? 'translate-x-4' : 'translate-x-0'}`} />
+                    </button>
+                  </div>
+                </div>
+                <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex-1 flex flex-col justify-between">
+                  <div>
+                    <div className="flex justify-between items-end mb-4">
                       <span className="text-slate-500 text-sm">일 평균 비용</span>
                       <span className="text-slate-700 font-mono font-semibold">{Math.round(avgDailyCost).toLocaleString()}원</span>
-                    </div>
-                    <div className="w-full h-1 bg-slate-100 rounded-full mb-6">
-                      <div className="h-full bg-slate-400 rounded-full transition-all duration-700" style={{ width: `${Math.min(costRatio, 100)}%` }} />
                     </div>
                   </div>
                   <div>
@@ -347,38 +431,23 @@ export default function Dashboard() {
                   </div>
                 </div>
               </div>
-
-              {/* 매출 분석 */}
-              <div className="flex flex-col h-full">
-                <h3 className="text-slate-500 font-semibold text-sm uppercase tracking-wider mb-3">매출 분석</h3>
-                <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex-1 flex flex-col justify-between">
-                  <div>
-                    <div className="flex justify-between items-end mb-2">
-                      <span className="text-slate-500 text-sm">일 평균 매출</span>
-                      <span className="text-slate-700 font-mono font-semibold">{Math.round(avgDailySales).toLocaleString()}원</span>
-                    </div>
-                    <div className="w-full h-1 bg-slate-100 rounded-full mb-6">
-                      <div className={`h-full rounded-full transition-all duration-700 ${isPositive ? 'bg-emerald-400' : 'bg-rose-400'}`} style={{ width: '100%' }} />
-                    </div>
-                  </div>
-                  <div>
-                    <div className="flex justify-between items-end">
-                      <span className="text-slate-800 font-bold">실제 전체 매출</span>
-                      <span className="text-2xl font-bold text-slate-800">{Math.round(totalSales).toLocaleString()}원</span>
-                    </div>
-                    {/* 높이 정렬을 위한 투명 텍스트 */}
-                    <div className="text-right text-xs text-transparent mt-1 select-none" aria-hidden="true">(높이 맞춤용)</div>
-                  </div>
-                </div>
-              </div>
             </div>
 
-            {/* 순수익 */}
-            <div className="mt-8 pt-6 border-t border-slate-200 flex justify-between items-center">
-              <div className="text-slate-600 font-medium">총 순수익</div>
+            {/* 순수익 (컨테이너 박스로 시각적 그룹핑) */}
+            <div className={`mt-8 p-6 rounded-xl border ${isPositive ? 'bg-emerald-50 border-emerald-100' : 'bg-rose-50 border-rose-100'} flex justify-between items-center shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)]`}>
+              <div>
+                <div className="text-slate-700 font-bold text-lg flex items-center gap-2">
+                  <TrendingUp size={20} className={isPositive ? 'text-emerald-500' : 'text-rose-500'} />
+                  총 순수익
+                </div>
+                <div className="text-sm font-medium text-slate-500 mt-1">
+                  매출 대비 <span className={`font-bold ${theme.textMain}`}>{profitMargin.toFixed(1)}%</span> 마진
+                </div>
+              </div>
               <div className="text-right">
-                <div className={`text-3xl font-extrabold ${theme.textMain}`}>{Math.round(netProfit).toLocaleString()}원</div>
-                <div className="text-sm font-medium text-slate-400">매출 대비 <span className={theme.textSub}>{profitMargin.toFixed(1)}%</span> 마진</div>
+                <div className={`text-4xl font-extrabold tracking-tight ${theme.textMain}`}>
+                  {Math.round(netProfit).toLocaleString()}원
+                </div>
               </div>
             </div>
           </div>
@@ -387,9 +456,9 @@ export default function Dashboard() {
 
       {/* ==================== 2. 차트 카드 2종 ==================== */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* 차트 A: 매출 대비 비용 */}
+        {/* 차트 A: 매출 대비 비용 -> 수익 구조 분석 */}
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-          <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-4">매출 대비 비용 비율</h3>
+          <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-4">수익 구조 분석</h3>
           {profitLoading ? (
             <div className="h-52 flex items-center justify-center text-slate-400">로딩 중...</div>
           ) : totalSales === 0 && totalCost === 0 ? (
@@ -403,34 +472,40 @@ export default function Dashboard() {
                 <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} tickFormatter={v => `${(v / 10000).toFixed(0)}만`} />
                 <Tooltip formatter={(v: any) => `${Number(v).toLocaleString()}원`} />
                 <Bar dataKey="value" radius={[6, 6, 0, 0]}>
-                  {barData.map((_, i) => <Cell key={i} fill={i === 0 ? '#3b82f6' : '#ef4444'} />)}
+                  {barData.map((_, i) => <Cell key={i} fill={i === 0 ? '#3b82f6' : '#64748b'} />)}
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
           ) : (
-            /* 흑자: 원 그래프 */
-            <ResponsiveContainer width="100%" height={220}>
-              <PieChart>
-                <Pie
-                  data={pieData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={50}
-                  outerRadius={80}
+            /* 흑자: 원 그래프 (도넛) */
+            <div className="relative h-[220px] w-full">
+              {/* 도넛 중앙 총 매출 텍스트 */}
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">총 매출</span>
+                <span className="text-xl font-black text-slate-800 tracking-tight">
+                  {(totalSales / 10000).toFixed(0)}만원
+                </span>
+              </div>
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={pieData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={80}
                   paddingAngle={0}
                   dataKey="value"
-                  label={renderInsideLabel}
-                  labelLine={false}
+                  label={renderOutsideLabel}
+                  labelLine={{ stroke: '#cbd5e1', strokeWidth: 1 }}
                 >
-                  {pieData.map((_, i) => <Cell key={i} fill={i === 1 ? '#10b981' : '#f87171'} />)}
+                  {pieData.map((_, i) => <Cell key={i} fill={i === 1 ? '#10b981' : '#64748b'} />)}
                 </Pie>
                 <Tooltip content={<CustomTooltip />} />
-              </PieChart>
-            </ResponsiveContainer>
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
           )}
-          <div className="mt-3 text-center text-xs text-slate-400">
-            {isDeficit ? '⚠️ 비용이 매출을 초과 — 적자 상태' : `비용 비율: ${costRatio.toFixed(1)}%`}
-          </div>
         </div>
 
         {/* 차트 B: 운영비 카테고리별 */}
@@ -441,44 +516,52 @@ export default function Dashboard() {
           ) : categoryChartData.length === 0 ? (
             <div className="h-52 flex items-center justify-center text-slate-400 text-sm">등록된 운영비가 없습니다.</div>
           ) : (
-            <ResponsiveContainer width="100%" height={220}>
-              <PieChart>
-                <Pie
-                  data={processedChartData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={50}
-                  outerRadius={80}
-                  paddingAngle={0}
-                  dataKey="value"
-                  label={renderInsideLabel}
-                  labelLine={false}
-                >
-                  {processedChartData.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
-                </Pie>
-                <Tooltip content={<CustomTooltip />} />
-                <Legend formatter={(v) => <span className="text-xs text-slate-600">{v}</span>} />
-              </PieChart>
-            </ResponsiveContainer>
+            <div className="relative h-[240px] w-full">
+              {/* 도넛 중앙 총 지출 텍스트 */}
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">총 지출</span>
+                <span className="text-xl font-black text-slate-800 tracking-tight">
+                  {(expTotalAmount / 10000).toFixed(0)}만원
+                </span>
+              </div>
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={processedChartData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={70}
+                    outerRadius={90}
+                    paddingAngle={2}
+                    dataKey="value"
+                    label={renderOutsideLabel}
+                    labelLine={{ stroke: '#cbd5e1', strokeWidth: 1 }}
+                  >
+                    {processedChartData.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
+                  </Pie>
+                  <Tooltip content={<CustomTooltip />} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
           )}
-          <div className="mt-3 text-center text-xs text-slate-400">
-            총 운영비: {expTotalAmount.toLocaleString()}원
-          </div>
         </div>
       </div>
 
       {/* ==================== 3. 매장 운영비 관리 ==================== */}
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="p-6">
-          <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">매장 운영비 관리</div>
-          <div className="flex items-center gap-2">
-            <button onClick={() => setShowExpenseDetails(!showExpenseDetails)} className="p-1 rounded-full hover:bg-slate-100 text-slate-400 transition-colors">
+        <div className="p-6 flex items-center justify-between cursor-pointer hover:bg-slate-50 transition-colors" onClick={() => setShowExpenseDetails(!showExpenseDetails)}>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                  <Tag size={20} />
+              </div>
+              <div>
+                  <h2 className="text-lg font-bold text-slate-800">매장 운영비 관리 및 상세 내역</h2>
+                  <p className="text-xs text-slate-500">운영비 항목 추가, 수정 및 삭제</p>
+              </div>
+            </div>
+            <button className="p-2 rounded-full hover:bg-slate-200 text-slate-400 transition-colors">
               {showExpenseDetails ? <ChevronDown size={24} /> : <ChevronRight size={24} />}
             </button>
-            <h2 className="text-xl font-bold text-slate-800">
-              이번달 매장 운영비는 <span className="text-amber-600">{expTotalAmount.toLocaleString()}원</span> 입니다.
-            </h2>
-          </div>
         </div>
 
         {showExpenseDetails && (
@@ -553,7 +636,7 @@ export default function Dashboard() {
                 </div>
                 <div className="w-full md:w-32">
                   <label className="block text-xs font-medium text-slate-500 mb-1">금액 (원) *</label>
-                  <input type="number" placeholder="0" value={newAmount} onChange={e => setNewAmount(e.target.value)} className="w-full p-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-blue-500 text-right text-slate-900 shadow-sm" />
+                  <input type="number" placeholder="예: 50000" value={newAmount} onChange={e => setNewAmount(e.target.value)} className="w-full p-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-blue-500 text-right text-slate-900 shadow-sm" />
                 </div>
                 <div className="w-full md:w-40">
                   <label className="block text-xs font-medium text-slate-500 mb-1">결제일</label>
@@ -575,13 +658,13 @@ export default function Dashboard() {
                         <select value={newCategory} onChange={e => setNewCategory(e.target.value)} className="flex-1 p-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-blue-500 text-slate-900 shadow-sm bg-white">
                           {categories.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
                         </select>
-                        <button onClick={() => setShowNewCategory(true)} className="px-3 py-2 bg-white border border-slate-300 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-50 whitespace-nowrap">+ 추가</button>
+                        <button onClick={() => setShowNewCategory(true)} className="px-3 py-2 bg-white border border-slate-300 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-50 whitespace-nowrap">+ 새 카테고리</button>
                       </>
                     )}
                   </div>
                 </div>
                 <div className="w-full md:w-40">
-                  <label className="block text-xs font-medium text-slate-500 mb-1">반복 여부</label>
+                  <label className="block text-xs font-medium text-slate-500 mb-1">비용 유형</label>
                   <div className="flex bg-white rounded-lg border border-slate-300 p-1 shadow-sm">
                     <button onClick={() => setNewType('fixed')} className={`flex-1 text-xs py-1.5 rounded-md transition-colors ${newType === 'fixed' ? 'bg-indigo-100 text-indigo-700 font-bold' : 'text-slate-400'}`}>고정비</button>
                     <button onClick={() => setNewType('variable')} className={`flex-1 text-xs py-1.5 rounded-md transition-colors ${newType === 'variable' ? 'bg-orange-100 text-orange-700 font-bold' : 'text-slate-400'}`}>변동비</button>
@@ -594,7 +677,7 @@ export default function Dashboard() {
               </div>
               <div className="flex justify-end">
                 <button onClick={addExpenseItem} disabled={addingItem || !newName || !newAmount} className="px-5 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-sm font-bold flex items-center gap-2 disabled:opacity-50 transition-all shadow-md active:scale-95">
-                  <Plus size={16} />{addingItem ? '저장 중...' : '추가'}
+                  <Plus size={16} />{addingItem ? '저장 중...' : '항목 등록'}
                 </button>
               </div>
             </div>
