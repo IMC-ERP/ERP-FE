@@ -516,6 +516,47 @@ export default function Inventory() {
     return acc;
   }, {} as Record<string, InventoryItem[]>);
 
+  const totalInventoryValue = inventory.reduce((sum, item) => (
+    sum + (item.quantity_on_hand * item.unit_cost)
+  ), 0);
+
+  const averageUnitCost = inventory.length > 0
+    ? inventory.reduce((sum, item) => sum + item.unit_cost, 0) / inventory.length
+    : 0;
+
+  const expensiveItems = [...inventory]
+    .filter(item => item.unit_cost > 0)
+    .sort((a, b) => b.unit_cost - a.unit_cost)
+    .slice(0, 8);
+
+  const categoryValueSummary = Object.entries(
+    inventory.reduce((acc, item) => {
+      const currentValue = acc[item.category] || 0;
+      acc[item.category] = currentValue + (item.quantity_on_hand * item.unit_cost);
+      return acc;
+    }, {} as Record<string, number>)
+  )
+    .sort(([, valueA], [, valueB]) => valueB - valueA)
+    .slice(0, 6);
+
+  const forecastItems = inventory
+    .filter(item => item.safety_stock > 0)
+    .map(item => {
+      const coverage = item.quantity_on_hand / item.safety_stock;
+      const suggestedOrder = Math.max(item.max_stock_level - item.quantity_on_hand, 0);
+
+      return {
+        ...item,
+        coverage,
+        suggestedOrder
+      };
+    })
+    .sort((a, b) => a.coverage - b.coverage);
+
+  const atRiskForecastItems = forecastItems.filter(item => item.coverage < 1);
+  const warningForecastItems = forecastItems.filter(item => item.coverage >= 1 && item.coverage < 1.5);
+  const stableForecastItems = forecastItems.filter(item => item.coverage >= 1.5);
+
   const renderInventoryCard = (item: InventoryItem) => {
     const percentage = getStockPercentage(item.quantity_on_hand, item.max_stock_level);
     const status = getStockStatus(percentage);
@@ -606,6 +647,164 @@ export default function Inventory() {
               </div>
             );
           })}
+      </section>
+    </div>
+  );
+
+  const renderPricingTab = () => (
+    <div className="space-y-4 md:space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+          <p className="text-xs font-bold tracking-[0.2em] text-slate-400 uppercase mb-2">Inventory Value</p>
+          <p className="text-2xl font-bold text-slate-800">{Math.round(totalInventoryValue).toLocaleString()}원</p>
+          <p className="mt-2 text-sm text-slate-500">현재고와 단가 기준 총 재고가치입니다.</p>
+        </div>
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+          <p className="text-xs font-bold tracking-[0.2em] text-slate-400 uppercase mb-2">Avg Unit Cost</p>
+          <p className="text-2xl font-bold text-slate-800">{Math.round(averageUnitCost).toLocaleString()}원</p>
+          <p className="mt-2 text-sm text-slate-500">등록된 품목의 평균 단가입니다.</p>
+        </div>
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+          <p className="text-xs font-bold tracking-[0.2em] text-slate-400 uppercase mb-2">Cost Focus</p>
+          <p className="text-2xl font-bold text-slate-800">{expensiveItems.length}개</p>
+          <p className="mt-2 text-sm text-slate-500">단가가 높은 핵심 품목을 우선 확인하세요.</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-[1.4fr_1fr] gap-4">
+        <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b border-slate-100">
+            <h3 className="text-lg font-bold text-slate-800">단가 모니터링 TOP 품목</h3>
+            <p className="text-sm text-slate-500 mt-1">현재 등록된 단가 기준으로 영향이 큰 품목입니다.</p>
+          </div>
+          <div className="responsive-table-shell">
+            <table className="w-full min-w-[620px] text-sm">
+              <thead className="bg-slate-50 text-slate-500">
+                <tr>
+                  <th className="px-4 py-3 text-left">품목</th>
+                  <th className="px-4 py-3 text-left">카테고리</th>
+                  <th className="px-4 py-3 text-right">단가</th>
+                  <th className="px-4 py-3 text-right">현재고</th>
+                  <th className="px-4 py-3 text-right">재고가치</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {expensiveItems.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-10 text-center text-slate-400">
+                      등록된 단가 정보가 없습니다.
+                    </td>
+                  </tr>
+                ) : expensiveItems.map(item => (
+                  <tr key={item.id} className="hover:bg-slate-50">
+                    <td className="px-4 py-3 font-medium text-slate-800">{item.id}</td>
+                    <td className="px-4 py-3 text-slate-500">{item.category}</td>
+                    <td className="px-4 py-3 text-right text-slate-700">{Math.round(item.unit_cost).toLocaleString()}원</td>
+                    <td className="px-4 py-3 text-right text-slate-700">{item.quantity_on_hand.toLocaleString()}{item.uom}</td>
+                    <td className="px-4 py-3 text-right font-semibold text-slate-800">
+                      {Math.round(item.quantity_on_hand * item.unit_cost).toLocaleString()}원
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+          <h3 className="text-lg font-bold text-slate-800">카테고리별 재고가치</h3>
+          <p className="text-sm text-slate-500 mt-1 mb-4">금액 비중이 큰 카테고리를 먼저 관리하세요.</p>
+          <div className="space-y-3">
+            {categoryValueSummary.length === 0 ? (
+              <p className="text-sm text-slate-400">카테고리별 단가 정보가 없습니다.</p>
+            ) : categoryValueSummary.map(([category, value]) => (
+              <div key={category}>
+                <div className="flex items-center justify-between text-sm mb-1">
+                  <span className="font-medium text-slate-700">{category}</span>
+                  <span className="text-slate-500">{Math.round(value).toLocaleString()}원</span>
+                </div>
+                <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-amber-500 to-orange-500"
+                    style={{ width: `${totalInventoryValue > 0 ? (value / totalInventoryValue) * 100 : 0}%` }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+
+  const renderForecastTab = () => (
+    <div className="space-y-4 md:space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-white rounded-2xl border border-red-200 shadow-sm p-5">
+          <p className="text-xs font-bold tracking-[0.2em] text-red-400 uppercase mb-2">At Risk</p>
+          <p className="text-2xl font-bold text-red-600">{atRiskForecastItems.length}개</p>
+          <p className="mt-2 text-sm text-slate-500">안전재고보다 낮아 즉시 확인이 필요한 품목입니다.</p>
+        </div>
+        <div className="bg-white rounded-2xl border border-amber-200 shadow-sm p-5">
+          <p className="text-xs font-bold tracking-[0.2em] text-amber-500 uppercase mb-2">Watchlist</p>
+          <p className="text-2xl font-bold text-amber-600">{warningForecastItems.length}개</p>
+          <p className="mt-2 text-sm text-slate-500">안전재고 근처에 있어 모니터링이 필요한 품목입니다.</p>
+        </div>
+        <div className="bg-white rounded-2xl border border-emerald-200 shadow-sm p-5">
+          <p className="text-xs font-bold tracking-[0.2em] text-emerald-500 uppercase mb-2">Stable</p>
+          <p className="text-2xl font-bold text-emerald-600">{stableForecastItems.length}개</p>
+          <p className="mt-2 text-sm text-slate-500">안전재고 대비 여유가 있는 품목입니다.</p>
+        </div>
+      </div>
+
+      <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="px-5 py-4 border-b border-slate-100">
+          <h3 className="text-lg font-bold text-slate-800">수요 대응 우선순위</h3>
+          <p className="text-sm text-slate-500 mt-1">안전재고 대비 현재고를 기준으로 발주 우선순위를 정리했습니다.</p>
+        </div>
+        <div className="responsive-table-shell">
+          <table className="w-full min-w-[720px] text-sm">
+            <thead className="bg-slate-50 text-slate-500">
+              <tr>
+                <th className="px-4 py-3 text-left">품목</th>
+                <th className="px-4 py-3 text-left">카테고리</th>
+                <th className="px-4 py-3 text-right">현재고</th>
+                <th className="px-4 py-3 text-right">안전재고</th>
+                <th className="px-4 py-3 text-right">커버리지</th>
+                <th className="px-4 py-3 text-right">권장 발주량</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {forecastItems.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-4 py-10 text-center text-slate-400">
+                    안전재고가 설정된 품목이 없습니다.
+                  </td>
+                </tr>
+              ) : forecastItems.slice(0, 12).map(item => (
+                <tr key={item.id} className="hover:bg-slate-50">
+                  <td className="px-4 py-3 font-medium text-slate-800">{item.id}</td>
+                  <td className="px-4 py-3 text-slate-500">{item.category}</td>
+                  <td className="px-4 py-3 text-right text-slate-700">{item.quantity_on_hand.toLocaleString()}{item.uom}</td>
+                  <td className="px-4 py-3 text-right text-slate-700">{item.safety_stock.toLocaleString()}{item.uom}</td>
+                  <td className="px-4 py-3 text-right">
+                    <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${item.coverage < 1
+                      ? 'bg-red-100 text-red-700'
+                      : item.coverage < 1.5
+                        ? 'bg-amber-100 text-amber-700'
+                        : 'bg-emerald-100 text-emerald-700'
+                      }`}>
+                      {item.coverage.toFixed(2)}x
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-right font-semibold text-slate-800">
+                    {item.suggestedOrder > 0 ? `${Math.round(item.suggestedOrder).toLocaleString()}${item.uom}` : '-'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </section>
     </div>
   );
@@ -1184,18 +1383,10 @@ export default function Inventory() {
         ) : (
           <>
             {activeTab === 'overview' && renderOverviewTab()}
-            {activeTab === 'pricing' && (
-              <div className="empty-tab">
-                <p>💰 시세 모니터링 기능은 준비 중입니다.</p>
-              </div>
-            )}
+            {activeTab === 'pricing' && renderPricingTab()}
             {activeTab === 'receiving' && renderReceivingTab()}
             {activeTab === 'history' && renderHistoryTab()}
-            {activeTab === 'forecast' && (
-              <div className="empty-tab">
-                <p>📈 수요예측 기능은 준비 중입니다.</p>
-              </div>
-            )}
+            {activeTab === 'forecast' && renderForecastTab()}
           </>
         )}
       </div>

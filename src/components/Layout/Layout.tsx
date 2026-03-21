@@ -1,7 +1,6 @@
 /**
  * Layout Component
- * GCP-ERP 스타일 - 반응형 사이드바 + AI 드로어
- * 모바일: 햄버거 메뉴 + 오버레이 사이드바
+ * 인증 정보 + 반응형 사이드바 + AI 코파일럿 드로어 통합
  */
 
 import { useState, useEffect, lazy, Suspense } from 'react';
@@ -22,11 +21,12 @@ import {
   BarChart3,
   Moon,
   Sun,
-  Type
+  Type,
+  LogOut
 } from 'lucide-react';
 import { useData } from '../../contexts/DataContext';
+import { useAuth } from '../../contexts/AuthContext';
 
-// Lazy load AIAssistant to avoid circular dependency
 const AIAssistant = lazy(() => import('../../pages/AIAssistant'));
 
 interface NavItemProps {
@@ -42,8 +42,8 @@ const NavItem = ({ to, icon: Icon, label, active, onClick }: NavItemProps) => (
     to={to}
     onClick={onClick}
     className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors duration-200 ${active
-      ? "bg-blue-100 text-blue-700 font-semibold"
-      : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+      ? 'bg-blue-100 text-blue-700 font-semibold'
+      : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
       }`}
   >
     <Icon size={20} />
@@ -53,11 +53,11 @@ const NavItem = ({ to, icon: Icon, label, active, onClick }: NavItemProps) => (
 
 export default function Layout() {
   const location = useLocation();
+  const { storeProfile, appSettings, updateAppSettings } = useData();
+  const { user, logout } = useAuth();
+
   const [isAIDrawerOpen, setIsAIDrawerOpen] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-  const { storeProfile, appSettings, updateAppSettings } = useData();
-
-  // 모바일 여부 감지
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
@@ -85,13 +85,13 @@ export default function Layout() {
     document.documentElement.style.colorScheme = appSettings.darkMode ? 'dark' : 'light';
   }, [appSettings.darkMode, appSettings.fontSize]);
 
-  // 페이지 이동 시 모바일 사이드바 닫기
   useEffect(() => {
     setIsMobileSidebarOpen(false);
   }, [location.pathname]);
 
   const closeMobileSidebar = () => setIsMobileSidebarOpen(false);
   const toggleDarkMode = () => updateAppSettings({ darkMode: !appSettings.darkMode });
+
   const cycleFontSize = () => {
     const nextSize = appSettings.fontSize === 'small'
       ? 'medium'
@@ -101,6 +101,15 @@ export default function Layout() {
 
     updateAppSettings({ fontSize: nextSize });
   };
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch (error) {
+      console.error('로그아웃 실패:', error);
+    }
+  };
+
   const fontSizeToken = appSettings.fontSize === 'small' ? 'A-' : appSettings.fontSize === 'medium' ? 'A' : 'A+';
   const fontSizeLabel = appSettings.fontSize === 'small' ? '작게' : appSettings.fontSize === 'medium' ? '보통' : '크게';
 
@@ -111,13 +120,11 @@ export default function Layout() {
     { to: '/transactions', icon: ClipboardList, label: '거래 데이터 관리' },
     { to: '/inventory', icon: Package, label: '재고 관리' },
     { to: '/cost-recipe', icon: ChefHat, label: '원가/레시피 관리' },
-    { to: '/kpi', icon: BarChart3, label: 'KPI 현황' },
+    { to: '/kpi', icon: BarChart3, label: 'KPI 현황' }
   ];
 
   return (
     <div className="flex min-h-screen bg-slate-50 relative overflow-x-hidden">
-
-      {/* ===== 모바일 상단 헤더 ===== */}
       {isMobile && (
         <div className="mobile-top-header">
           <button
@@ -156,7 +163,7 @@ export default function Layout() {
             <button
               onClick={() => setIsAIDrawerOpen(prev => !prev)}
               className="mobile-ai-btn"
-              aria-label="AI 비서"
+              aria-label="AI 코파일럿"
             >
               <Bot size={20} />
             </button>
@@ -164,22 +171,16 @@ export default function Layout() {
         </div>
       )}
 
-      {/* ===== 모바일 오버레이 ===== */}
       {isMobile && isMobileSidebarOpen && (
-        <div
-          className="mobile-sidebar-overlay"
-          onClick={closeMobileSidebar}
-        />
+        <div className="mobile-sidebar-overlay" onClick={closeMobileSidebar} />
       )}
 
-      {/* ===== 사이드바 ===== */}
       <div className={`
         sidebar-container
         ${isMobile ? 'mobile-sidebar' : ''}
         ${isMobile && isMobileSidebarOpen ? 'mobile-sidebar-open' : ''}
         ${isMobile && !isMobileSidebarOpen ? 'mobile-sidebar-closed' : ''}
       `}>
-        {/* Sidebar Header */}
         <div className="p-6 border-b border-slate-100 flex items-center gap-3">
           {storeProfile.logoUrl ? (
             <img src={storeProfile.logoUrl} alt="Logo" className="w-10 h-10 rounded-full object-cover border border-slate-200" />
@@ -203,7 +204,6 @@ export default function Layout() {
           )}
         </div>
 
-        {/* Main Navigation */}
         <nav className="p-4 space-y-1 flex-1 overflow-y-auto">
           {navItems.map(item => (
             <NavItem
@@ -217,14 +217,45 @@ export default function Layout() {
           ))}
         </nav>
 
-        {/* Bottom Utility Navigation */}
         <div className="p-4 border-t border-slate-100 space-y-1 bg-slate-50/50">
           <NavItem to="/help" icon={HelpCircle} label="도움말" active={location.pathname === '/help'} onClick={isMobile ? closeMobileSidebar : undefined} />
           <NavItem to="/settings" icon={Settings} label="설정" active={location.pathname === '/settings'} onClick={isMobile ? closeMobileSidebar : undefined} />
         </div>
+
+        {user && (
+          <div className="p-4 border-t border-slate-200 bg-slate-50">
+            <div className="flex items-center gap-3 mb-3">
+              {user.photoURL ? (
+                <img
+                  src={user.photoURL}
+                  alt="Profile"
+                  className="w-8 h-8 rounded-full border border-slate-200"
+                />
+              ) : (
+                <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center text-amber-700 font-bold text-sm">
+                  {user.email?.charAt(0).toUpperCase()}
+                </div>
+              )}
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-slate-700 truncate">
+                  {user.displayName || '사용자'}
+                </p>
+                <p className="text-xs text-slate-400 truncate">
+                  {user.email}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={handleLogout}
+              className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-slate-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors duration-200"
+            >
+              <LogOut size={16} />
+              <span>로그아웃</span>
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* Main Content Wrapper */}
       <div
         className={`flex-1 relative transition-all duration-300 ease-in-out ${isMobile ? 'ml-0 layout-main-mobile' : 'ml-64'}`}
         style={{ marginRight: !isMobile && isAIDrawerOpen ? '400px' : '0' }}
@@ -234,7 +265,6 @@ export default function Layout() {
         </main>
       </div>
 
-      {/* Floating AI Button (Desktop only) */}
       {!isMobile && (
         <>
           <div className="desktop-top-utilities">
@@ -264,12 +294,10 @@ export default function Layout() {
         </>
       )}
 
-      {/* AI Assistant Drawer */}
       <div
         className={`fixed inset-y-0 right-0 ${isMobile ? 'w-full' : 'w-[400px]'} bg-white shadow-xl z-50 transform transition-transform duration-300 ease-in-out border-l border-slate-200 flex flex-col ${isAIDrawerOpen ? 'translate-x-0' : 'translate-x-full'
           }`}
       >
-        {/* Drawer Header */}
         <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-100 flex justify-between items-center flex-shrink-0">
           <div className="flex items-center gap-2 font-bold text-slate-800">
             <div className="bg-white p-1.5 rounded-full shadow-sm">
@@ -285,7 +313,6 @@ export default function Layout() {
           </button>
         </div>
 
-        {/* Drawer Content */}
         <div className="flex-1 overflow-hidden">
           <Suspense fallback={<div className="p-4 text-center text-slate-400">로딩 중...</div>}>
             <AIAssistant isWidget={true} />

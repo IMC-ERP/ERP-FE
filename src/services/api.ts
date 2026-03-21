@@ -1,10 +1,12 @@
 /**
  * API Service
  * FastAPI 백엔드와 통신하는 axios 클라이언트
+ * Firebase 인증 토큰 자동 첨부
  */
 
 import axios from 'axios';
 import axiosRetry from 'axios-retry';
+import { auth } from '../firebase';
 
 // 개발 환경에서는 localhost, 프로덕션에서는 Cloud Run 백엔드 사용
 const API_BASE_URL = import.meta.env.VITE_API_URL
@@ -31,6 +33,25 @@ axiosRetry(api, {
   onRetry: (retryCount, error) => {
     console.log(`[API] Retry attempt ${retryCount} for ${error.config?.url}`);
   }
+});
+
+// Firebase ID Token 자동 첨부 인터셉터
+api.interceptors.request.use(async (config) => {
+  // Firebase Auth 초기화 대기 (새로고침 시 race condition 방지)
+  await auth.authStateReady();
+
+  const user = auth.currentUser;
+  if (user) {
+    try {
+      const token = await user.getIdToken();
+      config.headers.Authorization = `Bearer ${token}`;
+    } catch (error) {
+      console.error('Failed to get Firebase token:', error);
+    }
+  }
+  return config;
+}, (error) => {
+  return Promise.reject(error);
 });
 
 // ==================== Types ====================
@@ -344,6 +365,49 @@ export const dailySalesApi = {
       headers: { 'Content-Type': 'multipart/form-data' }
     });
   }
+};
+
+// ==================== User API ====================
+
+export interface UserRegistration {
+  email: string;
+  store_name: string;
+  owner_name: string;
+  phone?: string;
+  address?: string;
+}
+
+export interface UserProfile {
+  uid: string;
+  email: string;
+  store_id: string;
+  store_name: string;
+  owner_name: string;
+  phone?: string;
+  address?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UserProfileUpdate {
+  store_name?: string;
+  owner_name?: string;
+  phone?: string;
+  address?: string;
+}
+
+export interface RegistrationStatus {
+  is_registered: boolean;
+  email: string;
+  uid: string;
+  profile: UserProfile | null;
+}
+
+export const userApi = {
+  register: (data: UserRegistration) => api.post<UserProfile>('/users/register', data),
+  getProfile: () => api.get<UserProfile>('/users/profile'),
+  updateProfile: (data: UserProfileUpdate) => api.put<UserProfile>('/users/profile', data),
+  checkRegistration: () => api.get<RegistrationStatus>('/users/check-registration'),
 };
 
 // ==================== Auth API ====================
