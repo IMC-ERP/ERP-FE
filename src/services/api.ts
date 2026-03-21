@@ -6,7 +6,7 @@
 
 import axios from 'axios';
 import axiosRetry from 'axios-retry';
-import { auth } from '../firebase';
+import { supabase } from '../supabase';
 
 // 개발 환경에서는 localhost, 프로덕션에서는 Cloud Run 백엔드 사용
 const API_BASE_URL = import.meta.env.VITE_API_URL
@@ -35,19 +35,11 @@ axiosRetry(api, {
   }
 });
 
-// Firebase ID Token 자동 첨부 인터셉터
+// Supabase JWT 자동 첨부 인터셉터
 api.interceptors.request.use(async (config) => {
-  // Firebase Auth 초기화 대기 (새로고침 시 race condition 방지)
-  await auth.authStateReady();
-
-  const user = auth.currentUser;
-  if (user) {
-    try {
-      const token = await user.getIdToken();
-      config.headers.Authorization = `Bearer ${token}`;
-    } catch (error) {
-      console.error('Failed to get Firebase token:', error);
-    }
+  const { data: { session } } = await supabase.auth.getSession();
+  if (session?.access_token) {
+    config.headers.Authorization = `Bearer ${session.access_token}`;
   }
   return config;
 }, (error) => {
@@ -317,6 +309,8 @@ export interface DailySalesMenuItem {
   menu: string;
   quantity: number;
   sales_amount?: number;
+  matched?: boolean;
+  original_name?: string | null;
 }
 
 export interface DailySales {

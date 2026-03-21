@@ -1,21 +1,17 @@
 /**
  * AuthContext.tsx
- * Firebase Google 인증 상태 관리 + 사용자 프로필 관리
+ * Supabase Google 인증 상태 관리 + 사용자 프로필 관리
  */
 
 import { createContext, useContext, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
-import {
-    signInWithPopup,
-    signOut,
-    onAuthStateChanged
-} from 'firebase/auth';
-import type { User } from 'firebase/auth';
-import { auth, googleProvider } from '../firebase';
+import type { User, Session } from '@supabase/supabase-js';
+import { supabase } from '../supabase';
 import { userApi, type UserProfile } from '../services/api';
 
 interface AuthContextType {
     user: User | null;
+    session: Session | null;
     userProfile: UserProfile | null;
     loading: boolean;
     needsRegistration: boolean;
@@ -40,6 +36,7 @@ interface AuthProviderProps {
 
 export const AuthProvider = ({ children }: AuthProviderProps) => {
     const [user, setUser] = useState<User | null>(null);
+    const [session, setSession] = useState<Session | null>(null);
     const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
     const [loading, setLoading] = useState(true);
     const [needsRegistration, setNeedsRegistration] = useState(false);
@@ -47,7 +44,6 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     // 사용자 프로필 로드
     const loadUserProfile = async () => {
         try {
-            // check-registration 엔드포인트 사용 (미등록 사용자도 호출 가능)
             const response = await userApi.checkRegistration();
 
             if (response.data.is_registered && response.data.profile) {
@@ -55,14 +51,12 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
                 setNeedsRegistration(false);
                 console.log('[AUTH] User profile loaded:', response.data.profile.store_name);
             } else {
-                // 등록 필요
                 console.log('[AUTH] User needs registration');
                 setNeedsRegistration(true);
                 setUserProfile(null);
             }
         } catch (error: any) {
             console.error('[AUTH] Failed to check registration:', error);
-            // 에러 시 안전하게 등록 필요로 설정
             setNeedsRegistration(true);
             setUserProfile(null);
         }
@@ -77,7 +71,13 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     // Google 로그인
     const signInWithGoogle = async () => {
         try {
-            await signInWithPopup(auth, googleProvider);
+            const { error } = await supabase.auth.signInWithOAuth({
+                provider: 'google',
+                options: {
+                    redirectTo: window.location.origin,
+                },
+            });
+            if (error) throw error;
         } catch (error) {
             console.error('Google 로그인 실패:', error);
             throw error;
@@ -87,7 +87,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     // 로그아웃
     const logout = async () => {
         try {
-            await signOut(auth);
+            const { error } = await supabase.auth.signOut();
+            if (error) throw error;
             setUserProfile(null);
             setNeedsRegistration(false);
         } catch (error) {
@@ -98,26 +99,40 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
     // 인증 상태 감시
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-            setUser(currentUser);
+        // 현재 세션 확인
+        supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
+            setSession(currentSession);
+            setUser(currentSession?.user ?? null);
 
-            if (currentUser) {
-                // 사용자 로그인 상태 - 프로필 로드
-                await loadUserProfile();
-            } else {
-                // 로그아웃 상태
-                setUserProfile(null);
-                setNeedsRegistration(false);
+            if (currentSession?.user) {
+                loadUserProfile();
             }
-
             setLoading(false);
         });
 
-        return () => unsubscribe();
+        // 상태 변화 리스너
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(
+            async (_event, currentSession) => {
+                setSession(currentSession);
+                setUser(currentSession?.user ?? null);
+
+                if (currentSession?.user) {
+                    await loadUserProfile();
+                } else {
+                    setUserProfile(null);
+                    setNeedsRegistration(false);
+                }
+
+                setLoading(false);
+            }
+        );
+
+        return () => subscription.unsubscribe();
     }, []);
 
     const value: AuthContextType = {
         user,
+        session,
         userProfile,
         loading,
         needsRegistration,

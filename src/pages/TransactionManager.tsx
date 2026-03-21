@@ -639,20 +639,24 @@ const DailySalesAddView = () => {
                 showAlert(`❌ 이미지 인식 실패\n\n${data.error || '알 수 없는 오류가 발생했습니다.'}`, 'error');
                 setOcrResult(null);
             } else {
-                // 인식 성공
-                const matchedSales = data.sales_by_menu.map(item => {
-                    const matchedRecipe = recipes.find(r => r.menu_name === item.menu);
-                    if (matchedRecipe) {
-                        return {
-                            ...item,
-                            sales_amount: matchedRecipe.selling_price * item.quantity
-                        };
+                // 인식 성공 - 매칭/미매칭 메뉴 모두 포함
+                const processedSales = data.sales_by_menu.map(item => {
+                    if (item.matched !== false) {
+                        // 매칭된 메뉴: 레시피에서 판매가 조회
+                        const matchedRecipe = recipes.find(r => r.menu_name === item.menu);
+                        if (matchedRecipe) {
+                            return {
+                                ...item,
+                                matched: true,
+                                sales_amount: matchedRecipe.selling_price * item.quantity
+                            };
+                        }
                     }
-                    // 매칭 실패 시 기존 값(OCR이 준 값, 보통 0) 유지
-                    return item;
+                    // 미매칭 메뉴: OCR 추출값 그대로 유지
+                    return { ...item, matched: item.matched ?? false };
                 });
 
-                setOcrResult({ ...data, sales_by_menu: matchedSales });
+                setOcrResult({ ...data, sales_by_menu: processedSales });
 
                 if (data.date) {
                     setDate(data.date);
@@ -974,11 +978,28 @@ const DailySalesAddView = () => {
 
                 {ocrResult && !isOcrLoading && (
                     <div className="bg-white p-6 rounded-2xl border border-slate-200 space-y-4">
+                        {(() => {
+                            const unmatchedItems = ocrResult.sales_by_menu.filter(item => item.matched === false);
+                            const matchedCount = ocrResult.sales_by_menu.filter(item => item.matched !== false).length;
+                            return unmatchedItems.length > 0 ? (
+                                <div className="bg-amber-50 border border-amber-300 p-4 rounded-lg">
+                                    <p className="text-sm font-bold text-amber-800 mb-1">
+                                        {matchedCount}개 메뉴 매칭 완료 / {unmatchedItems.length}개 미등록 메뉴 발견
+                                    </p>
+                                    <p className="text-xs text-amber-700">
+                                        미등록 메뉴: {unmatchedItems.map(i => i.menu).join(', ')}
+                                    </p>
+                                    <p className="text-xs text-amber-600 mt-1">
+                                        미등록 메뉴는 노란색으로 표시됩니다. 기존 메뉴와 매칭하거나, 원가/레시피 관리에서 새로 등록할 수 있습니다.
+                                    </p>
+                                </div>
+                            ) : null;
+                        })()}
                         {ocrResult.warnings.length > 0 && (
-                            <div className="bg-amber-50 border border-amber-200 p-4 rounded-lg">
-                                <p className="text-sm font-bold text-amber-800 mb-2">⚠️ 경고</p>
+                            <div className="bg-slate-50 border border-slate-200 p-4 rounded-lg">
+                                <p className="text-sm font-bold text-slate-700 mb-2">참고</p>
                                 {ocrResult.warnings.map((warning, i) => (
-                                    <p key={i} className="text-xs text-amber-700">{warning}</p>
+                                    <p key={i} className="text-xs text-slate-600">{warning}</p>
                                 ))}
                             </div>
                         )}
@@ -1005,6 +1026,7 @@ const DailySalesAddView = () => {
                             </thead>
                             <tbody>
                                 {ocrResult.sales_by_menu.map((item, index) => {
+                                    const isUnmatched = item.matched === false;
                                     const filteredRecipes = recipes.filter(r =>
                                         r.menu_name.toLowerCase().includes(item.menu.toLowerCase())
                                     );
@@ -1012,17 +1034,33 @@ const DailySalesAddView = () => {
                                         (item.menu.length === 0 || filteredRecipes.length > 0);
 
                                     return (
-                                        <tr key={index} className="border-t border-slate-100">
+                                        <tr key={index} className={`border-t ${isUnmatched ? 'bg-amber-50 border-amber-200' : 'border-slate-100'}`}>
                                             <td className="p-3 relative">
-                                                <input
-                                                    type="text"
-                                                    value={item.menu}
-                                                    onChange={(e) => handleOcrResultChange(index, 'menu', e.target.value)}
-                                                    onFocus={() => setActiveMenuIndex(index)}
-                                                    onMouseDown={(e) => e.stopPropagation()}
-                                                    placeholder="메뉴 선택"
-                                                    className="w-full p-2 border border-slate-200 rounded"
-                                                />
+                                                <div className="flex items-center gap-2">
+                                                    <input
+                                                        type="text"
+                                                        value={item.menu}
+                                                        onChange={(e) => handleOcrResultChange(index, 'menu', e.target.value)}
+                                                        onFocus={() => setActiveMenuIndex(index)}
+                                                        onMouseDown={(e) => e.stopPropagation()}
+                                                        placeholder="메뉴 선택"
+                                                        className={`w-full p-2 border rounded ${isUnmatched ? 'border-amber-400 bg-amber-50' : 'border-slate-200'}`}
+                                                    />
+                                                </div>
+                                                {isUnmatched && (
+                                                    <div className="mt-1 flex items-center gap-2">
+                                                        <span className="text-xs text-amber-700 font-medium">
+                                                            미등록 메뉴
+                                                        </span>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => window.open('/cost-recipe', '_blank')}
+                                                            className="text-xs text-blue-600 hover:text-blue-800 underline font-medium"
+                                                        >
+                                                            등록하러 가기
+                                                        </button>
+                                                    </div>
+                                                )}
                                                 {showDropdown && (
                                                     <div
                                                         className="absolute z-10 w-full mt-1 bg-white border border-slate-300 rounded-lg shadow-lg max-h-48 overflow-y-auto"

@@ -6,7 +6,7 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import type { SaleItem, InventoryItem, StoreProfile, AppSettings } from '../types';
 import { salesApi, inventoryApi, type Sale, type InventoryItem as APIInventoryItem } from '../services/api';
-import { auth } from '../firebase';
+import { supabase } from '../supabase';
 
 interface DataContextType {
     sales: SaleItem[];
@@ -108,8 +108,8 @@ export const DataProvider = ({ children }: { children?: ReactNode }) => {
 
     useEffect(() => {
         // Auth 상태 변경 감지
-        const unsubscribe = auth.onAuthStateChanged((user) => {
-            if (user) {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            if (session?.user) {
                 fetchData();
             } else {
                 // 로그아웃 시 데이터 초기화
@@ -119,7 +119,7 @@ export const DataProvider = ({ children }: { children?: ReactNode }) => {
             }
         });
 
-        return () => unsubscribe();
+        return () => subscription.unsubscribe();
     }, []);
 
     const addSale = (newSale: SaleItem) => {
