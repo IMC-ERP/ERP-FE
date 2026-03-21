@@ -5,7 +5,7 @@
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import type { SaleItem, InventoryItem, StoreProfile, AppSettings } from '../types';
-import { salesApi, inventoryApi, type Sale, type InventoryItem as APIInventoryItem } from '../services/api';
+import { salesApi, inventoryApi, userApi, type Sale, type InventoryItem as APIInventoryItem } from '../services/api';
 import { supabase } from '../supabase';
 
 interface DataContextType {
@@ -108,9 +108,19 @@ export const DataProvider = ({ children }: { children?: ReactNode }) => {
 
     useEffect(() => {
         // Auth 상태 변경 감지
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
             if (session?.user) {
-                fetchData();
+                // 등록된 유저인지 먼저 확인 후 데이터 fetch
+                try {
+                    const res = await userApi.checkRegistration();
+                    if (res.data.is_registered) {
+                        fetchData();
+                    } else {
+                        setIsLoading(false);
+                    }
+                } catch {
+                    setIsLoading(false);
+                }
             } else {
                 // 로그아웃 시 데이터 초기화
                 setSales([]);

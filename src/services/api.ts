@@ -30,8 +30,8 @@ axiosRetry(api, {
     return axiosRetry.isNetworkOrIdempotentRequestError(error) ||
       error.response?.status === 503;
   },
-  onRetry: (retryCount, error) => {
-    console.log(`[API] Retry attempt ${retryCount} for ${error.config?.url}`);
+  onRetry: (_retryCount, _error) => {
+    // retry silently
   }
 });
 
@@ -118,13 +118,7 @@ export const ocrApi = {
     });
   },
 
-  // 다중 영수증 이미지 OCR (Not implemented in backend yet, but updating type for consistency if needed, or leave as is)
-  // Backend doesn't have /ocr/receipt/multiple. Frontend loops calls to single?
-  // Frontend code: Promise.all(files.map(file => ocrApi.analyzeMultipleReceipts(file)))
-  // Actually Inventory.tsx uses analyzeMultipleReceipts for EACH file if multiple files.
-  // Wait, the Inventory.tsx code says: `files.map(file => ocrApi.analyzeMultipleReceipts(file))`.
-  // It iterates and calls the API for each file.
-  // So I should point THIS also to `/ocr/receipt` and use the same response type.
+  // 다중 영수증: 파일별로 단일 OCR 엔드포인트 호출
   analyzeMultipleReceipts: (file: File) => {
     const formData = new FormData();
     formData.append('file', file);

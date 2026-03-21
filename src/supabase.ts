@@ -12,4 +12,10 @@ if (!supabaseUrl || !supabaseAnonKey) {
     console.error('[Supabase] Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY in .env');
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+        persistSession: true,
+        detectSessionInUrl: true,
+        flowType: 'implicit',
+    },
+});

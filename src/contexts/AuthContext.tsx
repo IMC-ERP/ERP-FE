@@ -49,9 +49,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
             if (response.data.is_registered && response.data.profile) {
                 setUserProfile(response.data.profile);
                 setNeedsRegistration(false);
-                console.log('[AUTH] User profile loaded:', response.data.profile.store_name);
             } else {
-                console.log('[AUTH] User needs registration');
                 setNeedsRegistration(true);
                 setUserProfile(null);
             }
@@ -107,6 +105,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
             if (currentSession?.user) {
                 loadUserProfile();
             }
+            setLoading(false);
+        }).catch(() => {
             setLoading(false);
         });
 
