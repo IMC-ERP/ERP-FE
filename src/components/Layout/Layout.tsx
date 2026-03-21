@@ -262,10 +262,10 @@ export default function Layout() {
       </div>
 
       <div
-        className={`flex-1 relative transition-all duration-300 ease-in-out ${isMobile ? 'ml-0 layout-main-mobile' : 'ml-64'}`}
+        className={`flex-1 relative min-w-0 overflow-x-hidden transition-all duration-300 ease-in-out ${isMobile ? 'ml-0 layout-main-mobile' : 'ml-64'}`}
         style={{ marginRight: !isMobile && isAIDrawerOpen ? '400px' : '0' }}
       >
-        <main className={`${isMobile ? 'p-4 pb-8' : 'p-8'} max-w-7xl mx-auto w-full`}>
+        <main className={`${isMobile ? 'p-4 pb-8' : 'p-8'} max-w-7xl mx-auto w-full min-w-0 overflow-x-hidden`}>
           <Outlet />
         </main>
       </div>

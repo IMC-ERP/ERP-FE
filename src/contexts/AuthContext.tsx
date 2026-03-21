@@ -7,6 +7,7 @@ import { createContext, useContext, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import {
     signInWithPopup,
+    signInWithRedirect,
     signOut,
     onAuthStateChanged
 } from 'firebase/auth';
@@ -19,7 +20,7 @@ interface AuthContextType {
     userProfile: UserProfile | null;
     loading: boolean;
     needsRegistration: boolean;
-    signInWithGoogle: () => Promise<void>;
+    signInWithGoogle: () => Promise<'popup' | 'redirect'>;
     logout: () => Promise<void>;
     refreshProfile: () => Promise<void>;
 }
@@ -43,6 +44,16 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
     const [loading, setLoading] = useState(true);
     const [needsRegistration, setNeedsRegistration] = useState(false);
+
+    const shouldUseRedirectAuth = () => {
+        if (typeof window === 'undefined') return false;
+
+        const mobileUserAgent = /Android|iPhone|iPad|iPod|Mobile/i.test(window.navigator.userAgent);
+        const narrowViewport = window.matchMedia?.('(max-width: 768px)').matches ?? false;
+        const coarsePointer = window.matchMedia?.('(pointer: coarse)').matches ?? false;
+
+        return mobileUserAgent || narrowViewport || coarsePointer;
+    };
 
     // 사용자 프로필 로드
     const loadUserProfile = async () => {
@@ -77,7 +88,15 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     // Google 로그인
     const signInWithGoogle = async () => {
         try {
+            googleProvider.setCustomParameters({ prompt: 'select_account' });
+
+            if (shouldUseRedirectAuth()) {
+                await signInWithRedirect(auth, googleProvider);
+                return 'redirect';
+            }
+
             await signInWithPopup(auth, googleProvider);
+            return 'popup';
         } catch (error) {
             console.error('Google 로그인 실패:', error);
             throw error;

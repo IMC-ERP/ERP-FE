@@ -8,6 +8,9 @@
   max-width: 1100px;
   margin: 0 auto;
   padding: 12px;
+  width: 100%;
+  min-width: 0;
+  overflow-x: clip;
 }
 
 .page-header-new {
@@ -271,6 +274,7 @@
 /* ========== 탭 컨텐츠 ========== */
 .tab-content {
   min-height: 400px;
+  min-width: 0;
 }
 
 .empty-tab {
@@ -720,6 +724,13 @@
   gap: 12px;
 }
 
+.intake-header-copy {
+  font-size: 0.875rem;
+  color: #64748b;
+  margin-top: 4px;
+  line-height: 1.5;
+}
+
 .intake-icon {
   font-size: 1.8rem;
 }
@@ -1125,8 +1136,64 @@
 
 /* 반응형 */
 @media (max-width: 768px) {
+  .inventory-page-new {
+    padding: 8px 0 20px;
+  }
+
   .option-card {
     padding: 28px 20px;
+  }
+
+  .receiving-options {
+    grid-template-columns: 1fr;
+    gap: 16px;
+    padding: 12px 0;
+  }
+
+  .reorder-section {
+    padding: 14px 16px;
+    margin-bottom: 24px;
+  }
+
+  .reorder-header,
+  .category-header,
+  .upload-header,
+  .intake-header,
+  .intake-header-inline {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .category-header,
+  .intake-header-inline,
+  .upload-header {
+    padding: 14px 16px;
+  }
+
+  .category-info,
+  .category-badge-group,
+  .intake-header-left,
+  .upload-header-left {
+    width: 100%;
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+
+  .category-badge-group {
+    justify-content: space-between;
+  }
+
+  .page-header-new p,
+  .intake-header-copy,
+  .upload-instruction {
+    font-size: 0.8rem;
+  }
+
+  .intake-table-container,
+  .image-upload-view,
+  .manual-input-view {
+    padding: 14px;
   }
 
   .intake-form-grid {
@@ -1141,11 +1208,24 @@
     flex-direction: column;
     gap: 16px;
     align-items: stretch;
+    padding: 16px;
   }
 
   .btn-submit-intake {
     width: 100%;
     justify-content: center;
+  }
+
+  .btn,
+  .btn-secondary,
+  .btn-primary,
+  .btn-upload-close,
+  .btn-intake-close-inline {
+    max-width: 100%;
+  }
+
+  .intake-header-left > div {
+    min-width: 0;
   }
 }
 
@@ -1650,6 +1730,10 @@
   .upload-header {
     padding: 14px 16px;
     border-bottom: 1px solid #f1f5f9;
+  }
+
+  .upload-header-left {
+    gap: 12px;
   }
 
   .intake-table th,

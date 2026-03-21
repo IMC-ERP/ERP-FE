@@ -7,6 +7,7 @@ import { createContext, useContext, useState, useEffect, type ReactNode } from '
 import type { SaleItem, InventoryItem, StoreProfile, AppSettings } from '../types';
 import { salesApi, inventoryApi, type Sale, type InventoryItem as APIInventoryItem } from '../services/api';
 import { auth } from '../firebase';
+import { isPreviewModeEnabled } from '../utils/previewMode';
 
 interface DataContextType {
     sales: SaleItem[];
@@ -61,12 +62,20 @@ export const DataProvider = ({ children }: { children?: ReactNode }) => {
 
     // Default Profile
     const [storeProfile, setStoreProfile] = useState<StoreProfile>(() => {
-        const defaultProfile: StoreProfile = {
-            name: "Coffee ERP",
-            ceoName: "홍길동",
-            foundedYear: "2023",
-            location: "서울시 강남구 테헤란로 123",
-            contact: "02-1234-5678"
+        const defaultProfile: StoreProfile = isPreviewModeEnabled()
+            ? {
+                name: "오렌지 브루 성수점",
+                ceoName: "이재호",
+                foundedYear: "2023",
+                location: "서울시 성동구 연무장길 21",
+                contact: "02-1234-5678"
+            }
+            : {
+                name: "Coffee ERP",
+                ceoName: "홍길동",
+                foundedYear: "2023",
+                location: "서울시 강남구 테헤란로 123",
+                contact: "02-1234-5678"
         };
 
         try {
@@ -137,6 +146,11 @@ export const DataProvider = ({ children }: { children?: ReactNode }) => {
     };
 
     useEffect(() => {
+        if (isPreviewModeEnabled()) {
+            fetchData();
+            return;
+        }
+
         // Auth 상태 변경 감지
         const unsubscribe = auth.onAuthStateChanged((user) => {
             if (user) {

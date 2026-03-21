@@ -17,6 +17,7 @@ html,
 body,
 #root {
   min-height: 100%;
+  width: 100%;
 }
 
 body {
@@ -121,6 +122,8 @@ textarea {
 
 .layout-main-mobile {
   padding-top: var(--mobile-header-offset);
+  min-width: 0;
+  overflow-x: hidden;
 }
 
 .desktop-top-utilities {
@@ -166,7 +169,9 @@ textarea {
 }
 
 .responsive-table-shell {
+  display: block;
   width: 100%;
+  max-width: 100%;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
 }

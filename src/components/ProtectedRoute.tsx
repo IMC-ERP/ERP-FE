@@ -6,6 +6,7 @@
 
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { isPreviewModeEnabled } from '../utils/previewMode';
 
 interface ProtectedRouteProps {
     children: React.ReactNode;
@@ -15,6 +16,7 @@ interface ProtectedRouteProps {
 const ProtectedRoute = ({ children, checkRegistration = true }: ProtectedRouteProps) => {
     const { user, loading, needsRegistration } = useAuth();
     const location = useLocation();
+    const previewMode = isPreviewModeEnabled();
 
     // 로딩 중일 때 스피너 표시
     if (loading) {
@@ -29,12 +31,12 @@ const ProtectedRoute = ({ children, checkRegistration = true }: ProtectedRoutePr
     }
 
     // 로그인 안 된 경우 로그인 페이지로 리다이렉트
-    if (!user) {
+    if (!user && !previewMode) {
         return <Navigate to="/login" replace />;
     }
 
     // 회원가입 필요한 경우 등록 페이지로 리다이렉트
-    if (checkRegistration && needsRegistration && location.pathname !== '/register') {
+    if (!previewMode && checkRegistration && needsRegistration && location.pathname !== '/register') {
         return <Navigate to="/register" replace />;
     }
 

@@ -112,7 +112,7 @@ const HistoryView = () => {
     }, [sales, editingId]);
 
     return (
-        <div className="space-y-4 md:space-y-5 animate-fade-in relative">
+        <div className="space-y-4 md:space-y-5 animate-fade-in relative min-w-0">
             {/* Advanced Filter Panel */}
             <div className="bg-white p-4 md:p-5 rounded-xl border border-slate-200 shadow-sm">
                 <div className="flex items-center gap-2 mb-4 text-slate-800 font-bold border-b border-slate-100 pb-2">
@@ -209,9 +209,9 @@ const HistoryView = () => {
             </div>
 
             {/* Data Table Container */}
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col h-[70vh] max-h-[700px] relative">
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col md:h-[70vh] md:max-h-[700px] relative min-w-0">
                 {/* Fixed Header with Sticky positioning */}
-                <div className="overflow-auto flex-1 custom-scrollbar">
+                <div className="overflow-auto flex-1 custom-scrollbar min-w-0">
                     <div className="responsive-table-shell">
                     <table className="w-full min-w-[760px] text-sm text-left border-collapse">
                         <thead className="bg-slate-50 text-slate-500 uppercase font-semibold border-b border-slate-200 sticky top-0 z-10 shadow-sm">
@@ -344,6 +344,9 @@ const HistoryView = () => {
                     * 내역이 많을 경우 목록을 스크롤하여 확인하세요. 행을 더블클릭하여 수정할 수 있습니다.
                 </div>
             )}
+            {!editingId && (
+                <p className="responsive-table-hint sm:hidden text-center">표는 좌우로 밀어서 확인할 수 있습니다.</p>
+            )}
 
             {/* Confirmation Modal */}
             {showConfirmModal && originalData && editForm && (
@@ -362,7 +365,8 @@ const HistoryView = () => {
                         </div>
 
                         <div className="p-6 space-y-4">
-                            <div className="grid grid-cols-11 gap-2 items-center text-sm">
+                            <div className="overflow-x-auto">
+                                <div className="grid min-w-[420px] grid-cols-11 gap-2 items-center text-sm">
                                 {/* Header */}
                                 <div className="col-span-5 font-bold text-slate-500 text-center">변경 전</div>
                                 <div className="col-span-1 flex justify-center"></div>
@@ -400,7 +404,7 @@ const HistoryView = () => {
                             </div>
 
                             {/* No visible changes check */}
-                            {originalData.itemDetail === editForm.itemDetail &&
+                                {originalData.itemDetail === editForm.itemDetail &&
                                 originalData.qty === editForm.qty &&
                                 originalData.price === editForm.price &&
                                 originalData.date === editForm.date &&
@@ -411,6 +415,7 @@ const HistoryView = () => {
                                     </div>
                                 )
                             }
+                            </div>
                         </div>
 
                         <div className="p-4 bg-slate-50 flex justify-end gap-3 border-t border-slate-100">
@@ -1379,7 +1384,7 @@ const DailySalesListView = () => {
     }
 
     return (
-        <div className="space-y-4 animate-fade-in">
+        <div className="space-y-4 animate-fade-in min-w-0">
             {salesData.map((data) => {
                 const isExpanded = expandedDates.has(data.date);
                 return (
@@ -1459,7 +1464,7 @@ export default function TransactionManager() {
     const [activeTab, setActiveTab] = useState("dailySalesAdd");
 
     return (
-        <div className="space-y-5 md:space-y-6 animate-fade-in">
+        <div className="space-y-5 md:space-y-6 animate-fade-in min-w-0">
             <header>
                 <h2 className="text-xl md:text-2xl font-bold text-slate-800 flex items-center gap-2">
                     📋 거래 데이터 관리

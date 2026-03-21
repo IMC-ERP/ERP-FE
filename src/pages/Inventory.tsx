@@ -80,14 +80,18 @@ export default function Inventory() {
 
   // 자동완성 드롭다운 상태
   const [activeSearchIndex, setActiveSearchIndex] = useState<number | null>(null);
-  const [dropdownPosition, setDropdownPosition] = useState<{ top: number; left: number } | null>(null);
+  const [dropdownPosition, setDropdownPosition] = useState<{ top: number; left: number; width: number } | null>(null);
 
   const handleInputFocus = (index: number, e: React.FocusEvent<HTMLInputElement> | React.MouseEvent<HTMLInputElement>) => {
     setActiveSearchIndex(index);
     const rect = e.currentTarget.getBoundingClientRect();
+    const viewportWidth = window.innerWidth;
+    const desiredWidth = Math.min(Math.max(rect.width, 240), viewportWidth - 24);
+    const maxLeft = window.scrollX + viewportWidth - desiredWidth - 12;
     setDropdownPosition({
       top: rect.bottom + window.scrollY,
-      left: rect.left + window.scrollX
+      left: Math.max(window.scrollX + 12, Math.min(rect.left + window.scrollX, maxLeft)),
+      width: desiredWidth
     });
   };
 
@@ -1012,10 +1016,11 @@ export default function Inventory() {
                               onClick={() => setActiveSearchIndex(null)}
                             />
                             <div
-                              className="absolute z-[9999] w-64 bg-white border border-slate-300 rounded-lg shadow-xl max-h-60 overflow-y-auto"
+                              className="absolute z-[9999] bg-white border border-slate-300 rounded-lg shadow-xl max-h-60 overflow-y-auto"
                               style={{
                                 top: `${dropdownPosition.top}px`,
                                 left: `${dropdownPosition.left}px`,
+                                width: `${dropdownPosition.width}px`,
                               }}
                             >
                               {inventory
@@ -1237,8 +1242,10 @@ export default function Inventory() {
         <div className="intake-header-inline">
           <div className="intake-header-left">
             <span className="intake-icon">📋</span>
-            <h2>재고 입고 기록</h2>
-            <p style={{ fontSize: '0.875rem', color: '#64748b', marginTop: '4px' }}>최근 100개의 입고 기록을 표시합니다. 삭제 시 재고는 되돌려지지 않습니다.</p>
+            <div>
+              <h2>재고 입고 기록</h2>
+              <p className="intake-header-copy">최근 100개의 입고 기록을 표시합니다. 삭제 시 재고는 되돌려지지 않습니다.</p>
+            </div>
           </div>
           <button className="btn btn-secondary" onClick={fetchIntakeHistory} disabled={loadingHistory}>
             <RefreshCw size={18} className={loadingHistory ? 'animate-spin' : ''} />

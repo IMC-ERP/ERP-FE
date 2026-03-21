@@ -5,8 +5,11 @@
  */
 
 import axios from 'axios';
+import type { AxiosResponse } from 'axios';
 import axiosRetry from 'axios-retry';
 import { auth } from '../firebase';
+import { demoAiStatus, demoDailySales, demoInventoryApiData, demoRecipeCosts, demoSalesApiData, demoStockIntakeHistory } from '../data/demoData';
+import { isPreviewModeEnabled } from '../utils/previewMode';
 
 // 개발 환경에서는 localhost, 프로덕션에서는 Cloud Run 백엔드 사용
 const API_BASE_URL = import.meta.env.VITE_API_URL
@@ -21,6 +24,8 @@ const api = axios.create({
   },
   timeout: 30000, // 30초 타임아웃 (Cloud Run Cold Start 대응)
 });
+
+const createPreviewResponse = <T>(data: T) => Promise.resolve({ data } as AxiosResponse<T>);
 
 // 지수 백오프 재시도 설정 (네트워크 오류 및 503 에러 대응)
 axiosRetry(api, {
@@ -158,7 +163,7 @@ export interface SalesByProduct {
 // ==================== Sales API ====================
 
 export const salesApi = {
-  getAll: () => api.get<Sale[]>('/sales'),
+  getAll: () => isPreviewModeEnabled() ? createPreviewResponse(demoSalesApiData) : api.get<Sale[]>('/sales'),
   create: (sale: Omit<Sale, 'id' | '수익'>) => api.post('/sales', sale),
   delete: (id: string) => api.delete(`/sales/${id}`),
 };
@@ -166,8 +171,10 @@ export const salesApi = {
 // ==================== Inventory API ====================
 
 export const inventoryApi = {
-  getAll: () => api.get<InventoryItem[]>('/inventory'),
-  getById: (id: string) => api.get<InventoryItem>(`/inventory/${id}`),
+  getAll: () => isPreviewModeEnabled() ? createPreviewResponse(demoInventoryApiData) : api.get<InventoryItem[]>('/inventory'),
+  getById: (id: string) => isPreviewModeEnabled()
+    ? createPreviewResponse(demoInventoryApiData.find(item => item.id === id) as InventoryItem)
+    : api.get<InventoryItem>(`/inventory/${id}`),
   create: (data: Omit<InventoryItem, 'id'> & { id: string }) => api.post('/inventory', data),
   update: (id: string, data: Partial<InventoryItem>) => api.put(`/inventory/${id}`, data),
 };
@@ -179,7 +186,9 @@ export interface StockIntakeRecord extends StockIntake {
 }
 
 export const stockIntakeApi = {
-  getAll: (limit: number = 100) => api.get<StockIntakeRecord[]>('/stock-intakes', { params: { limit } }),
+  getAll: (limit: number = 100) => isPreviewModeEnabled()
+    ? createPreviewResponse(demoStockIntakeHistory.slice(0, limit))
+    : api.get<StockIntakeRecord[]>('/stock-intakes', { params: { limit } }),
   create: (data: StockIntake) => api.post('/stock-intake', data),
   delete: (timestamp: string) => api.delete(`/stock-intake/${timestamp}`),
 };
@@ -204,8 +213,10 @@ export interface RecipeCost {
 
 // ==================== 레시피 원가 API ====================
 export const recipeCostApi = {
-  getAll: () => api.get<RecipeCost[]>('/recipe-costs'),
-  getByName: (menuName: string) => api.get<RecipeCost>(`/recipe-costs/${encodeURIComponent(menuName)}`),
+  getAll: () => isPreviewModeEnabled() ? createPreviewResponse(demoRecipeCosts) : api.get<RecipeCost[]>('/recipe-costs'),
+  getByName: (menuName: string) => isPreviewModeEnabled()
+    ? createPreviewResponse(demoRecipeCosts.find(recipe => recipe.menu_name === menuName) as RecipeCost)
+    : api.get<RecipeCost>(`/recipe-costs/${encodeURIComponent(menuName)}`),
   create: (data: Omit<RecipeCost, 'total_cost' | 'cost_ratio' | 'status'>) => api.post('/recipe-costs', data),
   delete: (menuName: string) => api.delete(`/recipe-costs/${encodeURIComponent(menuName)}`),
 };
@@ -256,8 +267,16 @@ export interface ChatResponse {
 }
 
 export const aiApi = {
-  getStatus: () => api.get<AIStatus>('/ai/status'),
-  chat: (request: ChatRequest) => api.post<ChatResponse>('/ai/chat', request),
+  getStatus: () => isPreviewModeEnabled() ? createPreviewResponse(demoAiStatus) : api.get<AIStatus>('/ai/status'),
+  chat: (request: ChatRequest) => isPreviewModeEnabled()
+    ? createPreviewResponse<ChatResponse>({
+      success: false,
+      message: null,
+      error: 'preview mode',
+      provider: null,
+      model: null
+    })
+    : api.post<ChatResponse>('/ai/chat', request),
   forecast: (menuSku: string, days: number = 7) =>
     api.post('/ai/forecast', { menu_sku_en: menuSku, days }),
 };
@@ -337,7 +356,7 @@ export const dailySalesApi = {
   create: (data: { date: string; sales_by_menu: DailySalesMenuItem[] }) =>
     api.post<DailySales>('/daily-sales', data),
 
-  getAll: () => api.get<DailySales[]>('/daily-sales'),
+  getAll: () => isPreviewModeEnabled() ? createPreviewResponse(demoDailySales) : api.get<DailySales[]>('/daily-sales'),
 
   getByDate: (date: string) => api.get<DailySales>(`/daily-sales/${date}`),
 

@@ -6,6 +6,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { clearPreviewMode, setPreviewModeEnabled } from '../utils/previewMode';
 
 const LoginPage = () => {
     const { signInWithGoogle } = useAuth();
@@ -13,28 +14,68 @@ const LoginPage = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [mode, setMode] = useState<'select' | 'login' | 'signup'>('select');
+    const host = typeof window !== 'undefined' ? window.location.hostname : '';
+    const isIpHost = /^\d{1,3}(\.\d{1,3}){3}$/.test(host);
+    const isMobileViewport = typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches;
+    const allowPreviewMode = Boolean(host === 'localhost' || isIpHost || import.meta.env.DEV);
 
     const handleGoogleAuth = async (_intent: 'login' | 'signup') => {
         setIsLoading(true);
         setError(null);
 
         try {
-            await signInWithGoogle();
-            // 로그인 후 AuthContext가 자동으로 등록 여부를 확인하고 리다이렉트
-            navigate('/');
-        } catch (err) {
-            setError('인증에 실패했습니다. 다시 시도해주세요.');
+            clearPreviewMode();
+            const flow = await signInWithGoogle();
+
+            if (flow === 'popup') {
+                navigate('/');
+            }
+        } catch (err: any) {
+            const code = err?.code as string | undefined;
+
+            if (code === 'auth/unauthorized-domain') {
+                setError('현재 주소는 Google 로그인 허용 도메인이 아니라 인증이 차단되었습니다. localhost 또는 배포 도메인에서 다시 열어주세요.');
+            } else if (code === 'auth/popup-blocked') {
+                setError('브라우저에서 로그인 팝업이 차단되었습니다. 팝업 허용 후 다시 시도해주세요.');
+            } else {
+                setError('인증에 실패했습니다. 다시 시도해주세요.');
+            }
             console.error(err);
         } finally {
             setIsLoading(false);
         }
     };
 
+    const handlePreviewMode = () => {
+        setPreviewModeEnabled(true);
+        navigate('/dashboard');
+    };
+
+    const loginHint = (
+        <div className="space-y-3 mb-6">
+            {isMobileViewport && (
+                <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800 leading-relaxed">
+                    모바일에서는 Google 로그인 후 외부 브라우저 또는 Google 화면으로 이동했다가 다시 돌아옵니다.
+                </div>
+            )}
+            {isIpHost && (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 leading-relaxed">
+                    현재 주소는 미리보기용 IP 링크입니다. Firebase Authorized Domain에 등록되지 않은 IP에서는 Google 로그인이 막힐 수 있습니다.
+                </div>
+            )}
+            {allowPreviewMode && (
+                <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 leading-relaxed">
+                    캡처나 시연이 급하면 아래 `로그인 없이 둘러보기`로 데모 데이터를 바로 확인할 수 있습니다.
+                </div>
+            )}
+        </div>
+    );
+
     // 선택 화면
     if (mode === 'select') {
         return (
             <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-amber-100 flex items-center justify-center p-4">
-                <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
+                <div className="bg-white rounded-2xl shadow-xl p-6 sm:p-8 w-full max-w-md">
                     {/* 로고 & 타이틀 */}
                     <div className="text-center mb-8">
                         <div className="text-6xl mb-4">☕</div>
@@ -45,6 +86,8 @@ const LoginPage = () => {
                             매장 관리 시스템에 오신 것을 환영합니다
                         </p>
                     </div>
+
+                    {loginHint}
 
                     {/* 선택 버튼들 */}
                     <div className="space-y-4">
@@ -59,6 +102,15 @@ const LoginPage = () => {
                             className="w-full bg-white border-2 border-amber-500 text-amber-600 font-semibold py-4 rounded-xl hover:bg-amber-50 transition-all">
                             새 매장 등록 (회원가입)
                         </button>
+
+                        {allowPreviewMode && (
+                            <button
+                                onClick={handlePreviewMode}
+                                className="w-full bg-slate-900 text-white font-semibold py-4 rounded-xl hover:bg-slate-800 transition-all shadow-md hover:shadow-lg"
+                            >
+                                로그인 없이 둘러보기
+                            </button>
+                        )}
                     </div>
 
                     <p className="text-center text-xs text-slate-400 mt-6">
@@ -72,7 +124,7 @@ const LoginPage = () => {
     // 로그인/회원가입 화면
     return (
         <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-amber-100 flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
+            <div className="bg-white rounded-2xl shadow-xl p-6 sm:p-8 w-full max-w-md">
                 {/* 로고 & 타이틀 */}
                 <div className="text-center mb-8">
                     <div className="text-6xl mb-4">☕</div>
@@ -85,6 +137,8 @@ const LoginPage = () => {
                             : '새 매장을 등록하세요'}
                     </p>
                 </div>
+
+                {loginHint}
 
                 {/* 에러 메시지 */}
                 {error && (
