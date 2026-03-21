@@ -374,26 +374,28 @@ export default function Recipes() {
                     </div>
                     <div className="recipe-section">
                       <h5>📋 레시피 구성 (재료)</h5>
-                      <table className="recipe-table">
-                        <thead>
-                          <tr>
-                            <th>재료 품목</th>
-                            <th>사용량</th>
-                            <th>단위 원가</th>
-                            <th>원가</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {recipe.ingredients.map((ingredient, idx) => (
-                            <tr key={idx}>
-                              <td>{ingredient.name}</td>
-                              <td>{ingredient.usage}</td>
-                              <td>{ingredient.cost_per_unit.toFixed(2)}원</td>
-                              <td>{ingredient.cost.toLocaleString()}원</td>
+                      <div className="responsive-table-shell">
+                        <table className="recipe-table">
+                          <thead>
+                            <tr>
+                              <th>재료 품목</th>
+                              <th>사용량</th>
+                              <th>단위 원가</th>
+                              <th>원가</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                          </thead>
+                          <tbody>
+                            {recipe.ingredients.map((ingredient, idx) => (
+                              <tr key={idx}>
+                                <td>{ingredient.name}</td>
+                                <td>{ingredient.usage}</td>
+                                <td>{ingredient.cost_per_unit.toFixed(2)}원</td>
+                                <td>{ingredient.cost.toLocaleString()}원</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
                     <div className="recipe-total">
                       <div className="total-label">레시피 총 원가 (Food Cost)</div>
@@ -505,26 +507,28 @@ export default function Recipes() {
                           {/* 레시피 구성 */}
                           <div className="recipe-section">
                             <h5>📋 레시피 구성 (재료)</h5>
-                            <table className="recipe-table">
-                              <thead>
-                                <tr>
-                                  <th>재료 품목</th>
-                                  <th>사용량</th>
-                                  <th>단위 원가</th>
-                                  <th>원가</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {recipe.ingredients.map((ingredient, idx) => (
-                                  <tr key={idx}>
-                                    <td>{ingredient.name}</td>
-                                    <td>{ingredient.usage}</td>
-                                    <td>{ingredient.cost_per_unit.toFixed(2)}원</td>
-                                    <td>{ingredient.cost.toLocaleString()}원</td>
+                            <div className="responsive-table-shell">
+                              <table className="recipe-table">
+                                <thead>
+                                  <tr>
+                                    <th>재료 품목</th>
+                                    <th>사용량</th>
+                                    <th>단위 원가</th>
+                                    <th>원가</th>
                                   </tr>
-                                ))}
-                              </tbody>
-                            </table>
+                                </thead>
+                                <tbody>
+                                  {recipe.ingredients.map((ingredient, idx) => (
+                                    <tr key={idx}>
+                                      <td>{ingredient.name}</td>
+                                      <td>{ingredient.usage}</td>
+                                      <td>{ingredient.cost_per_unit.toFixed(2)}원</td>
+                                      <td>{ingredient.cost.toLocaleString()}원</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
                           </div>
 
                           {/* 레시피 총 원가 */}

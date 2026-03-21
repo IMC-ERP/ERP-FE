@@ -104,7 +104,7 @@ export default function Sales() {
 
       {/* 판매 입력 폼 */}
       {showForm && (
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 animate-fade-in">
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 md:p-6 animate-fade-in">
           <h3 className="text-lg font-bold text-slate-800 mb-4">📝 새 판매 입력</h3>
           <form onSubmit={handleSubmit}>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-3 md:gap-4 mb-4">
@@ -150,17 +150,17 @@ export default function Sales() {
                 />
               </div>
             </div>
-            <div className="flex gap-2 justify-end">
+            <div className="flex flex-col-reverse sm:flex-row gap-2 justify-end">
               <button
                 type="button"
                 onClick={() => setShowForm(false)}
-                className="px-4 py-2 bg-white border border-slate-300 rounded-lg text-sm text-slate-600 hover:bg-slate-50 transition-colors"
+                className="w-full sm:w-auto px-4 py-2 bg-white border border-slate-300 rounded-lg text-sm text-slate-600 hover:bg-slate-50 transition-colors"
               >
                 취소
               </button>
               <button
                 type="submit"
-                className="px-4 py-2 bg-slate-800 text-white rounded-lg text-sm font-bold hover:bg-slate-900 transition-colors"
+                className="w-full sm:w-auto px-4 py-2 bg-slate-800 text-white rounded-lg text-sm font-bold hover:bg-slate-900 transition-colors"
               >
                 저장
               </button>
@@ -214,8 +214,8 @@ export default function Sales() {
           </div>
         ) : (
           /* ===== 데스크탑: 테이블 뷰 ===== */
-          <div className="overflow-x-auto max-h-[500px]">
-            <table className="w-full text-sm text-left">
+          <div className="responsive-table-shell max-h-[500px]">
+            <table className="w-full min-w-[640px] text-sm text-left">
               <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200 sticky top-0">
                 <tr>
                   <th className="px-4 py-3">날짜</th>

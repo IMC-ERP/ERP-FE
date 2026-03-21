@@ -22,6 +22,7 @@
 .header-actions {
   display: flex;
   gap: 12px;
+  flex-wrap: wrap;
 }
 
 .page-header-new h1 {
@@ -44,6 +45,11 @@
   margin-bottom: 12px;
   border-bottom: 2px solid #e2e8f0;
   padding-bottom: 0;
+  scrollbar-width: none;
+}
+
+.tab-navigation::-webkit-scrollbar {
+  display: none;
 }
 
 .tab-btn {
@@ -58,6 +64,8 @@
   transition: all 0.2s;
   position: relative;
   top: 2px;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .tab-btn:hover {
@@ -540,6 +548,15 @@
     gap: 12px;
   }
 
+  .header-actions {
+    width: 100%;
+  }
+
+  .header-actions .btn {
+    flex: 1;
+    justify-content: center;
+  }
+
   .tab-navigation {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
@@ -548,7 +565,7 @@
   .tab-btn {
     white-space: nowrap;
     font-size: 0.85rem;
-    padding: 10px 16px;
+    padding: 10px 14px;
   }
 }
 
@@ -1108,6 +1125,10 @@
 
 /* 반응형 */
 @media (max-width: 768px) {
+  .option-card {
+    padding: 28px 20px;
+  }
+
   .intake-form-grid {
     grid-template-columns: 1fr;
   }
@@ -1636,4 +1657,62 @@
     padding: 8px 6px;
     font-size: 0.78rem;
   }
+}
+
+html[data-theme="dark"] .inventory-page-new,
+html[data-theme="dark"] .receiving-tab,
+html[data-theme="dark"] .option-card,
+html[data-theme="dark"] .modal-content,
+html[data-theme="dark"] .drag-drop-zone,
+html[data-theme="dark"] .upload-header,
+html[data-theme="dark"] .intake-table,
+html[data-theme="dark"] .intake-table thead,
+html[data-theme="dark"] .table-input,
+html[data-theme="dark"] .table-select,
+html[data-theme="dark"] .btn-secondary {
+  background: #0f172a;
+  color: #e2e8f0;
+}
+
+html[data-theme="dark"] .inventory-page-new,
+html[data-theme="dark"] .option-card,
+html[data-theme="dark"] .modal-content,
+html[data-theme="dark"] .drag-drop-zone,
+html[data-theme="dark"] .upload-header,
+html[data-theme="dark"] .intake-table,
+html[data-theme="dark"] .table-input,
+html[data-theme="dark"] .table-select,
+html[data-theme="dark"] .btn-secondary {
+  border-color: #334155;
+}
+
+html[data-theme="dark"] .page-header-new h1,
+html[data-theme="dark"] .upload-header h2,
+html[data-theme="dark"] .intake-header-inline h2,
+html[data-theme="dark"] .mobile-action-title {
+  color: #f8fafc;
+}
+
+html[data-theme="dark"] .page-header-new p,
+html[data-theme="dark"] .tab-btn,
+html[data-theme="dark"] .upload-instruction,
+html[data-theme="dark"] .mobile-action-sub,
+html[data-theme="dark"] .mobile-upload-divider span {
+  color: #94a3b8;
+}
+
+html[data-theme="dark"] .tab-btn:hover,
+html[data-theme="dark"] .option-card:hover,
+html[data-theme="dark"] .btn-secondary:hover,
+html[data-theme="dark"] .table-input:focus,
+html[data-theme="dark"] .table-select:focus {
+  background: #1e293b;
+}
+
+html[data-theme="dark"] .mobile-action-btn.secondary-action,
+html[data-theme="dark"] .mobile-upload-tip,
+html[data-theme="dark"] .intake-footer {
+  background: #111827;
+  border-color: #334155;
+  color: #e2e8f0;
 }

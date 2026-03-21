@@ -121,11 +121,11 @@ const AddMaterialModal = ({
                     </button>
                 </div>
 
-                <div className="p-6 space-y-5">
+                <div className="p-5 sm:p-6 space-y-5">
                     {/* Category Selection */}
                     <div>
                         <label className="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide">카테고리 선택</label>
-                        <div className="flex gap-4 mb-3">
+                        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-3">
                             <label className="flex items-center gap-2 cursor-pointer group">
                                 <input
                                     type="radio"
@@ -178,7 +178,7 @@ const AddMaterialModal = ({
                         />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                             <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wide">구매가 (원)</label>
                             <input
@@ -227,16 +227,16 @@ const AddMaterialModal = ({
                     </div>
                 </div>
 
-                <div className="p-4 bg-slate-50 flex justify-end gap-3 border-t border-slate-100">
+                <div className="p-4 bg-slate-50 flex flex-col-reverse sm:flex-row justify-end gap-3 border-t border-slate-100">
                     <button
                         onClick={onClose}
-                        className="px-5 py-2.5 text-slate-600 font-bold hover:bg-slate-200 rounded-lg text-sm transition-colors"
+                        className="w-full sm:w-auto px-5 py-2.5 text-slate-600 font-bold hover:bg-slate-200 rounded-lg text-sm transition-colors"
                     >
                         취소
                     </button>
                     <button
                         onClick={handleSave}
-                        className="px-5 py-2.5 bg-indigo-600 text-white font-bold rounded-lg text-sm hover:bg-indigo-700 shadow-md shadow-indigo-200 transition-colors"
+                        className="w-full sm:w-auto px-5 py-2.5 bg-indigo-600 text-white font-bold rounded-lg text-sm hover:bg-indigo-700 shadow-md shadow-indigo-200 transition-colors"
                     >
                         저장하기
                     </button>
@@ -344,11 +344,11 @@ const AddRecipeModal = ({
                     </button>
                 </div>
 
-                <div className="p-6 space-y-5 overflow-y-auto flex-1">
+                <div className="p-5 sm:p-6 space-y-5 overflow-y-auto flex-1">
                     {/* Category Selection */}
                     <div>
                         <label className="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide">카테고리 선택</label>
-                        <div className="flex gap-4 mb-3">
+                        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-3">
                             <label className="flex items-center gap-2 cursor-pointer group">
                                 <input
                                     type="radio"
@@ -390,7 +390,7 @@ const AddRecipeModal = ({
                     </div>
 
                     {/* Menu Info */}
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                             <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wide">메뉴명</label>
                             <input
@@ -417,7 +417,8 @@ const AddRecipeModal = ({
                     <div>
                         <label className="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide">레시피 구성</label>
                         <div className="bg-slate-50 rounded-lg border border-slate-200 overflow-hidden">
-                            <table className="w-full text-sm text-left">
+                            <div className="responsive-table-shell">
+                            <table className="w-full min-w-[720px] text-sm text-left">
                                 <thead className="bg-slate-100 text-slate-600 font-semibold">
                                     <tr>
                                         <th className="px-4 py-2">원재료 선택</th>
@@ -483,7 +484,9 @@ const AddRecipeModal = ({
                                     </tr>
                                 </tfoot>
                             </table>
+                            </div>
                         </div>
+                        <p className="responsive-table-hint sm:hidden mt-2">표는 좌우로 밀어서 확인할 수 있습니다.</p>
                         <button
                             onClick={handleAddIngredient}
                             className="mt-3 flex items-center gap-2 text-sm font-bold text-blue-600 hover:text-blue-700 px-2 py-1 rounded hover:bg-blue-50 transition-colors"
@@ -493,16 +496,16 @@ const AddRecipeModal = ({
                     </div>
                 </div>
 
-                <div className="p-4 bg-slate-50 flex justify-end gap-3 border-t border-slate-100">
+                <div className="p-4 bg-slate-50 flex flex-col-reverse sm:flex-row justify-end gap-3 border-t border-slate-100">
                     <button
                         onClick={onClose}
-                        className="px-5 py-2.5 text-slate-600 font-bold hover:bg-slate-200 rounded-lg text-sm transition-colors"
+                        className="w-full sm:w-auto px-5 py-2.5 text-slate-600 font-bold hover:bg-slate-200 rounded-lg text-sm transition-colors"
                     >
                         취소
                     </button>
                     <button
                         onClick={handleSave}
-                        className="px-5 py-2.5 bg-indigo-600 text-white font-bold rounded-lg text-sm hover:bg-indigo-700 shadow-md shadow-indigo-200 transition-colors"
+                        className="w-full sm:w-auto px-5 py-2.5 bg-indigo-600 text-white font-bold rounded-lg text-sm hover:bg-indigo-700 shadow-md shadow-indigo-200 transition-colors"
                     >
                         저장하기
                     </button>
@@ -548,7 +551,7 @@ const RecipeRow = ({
             {/* Header Row */}
             <div
                 onClick={() => setExpandedRecipeId(isExpanded ? null : recipe.id)}
-                className="flex items-center justify-between p-4 cursor-pointer hover:bg-slate-50 transition-colors"
+                className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-4 cursor-pointer hover:bg-slate-50 transition-colors"
             >
                 <div className="flex items-center gap-4">
                     {isExpanded ? <ChevronDown size={20} className="text-slate-400" /> : <ChevronRight size={20} className="text-slate-400" />}
@@ -560,7 +563,7 @@ const RecipeRow = ({
                     </div>
                 </div>
 
-                <div className="flex items-center gap-4">
+                <div className="flex items-center justify-between sm:justify-start gap-4 w-full sm:w-auto">
                     <div className={`px-3 py-1 rounded-full text-xs font-bold border ${statusColor} flex items-center gap-1`}>
                         {cogsRatio >= 30 && <AlertCircle size={12} />}
                         원가율 {cogsRatio.toFixed(1)}%
@@ -578,7 +581,7 @@ const RecipeRow = ({
             {isExpanded && (
                 <div className="border-t border-slate-100 bg-slate-50 p-6 animate-fade-in">
                     {/* Meta Editing */}
-                    <div className="flex gap-4 mb-6 items-end">
+                    <div className="flex flex-col sm:flex-row gap-4 mb-6 items-stretch sm:items-end">
                         <div className="flex-1">
                             <label className="block text-xs font-bold text-slate-500 mb-1">메뉴명 수정</label>
                             <input
@@ -588,7 +591,7 @@ const RecipeRow = ({
                                 className="w-full p-2 border border-slate-300 rounded text-sm"
                             />
                         </div>
-                        <div className="w-48">
+                        <div className="w-full sm:w-48">
                             <label className="block text-xs font-bold text-slate-500 mb-1">판매가 (원)</label>
                             <input
                                 type="number"
@@ -601,7 +604,8 @@ const RecipeRow = ({
 
                     {/* Ingredients Table */}
                     <div className="bg-white rounded-lg border border-slate-200 overflow-hidden mb-4">
-                        <table className="w-full text-sm text-left">
+                        <div className="responsive-table-shell">
+                        <table className="w-full min-w-[720px] text-sm text-left">
                             <thead className="bg-slate-100 text-slate-600 font-semibold">
                                 <tr>
                                     <th className="px-4 py-2">원재료 선택</th>
@@ -667,7 +671,9 @@ const RecipeRow = ({
                                 </tr>
                             </tfoot>
                         </table>
+                        </div>
                     </div>
+                    <p className="responsive-table-hint sm:hidden mb-4">표는 좌우로 밀어서 확인할 수 있습니다.</p>
 
                     <button
                         onClick={() => onAddIngredient(recipe.id)}
@@ -701,11 +707,12 @@ const MaterialTable = ({ materials, onUpdate, onDelete }: MaterialTableProps) =>
         <div className="space-y-8 animate-fade-in">
             {Object.entries(groupedMaterials).map(([category, items]: [string, RawMaterial[]]) => (
                 <div key={category} className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                    <div className="bg-slate-50 px-6 py-3 border-b border-slate-200 flex justify-between items-center">
+                    <div className="bg-slate-50 px-4 sm:px-6 py-3 border-b border-slate-200 flex flex-col gap-2 sm:flex-row sm:justify-between sm:items-center">
                         <h3 className="font-bold text-slate-700 uppercase tracking-wide text-sm">{category}</h3>
                         <span className="text-xs text-slate-400">{items.length}개 품목</span>
                     </div>
-                    <table className="w-full text-sm text-left">
+                    <div className="responsive-table-shell">
+                    <table className="w-full min-w-[780px] text-sm text-left">
                         <thead className="bg-white text-slate-500 font-semibold border-b border-slate-100">
                             <tr>
                                 <th className="px-6 py-3">원재료명</th>
@@ -773,6 +780,7 @@ const MaterialTable = ({ materials, onUpdate, onDelete }: MaterialTableProps) =>
                             ))}
                         </tbody>
                     </table>
+                    </div>
                 </div>
             ))}
         </div>
@@ -1029,7 +1037,7 @@ export default function CostRecipeManager() {
                 materials={materials}
             />
 
-            <header className="flex justify-between items-center">
+            <header className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-center">
                 <div>
                     <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
                         <Calculator className="text-indigo-600" />
@@ -1037,18 +1045,18 @@ export default function CostRecipeManager() {
                     </h2>
                     <p className="text-sm text-slate-500 mt-1">원재료 가격에 따른 실시간 원가율(COGS)을 분석하고 레시피를 관리합니다.</p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex w-full sm:w-auto gap-2">
                     {activeTab === 'recipe' ? (
                         <button
                             onClick={handleAddRecipe}
-                            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg font-bold shadow hover:bg-indigo-700 transition-colors"
+                            className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg font-bold shadow hover:bg-indigo-700 transition-colors"
                         >
                             <Plus size={18} /> 새 메뉴 추가
                         </button>
                     ) : (
                         <button
                             onClick={handleOpenAddMaterialModal}
-                            className="flex items-center gap-2 px-4 py-2 bg-slate-800 text-white rounded-lg font-bold shadow hover:bg-slate-900 transition-colors"
+                            className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-slate-800 text-white rounded-lg font-bold shadow hover:bg-slate-900 transition-colors"
                         >
                             <Plus size={18} /> 새 원재료 추가
                         </button>
@@ -1057,10 +1065,10 @@ export default function CostRecipeManager() {
             </header>
 
             {/* Tabs */}
-            <div className="flex gap-2 border-b border-slate-200">
+            <div className="flex gap-2 border-b border-slate-200 overflow-x-auto pb-1 scrollbar-hide">
                 <button
                     onClick={() => setActiveTab('recipe')}
-                    className={`flex items-center gap-2 px-6 py-3 text-sm font-bold rounded-t-lg transition-colors ${activeTab === 'recipe'
+                    className={`flex items-center gap-2 px-4 sm:px-6 py-3 text-xs sm:text-sm font-bold rounded-t-lg transition-colors whitespace-nowrap ${activeTab === 'recipe'
                         ? "bg-white text-indigo-600 border-b-2 border-indigo-600"
                         : "text-slate-500 hover:text-slate-800 hover:bg-slate-50"
                         }`}
@@ -1070,7 +1078,7 @@ export default function CostRecipeManager() {
                 </button>
                 <button
                     onClick={() => setActiveTab('material')}
-                    className={`flex items-center gap-2 px-6 py-3 text-sm font-bold rounded-t-lg transition-colors ${activeTab === 'material'
+                    className={`flex items-center gap-2 px-4 sm:px-6 py-3 text-xs sm:text-sm font-bold rounded-t-lg transition-colors whitespace-nowrap ${activeTab === 'material'
                         ? "bg-white text-indigo-600 border-b-2 border-indigo-600"
                         : "text-slate-500 hover:text-slate-800 hover:bg-slate-50"
                         }`}
@@ -1089,7 +1097,7 @@ export default function CostRecipeManager() {
                             <div className="mb-8 bg-red-50 rounded-xl border border-red-200 shadow-sm overflow-hidden">
                                 <div
                                     onClick={() => setIsDangerSectionExpanded(!isDangerSectionExpanded)}
-                                    className="px-6 py-4 flex justify-between items-center cursor-pointer hover:bg-red-100/50 transition-colors"
+                                    className="px-4 sm:px-6 py-4 flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center cursor-pointer hover:bg-red-100/50 transition-colors"
                                 >
                                     <div className="flex items-center gap-3">
                                         {isDangerSectionExpanded ? <ChevronDown size={20} className="text-red-400" /> : <ChevronRight size={20} className="text-red-400" />}
@@ -1124,7 +1132,7 @@ export default function CostRecipeManager() {
                         )}
 
                         {/* Sort Controls */}
-                        <div className="flex justify-end gap-2 mb-2">
+                        <div className="flex flex-wrap justify-end gap-2 mb-2">
                             <span className="text-xs text-slate-400 flex items-center mr-1">정렬 기준:</span>
                             <button
                                 onClick={() => handleSort('name')}

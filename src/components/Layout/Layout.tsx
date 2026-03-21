@@ -19,7 +19,10 @@ import {
   HelpCircle,
   X,
   Menu,
-  BarChart3
+  BarChart3,
+  Moon,
+  Sun,
+  Type
 } from 'lucide-react';
 import { useData } from '../../contexts/DataContext';
 
@@ -52,7 +55,7 @@ export default function Layout() {
   const location = useLocation();
   const [isAIDrawerOpen, setIsAIDrawerOpen] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-  const { storeProfile } = useData();
+  const { storeProfile, appSettings, updateAppSettings } = useData();
 
   // 모바일 여부 감지
   const [isMobile, setIsMobile] = useState(false);
@@ -64,12 +67,42 @@ export default function Layout() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
+  useEffect(() => {
+    if (!isMobile) {
+      document.body.style.overflow = '';
+      return;
+    }
+
+    document.body.style.overflow = isMobileSidebarOpen || isAIDrawerOpen ? 'hidden' : '';
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isAIDrawerOpen, isMobile, isMobileSidebarOpen]);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = appSettings.darkMode ? 'dark' : 'light';
+    document.documentElement.dataset.fontSize = appSettings.fontSize;
+    document.documentElement.style.colorScheme = appSettings.darkMode ? 'dark' : 'light';
+  }, [appSettings.darkMode, appSettings.fontSize]);
+
   // 페이지 이동 시 모바일 사이드바 닫기
   useEffect(() => {
     setIsMobileSidebarOpen(false);
   }, [location.pathname]);
 
   const closeMobileSidebar = () => setIsMobileSidebarOpen(false);
+  const toggleDarkMode = () => updateAppSettings({ darkMode: !appSettings.darkMode });
+  const cycleFontSize = () => {
+    const nextSize = appSettings.fontSize === 'small'
+      ? 'medium'
+      : appSettings.fontSize === 'medium'
+        ? 'large'
+        : 'small';
+
+    updateAppSettings({ fontSize: nextSize });
+  };
+  const fontSizeToken = appSettings.fontSize === 'small' ? 'A-' : appSettings.fontSize === 'medium' ? 'A' : 'A+';
+  const fontSizeLabel = appSettings.fontSize === 'small' ? '작게' : appSettings.fontSize === 'medium' ? '보통' : '크게';
 
   const navItems = [
     { to: '/', icon: Home, label: '홈' },
@@ -102,13 +135,32 @@ export default function Layout() {
             )}
             <span>{storeProfile.name}</span>
           </div>
-          <button
-            onClick={() => setIsAIDrawerOpen(prev => !prev)}
-            className="mobile-ai-btn"
-            aria-label="AI 비서"
-          >
-            <Bot size={20} />
-          </button>
+          <div className="mobile-header-actions">
+            <button
+              onClick={cycleFontSize}
+              className="mobile-header-utility-btn"
+              aria-label={`글자 크기 변경, 현재 ${fontSizeLabel}`}
+              title={`글자 크기: ${fontSizeLabel}`}
+            >
+              <Type size={15} />
+              <span>{fontSizeToken}</span>
+            </button>
+            <button
+              onClick={toggleDarkMode}
+              className="mobile-header-utility-btn"
+              aria-label={appSettings.darkMode ? '라이트 모드로 전환' : '다크 모드로 전환'}
+              title={appSettings.darkMode ? '라이트 모드' : '다크 모드'}
+            >
+              {appSettings.darkMode ? <Sun size={16} /> : <Moon size={16} />}
+            </button>
+            <button
+              onClick={() => setIsAIDrawerOpen(prev => !prev)}
+              className="mobile-ai-btn"
+              aria-label="AI 비서"
+            >
+              <Bot size={20} />
+            </button>
+          </div>
         </div>
       )}
 
@@ -174,23 +226,42 @@ export default function Layout() {
 
       {/* Main Content Wrapper */}
       <div
-        className={`flex-1 relative transition-all duration-300 ease-in-out ${isMobile ? 'ml-0 mt-14' : 'ml-64'}`}
+        className={`flex-1 relative transition-all duration-300 ease-in-out ${isMobile ? 'ml-0 layout-main-mobile' : 'ml-64'}`}
         style={{ marginRight: !isMobile && isAIDrawerOpen ? '400px' : '0' }}
       >
-        <main className={`${isMobile ? 'p-4' : 'p-8'} max-w-7xl mx-auto`}>
+        <main className={`${isMobile ? 'p-4 pb-8' : 'p-8'} max-w-7xl mx-auto w-full`}>
           <Outlet />
         </main>
       </div>
 
       {/* Floating AI Button (Desktop only) */}
       {!isMobile && (
-        <button
-          onClick={() => setIsAIDrawerOpen(prev => !prev)}
-          className={`fixed top-6 right-8 z-40 p-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-full shadow-lg hover:shadow-xl hover:scale-110 transition-all duration-200 group border-2 border-white/20 ${isAIDrawerOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
-          title="AI 비서 열기"
-        >
-          <Bot size={24} className="group-hover:rotate-12 transition-transform" />
-        </button>
+        <>
+          <div className="desktop-top-utilities">
+            <button
+              onClick={cycleFontSize}
+              className="desktop-utility-btn"
+              title={`글자 크기: ${fontSizeLabel}`}
+            >
+              <Type size={16} />
+              <span>{fontSizeToken}</span>
+            </button>
+            <button
+              onClick={toggleDarkMode}
+              className="desktop-utility-btn"
+              title={appSettings.darkMode ? '라이트 모드' : '다크 모드'}
+            >
+              {appSettings.darkMode ? <Sun size={18} /> : <Moon size={18} />}
+            </button>
+          </div>
+          <button
+            onClick={() => setIsAIDrawerOpen(prev => !prev)}
+            className={`fixed top-6 right-8 z-40 p-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-full shadow-lg hover:shadow-xl hover:scale-110 transition-all duration-200 group border-2 border-white/20 ${isAIDrawerOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
+            title="AI 코파일럿 열기"
+          >
+            <Bot size={24} className="group-hover:rotate-12 transition-transform" />
+          </button>
+        </>
       )}
 
       {/* AI Assistant Drawer */}
@@ -204,7 +275,7 @@ export default function Layout() {
             <div className="bg-white p-1.5 rounded-full shadow-sm">
               <Bot className="text-blue-600" size={20} />
             </div>
-            <span>AI 경영 비서</span>
+            <span>AI 운영 코파일럿</span>
           </div>
           <button
             onClick={() => setIsAIDrawerOpen(false)}

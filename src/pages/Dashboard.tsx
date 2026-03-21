@@ -120,16 +120,16 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-4 md:space-y-6 animate-fade-in overflow-visible">
+    <div className="max-w-4xl mx-auto space-y-4 sm:space-y-6 animate-fade-in overflow-visible">
 
       {/* 1. Profitability Section */}
       <div className="bg-white rounded-2xl shadow-lg border border-slate-200">
         <div className={`relative ${theme.gradient} p-5 md:p-8 text-white transition-colors duration-500 rounded-t-2xl ${!showProfitDetails ? 'rounded-b-2xl' : ''}`}>
-          <div className="flex items-start justify-between">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <div className="flex items-center gap-2 mb-2">
+              <div className="flex items-center gap-2 mb-2 flex-wrap">
                 <span className={`${theme.subTitleColor} font-medium text-sm`}>실시간 수익성 분석</span>
-                <div className="group relative">
+                <div className="group relative hidden md:block">
                   <Info size={16} className={`${theme.iconColor} cursor-help`} />
                   <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block w-72 p-3 bg-slate-800 text-xs text-slate-200 rounded-lg shadow-xl z-[60]">
                     이번 달 1일({dateRange.start.toLocaleDateString()})부터 어제({dateRange.end.toLocaleDateString()})까지의 데이터 기준 이익률입니다.
@@ -137,13 +137,13 @@ export default function Dashboard() {
                   </div>
                 </div>
               </div>
-              <div className="flex items-end gap-2 md:gap-4">
-                <h1 className="text-xl md:text-3xl font-light">
-                  현재 이달 수익률은 <span className="font-bold text-3xl md:text-5xl">{financialMetrics.profitMargin.toFixed(1)}%</span> 입니다.
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:gap-4">
+                <h1 className="text-lg sm:text-xl md:text-3xl font-light leading-tight">
+                  현재 이달 수익률은 <span className="block sm:inline font-bold text-3xl sm:text-4xl md:text-5xl">{financialMetrics.profitMargin.toFixed(1)}%</span> 입니다.
                 </h1>
                 <button
                   onClick={() => setShowProfitDetails(!showProfitDetails)}
-                  className="mb-2 p-1 rounded-full hover:bg-white/20 transition-colors"
+                  className="self-start sm:self-auto sm:mb-2 p-1 rounded-full hover:bg-white/20 transition-colors"
                 >
                   {showProfitDetails ? <ChevronDown size={28} /> : <ChevronRight size={28} />}
                 </button>
@@ -156,7 +156,7 @@ export default function Dashboard() {
           <div className="p-4 md:p-8 bg-slate-50 border-t border-slate-100 rounded-b-2xl">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8">
               <div className="space-y-4">
-                <div className="flex justify-between items-center mb-2">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-2">
                   <h3 className="text-slate-500 font-semibold text-sm uppercase tracking-wider">Total Cost Analysis</h3>
                   <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-full border border-slate-200 shadow-sm">
                     <span className="text-xs text-slate-600 font-medium">공과금 포함</span>
@@ -169,14 +169,14 @@ export default function Dashboard() {
                   </div>
                 </div>
                 <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                  <div className="flex justify-between items-end mb-1">
+                  <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between mb-1">
                     <span className="text-slate-500 text-sm">Average Total Cost (일평균)</span>
                     <span className="text-slate-700 font-mono font-semibold">{Math.round(financialMetrics.avgDailyCost).toLocaleString()}원</span>
                   </div>
                   <div className="w-full h-1 bg-slate-100 rounded-full mb-4">
                     <div className="h-full bg-slate-400 rounded-full transition-all duration-700" style={{ width: `${Math.min(financialMetrics.costRatio, 100)}%` }}></div>
                   </div>
-                  <div className="flex justify-between items-end">
+                  <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
                     <span className="text-slate-800 font-bold">실제 전체 비용</span>
                     <span className="text-2xl font-bold text-slate-800">{Math.round(financialMetrics.totalCost).toLocaleString()}원</span>
                   </div>
@@ -186,14 +186,14 @@ export default function Dashboard() {
               <div className="space-y-4">
                 <h3 className="text-slate-500 font-semibold text-sm uppercase tracking-wider mb-2">Total Revenue Analysis</h3>
                 <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                  <div className="flex justify-between items-end mb-1">
+                  <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between mb-1">
                     <span className="text-slate-500 text-sm">Average Total Revenue (일평균)</span>
                     <span className="text-slate-700 font-mono font-semibold">{Math.round(financialMetrics.avgDailyRevenue).toLocaleString()}원</span>
                   </div>
                   <div className="w-full h-1 bg-slate-100 rounded-full mb-4">
                     <div className={`h-full rounded-full transition-all duration-700 ${isPositive ? 'bg-rose-400' : 'bg-blue-400'}`} style={{ width: '100%' }}></div>
                   </div>
-                  <div className="flex justify-between items-end">
+                  <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
                     <span className="text-slate-800 font-bold">실제 전체 수익</span>
                     <span className="text-2xl font-bold text-slate-800">{financialMetrics.totalRevenue.toLocaleString()}원</span>
                   </div>
@@ -202,7 +202,7 @@ export default function Dashboard() {
             </div>
             <div className="mt-6 md:mt-8 pt-4 md:pt-6 border-t border-slate-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
               <div className="text-slate-600 font-medium">총 순수익 (Net Profit)</div>
-              <div className="text-right">
+              <div className="w-full text-left sm:w-auto sm:text-right">
                 <div className={`text-3xl font-extrabold ${theme.textMain}`}>{Math.round(financialMetrics.netProfit).toLocaleString()}원</div>
                 <div className="text-sm font-medium text-slate-400">매출 대비 <span className={theme.textSub}>{financialMetrics.profitMargin.toFixed(1)}%</span> 마진</div>
               </div>
@@ -213,18 +213,18 @@ export default function Dashboard() {
 
       {/* 2. Utility Bills Management Section */}
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="p-6">
+        <div className="p-4 sm:p-6">
           <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">공과금 (세금과공과 제외)</div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-start gap-2">
             <button onClick={() => setShowUtilityDetails(!showUtilityDetails)} className="p-1 rounded-full hover:bg-slate-100 text-slate-400 transition-colors">
               {showUtilityDetails ? <ChevronDown size={24} /> : <ChevronRight size={24} />}
             </button>
-            <h2 className="text-xl font-bold text-slate-800">이번달 공과금은 <span className="text-amber-600">{currentMonthUtilitiesTotal.toLocaleString()}원</span> 입니다.</h2>
+            <h2 className="text-lg sm:text-xl font-bold text-slate-800 leading-snug">이번달 공과금은 <span className="text-amber-600">{currentMonthUtilitiesTotal.toLocaleString()}원</span> 입니다.</h2>
           </div>
         </div>
         {showUtilityDetails && (
-          <div className="border-t border-slate-100 bg-slate-50/50 p-6 animate-fade-in">
-            <div className="flex justify-between items-center mb-6">
+          <div className="border-t border-slate-100 bg-slate-50/50 p-4 sm:p-6 animate-fade-in">
+            <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center mb-6">
               <div className="relative">
                 <Calendar className="absolute left-3 top-2.5 text-slate-400" size={16} />
                 <input type="month" value={selectedUtilityMonth} onChange={handleMonthChange} className="pl-10 pr-4 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white text-slate-900" style={{ colorScheme: 'light' }} />
@@ -232,22 +232,25 @@ export default function Dashboard() {
               <div className="text-sm text-slate-500"><span className="font-medium text-slate-700">{selectedUtilityMonth}</span>월 데이터 관리 중</div>
             </div>
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden mb-6">
-              <table className="w-full text-sm text-left">
-                <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
-                  <tr><th className="px-4 py-3">항목명</th><th className="px-4 py-3 text-right">금액</th><th className="px-4 py-3 text-center">유형</th><th className="px-4 py-3 text-center">관리</th></tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {(utilityData[selectedUtilityMonth] || []).length === 0 ? (<tr><td colSpan={4} className="p-8 text-center text-slate-400">등록된 공과금 내역이 없습니다.</td></tr>) : ((utilityData[selectedUtilityMonth] || []).map((item) => (
-                    <tr key={item.id} className="hover:bg-slate-50 group">
-                      <td className="px-4 py-3 font-medium text-slate-700">{item.name}</td>
-                      <td className="px-4 py-3 text-right font-mono text-slate-600">{item.amount.toLocaleString()}원</td>
-                      <td className="px-4 py-3 text-center"><button onClick={() => toggleItemType(item.id)} className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-colors ${item.type === 'recurring' ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' : 'bg-orange-50 text-orange-700 border border-orange-200'}`}>{item.type === 'recurring' ? '🔄 매달 반복' : '⚡ 이번달만'}</button></td>
-                      <td className="px-4 py-3 text-center"><button onClick={() => removeUtilityItem(item.id)} className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"><Trash2 size={16} /></button></td>
-                    </tr>)))}
-                </tbody>
-              </table>
+              <div className="responsive-table-shell">
+                <table className="w-full min-w-[640px] text-sm text-left">
+                  <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
+                    <tr><th className="px-4 py-3">항목명</th><th className="px-4 py-3 text-right">금액</th><th className="px-4 py-3 text-center">유형</th><th className="px-4 py-3 text-center">관리</th></tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {(utilityData[selectedUtilityMonth] || []).length === 0 ? (<tr><td colSpan={4} className="p-8 text-center text-slate-400">등록된 공과금 내역이 없습니다.</td></tr>) : ((utilityData[selectedUtilityMonth] || []).map((item) => (
+                      <tr key={item.id} className="hover:bg-slate-50 group">
+                        <td className="px-4 py-3 font-medium text-slate-700">{item.name}</td>
+                        <td className="px-4 py-3 text-right font-mono text-slate-600">{item.amount.toLocaleString()}원</td>
+                        <td className="px-4 py-3 text-center"><button onClick={() => toggleItemType(item.id)} className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-colors ${item.type === 'recurring' ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' : 'bg-orange-50 text-orange-700 border border-orange-200'}`}>{item.type === 'recurring' ? '🔄 매달 반복' : '⚡ 이번달만'}</button></td>
+                        <td className="px-4 py-3 text-center"><button onClick={() => removeUtilityItem(item.id)} className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"><Trash2 size={16} /></button></td>
+                      </tr>)))}
+                  </tbody>
+                </table>
+              </div>
             </div>
-            <div className="bg-slate-100 p-3 md:p-4 rounded-xl flex flex-col md:flex-row gap-3 md:gap-4 items-end">
+            <p className="responsive-table-hint mb-3 sm:hidden">표는 좌우로 밀어서 확인할 수 있습니다.</p>
+            <div className="bg-slate-100 p-3 md:p-4 rounded-xl flex flex-col md:flex-row gap-3 md:gap-4 items-stretch md:items-end">
               <div className="flex-1 w-full"><label className="block text-xs font-medium text-slate-500 mb-1">항목 이름</label><input type="text" placeholder="예: 인터넷비" value={newItemName} onChange={(e) => setNewItemName(e.target.value)} className="w-full p-2.5 md:p-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-blue-500 text-slate-900 shadow-sm" /></div>
               <div className="w-full md:w-32"><label className="block text-xs font-medium text-slate-500 mb-1">금액 (원)</label><input type="number" placeholder="0" value={newItemAmount} onChange={(e) => setNewItemAmount(e.target.value)} className="w-full p-2.5 md:p-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-blue-500 text-right text-slate-900 shadow-sm" /></div>
               <div className="w-full md:w-40"><label className="block text-xs font-medium text-slate-500 mb-1">반복 여부</label><div className="flex bg-white rounded-lg border border-slate-300 p-1 shadow-sm"><button onClick={() => setNewItemType('recurring')} className={`flex-1 text-xs py-1.5 rounded-md ${newItemType === 'recurring' ? 'bg-indigo-100 text-indigo-700 font-bold' : 'text-slate-400'}`}>매달</button><button onClick={() => setNewItemType('onetime')} className={`flex-1 text-xs py-1.5 rounded-md ${newItemType === 'onetime' ? 'bg-orange-100 text-orange-700 font-bold' : 'text-slate-400'}`}>이번달</button></div></div>

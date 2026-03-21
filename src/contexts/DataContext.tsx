@@ -22,6 +22,8 @@ interface DataContextType {
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
+const STORE_PROFILE_STORAGE_KEY = 'erp_store_profile';
+const APP_SETTINGS_STORAGE_KEY = 'erp_app_settings';
 
 // API 응답을 프론트엔드 타입으로 변환
 const transformSale = (apiSale: Sale): SaleItem => ({
@@ -57,23 +59,51 @@ export const DataProvider = ({ children }: { children?: ReactNode }) => {
     const [error, setError] = useState<string | null>(null);
 
     // Default Profile
-    const [storeProfile, setStoreProfile] = useState<StoreProfile>({
-        name: "Coffee ERP",
-        ceoName: "홍길동",
-        foundedYear: "2023",
-        location: "서울시 강남구 테헤란로 123",
-        contact: "02-1234-5678"
+    const [storeProfile, setStoreProfile] = useState<StoreProfile>(() => {
+        const defaultProfile: StoreProfile = {
+            name: "Coffee ERP",
+            ceoName: "홍길동",
+            foundedYear: "2023",
+            location: "서울시 강남구 테헤란로 123",
+            contact: "02-1234-5678"
+        };
+
+        try {
+            const saved = localStorage.getItem(STORE_PROFILE_STORAGE_KEY);
+            return saved ? { ...defaultProfile, ...JSON.parse(saved) } : defaultProfile;
+        } catch {
+            return defaultProfile;
+        }
     });
 
     // Default Settings
-    const [appSettings, setAppSettings] = useState<AppSettings>({
-        themeColor: 'blue',
-        darkMode: false,
-        fontSize: 'medium',
-        notifications: {
-            lowStock: true,
-            dailyReport: true,
-            marketing: false
+    const [appSettings, setAppSettings] = useState<AppSettings>(() => {
+        const defaultSettings: AppSettings = {
+            themeColor: 'blue',
+            darkMode: false,
+            fontSize: 'medium',
+            notifications: {
+                lowStock: true,
+                dailyReport: true,
+                marketing: false
+            }
+        };
+
+        try {
+            const saved = localStorage.getItem(APP_SETTINGS_STORAGE_KEY);
+            if (!saved) return defaultSettings;
+
+            const parsed = JSON.parse(saved) as Partial<AppSettings>;
+            return {
+                ...defaultSettings,
+                ...parsed,
+                notifications: {
+                    ...defaultSettings.notifications,
+                    ...parsed.notifications
+                }
+            };
+        } catch {
+            return defaultSettings;
         }
     });
 
@@ -109,6 +139,14 @@ export const DataProvider = ({ children }: { children?: ReactNode }) => {
         fetchData();
     }, []);
 
+    useEffect(() => {
+        localStorage.setItem(STORE_PROFILE_STORAGE_KEY, JSON.stringify(storeProfile));
+    }, [storeProfile]);
+
+    useEffect(() => {
+        localStorage.setItem(APP_SETTINGS_STORAGE_KEY, JSON.stringify(appSettings));
+    }, [appSettings]);
+
     const addSale = (newSale: SaleItem) => {
         setSales(prev => [...prev, newSale]);
     };
@@ -122,7 +160,14 @@ export const DataProvider = ({ children }: { children?: ReactNode }) => {
     };
 
     const updateAppSettings = (settings: Partial<AppSettings>) => {
-        setAppSettings(prev => ({ ...prev, ...settings }));
+        setAppSettings(prev => ({
+            ...prev,
+            ...settings,
+            notifications: {
+                ...prev.notifications,
+                ...(settings.notifications || {})
+            }
+        }));
     };
 
     return (
