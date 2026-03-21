@@ -6,7 +6,7 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import type { InventoryItem, SaleItem } from '../types';
 import { useData } from '../contexts/DataContext';
-import { aiApi, type AIStatus } from '../services/api';
+import { aiApi, recipeCostApi, type AIStatus, type RecipeCost } from '../services/api';
 import {
   AlertCircle,
   AlertTriangle,
@@ -32,7 +32,7 @@ interface AIAssistantProps {
   isWidget?: boolean;
 }
 
-type AssistantMode = 'briefing' | 'inventory' | 'sales' | 'growth';
+type AssistantMode = 'briefing' | 'inventory' | 'sales' | 'margin' | 'growth';
 type InsightTone = 'critical' | 'opportunity' | 'info';
 
 interface ProductSummary {
@@ -47,6 +47,12 @@ interface StockRiskItem extends InventoryItem {
   coverage: number;
 }
 
+interface RecipeInsight extends RecipeCost {
+  recentQty: number;
+  contributionMargin: number;
+  estimatedContribution: number;
+}
+
 interface AnalyticsSnapshot {
   latestDateLabel: string;
   recentRangeLabel: string;
@@ -59,6 +65,12 @@ interface AnalyticsSnapshot {
   topProduct: ProductSummary | null;
   peakWeekday: { label: string; revenue: number } | null;
   peakHour: { label: string; revenue: number } | null;
+  recipeCount: number;
+  avgCostRatio: number;
+  riskyRecipes: RecipeInsight[];
+  watchRecipes: RecipeInsight[];
+  topRiskRecipe: RecipeInsight | null;
+  bestMarginRecipe: RecipeInsight | null;
   briefing: string;
 }
 
@@ -81,6 +93,7 @@ const MODE_LABELS: Record<AssistantMode, { title: string; caption: string }> = {
   briefing: { title: '경영 브리핑', caption: '대표가 바로 볼 숫자와 리스크' },
   inventory: { title: '재고 운영', caption: '저재고와 발주 우선순위' },
   sales: { title: '매출 해석', caption: '피크 시간과 베스트 메뉴' },
+  margin: { title: '마진 관리', caption: '원가율과 수익성 위험 관리' },
   growth: { title: '성장 액션', caption: '프로모션과 객단가 개선 아이디어' }
 };
 
@@ -97,7 +110,51 @@ const getHourLabel = (hour: number) => {
   return `${String(hour).padStart(2, '0')}:00-${String(nextHour).padStart(2, '0')}:00`;
 };
 
-const buildAnalyticsSnapshot = (sales: SaleItem[], inventory: InventoryItem[]): AnalyticsSnapshot => {
+const buildRecipeInsights = (recipes: RecipeCost[], recentMenuQtyMap: Map<string, number>) => {
+  const recipeInsights: RecipeInsight[] = recipes.map(recipe => {
+    const recentQty = recentMenuQtyMap.get(recipe.menu_name) || 0;
+    const contributionMargin = recipe.selling_price - recipe.total_cost;
+
+    return {
+      ...recipe,
+      recentQty,
+      contributionMargin,
+      estimatedContribution: recentQty * contributionMargin
+    };
+  });
+
+  const riskyRecipes = recipeInsights
+    .filter(recipe => recipe.status === 'danger' || recipe.cost_ratio >= 33)
+    .sort((a, b) => b.cost_ratio - a.cost_ratio);
+
+  const watchRecipes = recipeInsights
+    .filter(recipe => !riskyRecipes.some(risky => risky.menu_name === recipe.menu_name) && (recipe.status === 'needs_check' || recipe.cost_ratio >= 28))
+    .sort((a, b) => b.cost_ratio - a.cost_ratio);
+
+  const bestMarginRecipe = [...recipeInsights]
+    .filter(recipe => recipe.contributionMargin > 0)
+    .sort((a, b) => {
+      if (b.estimatedContribution !== a.estimatedContribution) {
+        return b.estimatedContribution - a.estimatedContribution;
+      }
+      return b.contributionMargin - a.contributionMargin;
+    })[0] || null;
+
+  const avgCostRatio = recipeInsights.length > 0
+    ? recipeInsights.reduce((sum, recipe) => sum + recipe.cost_ratio, 0) / recipeInsights.length
+    : 0;
+
+  return {
+    recipeCount: recipeInsights.length,
+    avgCostRatio,
+    riskyRecipes,
+    watchRecipes,
+    topRiskRecipe: riskyRecipes[0] || null,
+    bestMarginRecipe
+  };
+};
+
+const buildAnalyticsSnapshot = (sales: SaleItem[], inventory: InventoryItem[], recipes: RecipeCost[]): AnalyticsSnapshot => {
   const lowStockItems = inventory
     .filter(item => item.safetyStock > 0 && item.currentStock < item.safetyStock)
     .map(item => ({
@@ -112,6 +169,7 @@ const buildAnalyticsSnapshot = (sales: SaleItem[], inventory: InventoryItem[]): 
     item.currentStock >= item.safetyStock &&
     item.currentStock <= item.safetyStock * 1.2
   ).length;
+  const initialRecipeSnapshot = buildRecipeInsights(recipes, new Map<string, number>());
 
   if (sales.length === 0) {
     return {
@@ -126,9 +184,12 @@ const buildAnalyticsSnapshot = (sales: SaleItem[], inventory: InventoryItem[]): 
       topProduct: null,
       peakWeekday: null,
       peakHour: null,
+      ...initialRecipeSnapshot,
       briefing: lowStockItems.length > 0
-        ? `매출 데이터는 아직 없지만, 저재고 ${lowStockItems.length}개 품목은 먼저 확인할 필요가 있습니다.`
-        : '매출 데이터가 아직 없어 초기 브리핑을 준비하지 못했습니다. 판매 데이터가 쌓이면 AI가 패턴을 읽기 시작합니다.'
+        ? `매출 데이터는 아직 없지만, 저재고 ${lowStockItems.length}개 품목은 먼저 확인할 필요가 있습니다.${initialRecipeSnapshot.topRiskRecipe ? ` 원가율 경고 메뉴는 ${initialRecipeSnapshot.topRiskRecipe.menu_name} ${initialRecipeSnapshot.topRiskRecipe.cost_ratio.toFixed(1)}%입니다.` : ''}`
+        : initialRecipeSnapshot.recipeCount > 0
+          ? `매출 데이터는 아직 적지만, 레시피 ${initialRecipeSnapshot.recipeCount}개가 연결되어 평균 원가율은 ${initialRecipeSnapshot.avgCostRatio.toFixed(1)}%입니다.`
+          : '매출 데이터가 아직 없어 초기 브리핑을 준비하지 못했습니다. 판매 데이터가 쌓이면 AI가 패턴을 읽기 시작합니다.'
     };
   }
 
@@ -156,6 +217,7 @@ const buildAnalyticsSnapshot = (sales: SaleItem[], inventory: InventoryItem[]): 
   const productMap = new Map<string, { revenue: number; qty: number }>();
   const weekdayMap = new Map<string, number>();
   const hourMap = new Map<number, number>();
+  const recentMenuQtyMap = new Map<string, number>();
 
   recentSales.forEach(sale => {
     const existingProduct = productMap.get(sale.itemDetail) || { revenue: 0, qty: 0 };
@@ -171,6 +233,9 @@ const buildAnalyticsSnapshot = (sales: SaleItem[], inventory: InventoryItem[]): 
     const safeHour = Number.isNaN(hour) ? 0 : hour;
     const hourRevenue = hourMap.get(safeHour) || 0;
     hourMap.set(safeHour, hourRevenue + sale.revenue);
+
+    const existingRecentQty = recentMenuQtyMap.get(sale.itemDetail) || 0;
+    recentMenuQtyMap.set(sale.itemDetail, existingRecentQty + sale.qty);
   });
 
   const topProductEntry = [...productMap.entries()].sort((a, b) => b[1].revenue - a[1].revenue)[0];
@@ -187,6 +252,8 @@ const buildAnalyticsSnapshot = (sales: SaleItem[], inventory: InventoryItem[]): 
     ? `${lowStockItems[0].name_ko} 외 ${Math.max(lowStockItems.length - 1, 0)}개`
     : '안정권';
 
+  const recipeSnapshot = buildRecipeInsights(recipes, recentMenuQtyMap);
+
   const briefingParts = [
     `최근 7일 매출은 ${formatCurrency(recentRevenue)}이며 거래는 ${recentOrders}건입니다.`,
     topProduct
@@ -197,7 +264,12 @@ const buildAnalyticsSnapshot = (sales: SaleItem[], inventory: InventoryItem[]): 
       : '시간대별 패턴은 아직 충분히 집계되지 않았습니다.',
     lowStockItems.length > 0
       ? `저재고는 ${lowStockItems.length}개 품목이며 가장 급한 품목은 ${lowStockHeadline}입니다.`
-      : `저재고는 없고, 주시가 필요한 품목은 ${watchlistCount}개입니다.`
+      : `저재고는 없고, 주시가 필요한 품목은 ${watchlistCount}개입니다.`,
+    recipeSnapshot.recipeCount > 0
+      ? recipeSnapshot.topRiskRecipe
+        ? `원가율 경고 메뉴는 ${recipeSnapshot.topRiskRecipe.menu_name}이며 현재 원가율은 ${recipeSnapshot.topRiskRecipe.cost_ratio.toFixed(1)}%입니다.`
+        : `레시피 ${recipeSnapshot.recipeCount}개가 연결되어 있고 평균 원가율은 ${recipeSnapshot.avgCostRatio.toFixed(1)}%입니다.`
+      : '레시피 원가 데이터가 아직 연결되지 않아 마진 분석은 제한적입니다.'
   ];
 
   return {
@@ -212,12 +284,23 @@ const buildAnalyticsSnapshot = (sales: SaleItem[], inventory: InventoryItem[]): 
     topProduct,
     peakWeekday: peakWeekdayEntry ? { label: peakWeekdayEntry[0], revenue: peakWeekdayEntry[1] } : null,
     peakHour: peakHourEntry ? { label: getHourLabel(peakHourEntry[0]), revenue: peakHourEntry[1] } : null,
+    ...recipeSnapshot,
     briefing: briefingParts.join(' ')
   };
 };
 
 const buildInsightCards = (snapshot: AnalyticsSnapshot): InsightCard[] => {
   const cards: InsightCard[] = [];
+
+  if (snapshot.topRiskRecipe) {
+    cards.push({
+      id: 'margin-risk',
+      tone: 'critical',
+      title: `${snapshot.topRiskRecipe.menu_name} 마진 경고`,
+      summary: `원가율 ${snapshot.topRiskRecipe.cost_ratio.toFixed(1)}%, 최근 판매 ${snapshot.topRiskRecipe.recentQty}건입니다.`,
+      prompt: `원가율이 높은 메뉴를 우선순위별로 정리해줘. 특히 ${snapshot.topRiskRecipe.menu_name}를 먼저 보고 가격, 구성, 레시피 조정안을 제안해줘.`
+    });
+  }
 
   if (snapshot.lowStockItems.length > 0) {
     const urgent = snapshot.lowStockItems[0];
@@ -245,6 +328,16 @@ const buildInsightCards = (snapshot: AnalyticsSnapshot): InsightCard[] => {
       title: `${snapshot.topProduct.name} 집중 기회`,
       summary: `최근 7일 매출 비중이 ${snapshot.topProduct.share.toFixed(1)}%입니다.`,
       prompt: `최근 7일 베스트 메뉴인 ${snapshot.topProduct.name}를 중심으로 객단가를 올릴 업셀링 전략 3개를 제안해줘.`
+    });
+  }
+
+  if (snapshot.bestMarginRecipe) {
+    cards.push({
+      id: 'best-margin',
+      tone: 'opportunity',
+      title: `${snapshot.bestMarginRecipe.menu_name} 수익 기회`,
+      summary: `잔당 공헌이익 ${formatCurrency(snapshot.bestMarginRecipe.contributionMargin)}이며 최근 판매 ${snapshot.bestMarginRecipe.recentQty}건입니다.`,
+      prompt: `수익성이 좋은 ${snapshot.bestMarginRecipe.menu_name}를 더 잘 팔 수 있게 진열, 멘트, 세트 전략을 제안해줘.`
     });
   }
 
@@ -305,13 +398,42 @@ const buildModeActions = (mode: AssistantMode, snapshot: AnalyticsSnapshot): Act
           prompt: `현재 데이터 기준으로 매출이 약해질 수 있는 신호를 찾아서 알려줘.`
         }
       ];
+    case 'margin':
+      return [
+        {
+          id: 'margin-risk',
+          label: '원가율 경고 메뉴',
+          description: '가격/레시피 조정이 필요한 메뉴를 정리합니다.',
+          prompt: snapshot.topRiskRecipe
+            ? `원가율이 높은 메뉴를 우선순위대로 정리해줘. 특히 ${snapshot.topRiskRecipe.menu_name}는 왜 위험한지와 바로 할 수정 액션을 알려줘.`
+            : '현재 메뉴별 원가율을 점검해서 위험 메뉴와 즉시 확인할 항목을 정리해줘.'
+        },
+        {
+          id: 'margin-price',
+          label: '가격 조정 초안',
+          description: '값을 올릴지, 구성을 바꿀지 판단합니다.',
+          prompt: snapshot.topRiskRecipe
+            ? `${snapshot.topRiskRecipe.menu_name}의 원가율을 안정권으로 돌릴 가격 또는 구성 조정안을 제안해줘.`
+            : '현재 레시피 데이터 기준으로 가격 또는 구성 조정이 필요한 메뉴를 찾아줘.'
+        },
+        {
+          id: 'margin-opportunity',
+          label: '수익성 좋은 메뉴 활용',
+          description: '잘 남는 메뉴를 더 밀 수 있는 실행안을 봅니다.',
+          prompt: snapshot.bestMarginRecipe
+            ? `${snapshot.bestMarginRecipe.menu_name}가 수익성이 좋은데 더 잘 팔기 위한 진열, 멘트, 세트 전략을 제안해줘.`
+            : '수익성이 좋은 메뉴를 더 잘 팔 수 있는 운영 아이디어를 제안해줘.'
+        }
+      ];
     case 'growth':
       return [
         {
           id: 'growth-upsell',
           label: '객단가 상승 아이디어',
           description: '잘 팔리는 메뉴를 활용한 조합을 제안합니다.',
-          prompt: `현재 베스트 메뉴와 판매 패턴을 기준으로 객단가를 높일 조합 전략 3개를 제안해줘.`
+          prompt: snapshot.bestMarginRecipe
+            ? `현재 판매 패턴과 수익성이 좋은 ${snapshot.bestMarginRecipe.menu_name}를 기준으로 객단가를 높일 조합 전략 3개를 제안해줘.`
+            : '현재 베스트 메뉴와 판매 패턴을 기준으로 객단가를 높일 조합 전략 3개를 제안해줘.'
         },
         {
           id: 'growth-promo',
@@ -376,7 +498,12 @@ const buildLocalFallbackResponse = (
       : '- 피크 타이밍: 아직 패턴을 읽기 위한 데이터가 부족합니다.',
     snapshot.lowStockCount > 0
       ? `- 저재고: ${snapshot.lowStockCount}개 품목 (${topLowStocks})`
-      : `- 재고 상태: 안전재고 미만 없음, 관찰 필요 ${snapshot.watchlistCount}개 / 전체 ${inventoryCount}개 품목`
+      : `- 재고 상태: 안전재고 미만 없음, 관찰 필요 ${snapshot.watchlistCount}개 / 전체 ${inventoryCount}개 품목`,
+    snapshot.recipeCount > 0
+      ? snapshot.topRiskRecipe
+        ? `- 마진 경고: ${snapshot.topRiskRecipe.menu_name} 원가율 ${snapshot.topRiskRecipe.cost_ratio.toFixed(1)}%`
+        : `- 원가 상태: 레시피 ${snapshot.recipeCount}개 / 평균 원가율 ${snapshot.avgCostRatio.toFixed(1)}%`
+      : '- 마진 상태: 레시피 원가 데이터가 아직 연결되지 않았습니다.'
   ];
 
   if (hasKeyword(normalized, ['재고', '발주', 'stock', 'inventory'])) {
@@ -414,10 +541,14 @@ const buildLocalFallbackResponse = (
       ...briefingLines,
       '',
       '권장 액션',
-      snapshot.topProduct
-        ? `1. ${snapshot.topProduct.name}와 잘 붙는 추가 메뉴를 묶어 객단가 테스트를 하세요.`
-        : '1. 먼저 상위 판매 메뉴를 확정해야 프로모션 효율이 올라갑니다.',
-      '2. 피크 시간 직전 30분에만 적용하는 짧은 프로모션으로 운영 부담을 줄이세요.',
+      snapshot.bestMarginRecipe
+        ? `1. ${snapshot.bestMarginRecipe.menu_name}를 중심으로 추가 메뉴를 묶어 객단가 테스트를 하세요.`
+        : snapshot.topProduct
+          ? `1. ${snapshot.topProduct.name}와 잘 붙는 추가 메뉴를 묶어 객단가 테스트를 하세요.`
+          : '1. 먼저 상위 판매 메뉴를 확정해야 프로모션 효율이 올라갑니다.',
+      snapshot.bestMarginRecipe
+        ? `2. ${snapshot.bestMarginRecipe.menu_name}는 잔당 ${formatCurrency(snapshot.bestMarginRecipe.contributionMargin)} 남기므로 우선 노출 가치가 높습니다.`
+        : '2. 피크 시간 직전 30분에만 적용하는 짧은 프로모션으로 운영 부담을 줄이세요.',
       '3. 재고 안정권 품목을 활용한 한정 제안으로 폐기 리스크를 낮추세요.'
     ].join('\n');
   }
@@ -426,15 +557,23 @@ const buildLocalFallbackResponse = (
     return [
       ...briefingLines,
       '',
-      '참고',
-      '- 정확한 메뉴별 마진 분석은 원가/레시피 데이터가 함께 연결될 때 가장 정확합니다.',
-      '- 현재는 매출/판매 흐름 기준으로 강한 메뉴와 위험 재고를 먼저 보는 것이 안전합니다.',
-      '',
-      '권장 액션',
-      '1. 상위 판매 메뉴의 원가율을 우선 검증하세요.',
-      '2. 저재고 품목이 포함된 메뉴는 판매 기회 손실을 먼저 막으세요.',
-      '3. 베스트 메뉴를 기준으로 가격, 옵션, 세트 전략을 검토하세요.'
-    ].join('\n');
+      ...(snapshot.recipeCount > 0
+        ? [
+          '권장 액션',
+          snapshot.topRiskRecipe
+            ? `1. ${snapshot.topRiskRecipe.menu_name}의 원가율 ${snapshot.topRiskRecipe.cost_ratio.toFixed(1)}%부터 먼저 조정하세요.`
+            : '1. 현재 원가율이 높은 메뉴부터 우선순위를 정리하세요.',
+          snapshot.bestMarginRecipe
+            ? `2. ${snapshot.bestMarginRecipe.menu_name}는 잔당 ${formatCurrency(snapshot.bestMarginRecipe.contributionMargin)} 남기므로 노출 우선순위를 높이세요.`
+            : '2. 공헌이익이 높은 메뉴를 전면에 배치하세요.',
+          `3. 원가율 경고 ${snapshot.riskyRecipes.length}개, 관찰 메뉴 ${snapshot.watchRecipes.length}개를 주간 점검 대상으로 두세요.`
+        ]
+        : [
+          '참고',
+          '- 정확한 메뉴별 마진 분석은 원가/레시피 데이터가 함께 연결될 때 가장 정확합니다.',
+          '- 현재는 매출/판매 흐름 기준으로 강한 메뉴와 위험 재고를 먼저 보는 것이 안전합니다.'
+        ])
+    ].filter(Boolean).join('\n');
   }
 
   return [
@@ -443,7 +582,7 @@ const buildLocalFallbackResponse = (
     '권장 액션',
     '1. 경영 브리핑으로 오늘 볼 숫자를 먼저 정리하세요.',
     '2. 재고 운영 모드에서 저재고와 발주 리스크를 확인하세요.',
-    '3. 성장 액션 모드에서 바로 실행할 업셀링/프로모션 아이디어를 실험하세요.'
+    '3. 마진 관리 또는 성장 액션 모드에서 원가율 조정과 업셀링 아이디어를 확인하세요.'
   ].join('\n');
 };
 
@@ -460,23 +599,27 @@ const getInsightToneClasses = (tone: InsightTone) => {
 };
 
 export default function AIAssistant({ isWidget = false }: AIAssistantProps) {
-  const { sales, inventory, storeProfile } = useData();
+  const { sales, inventory, storeProfile, refetch } = useData();
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'assistant',
       content: '안녕하세요. 저는 경영 코파일럿입니다. 위 브리핑과 추천 액션을 눌러 바로 재고, 매출, 성장 포인트를 확인해보세요.'
     }
   ]);
+  const [recipes, setRecipes] = useState<RecipeCost[]>([]);
   const [input, setInput] = useState('');
   const [isThinking, setIsThinking] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
+  const [recipeError, setRecipeError] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [aiStatus, setAiStatus] = useState<AIStatus | null>(null);
   const [isStatusLoading, setIsStatusLoading] = useState(true);
+  const [isRecipeLoading, setIsRecipeLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [activeMode, setActiveMode] = useState<AssistantMode>('briefing');
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const snapshot = useMemo(() => buildAnalyticsSnapshot(sales, inventory), [sales, inventory]);
+  const snapshot = useMemo(() => buildAnalyticsSnapshot(sales, inventory, recipes), [sales, inventory, recipes]);
   const insightCards = useMemo(() => buildInsightCards(snapshot), [snapshot]);
   const actionCards = useMemo(() => buildModeActions(activeMode, snapshot), [activeMode, snapshot]);
 
@@ -489,6 +632,13 @@ export default function AIAssistant({ isWidget = false }: AIAssistantProps) {
 
     return providers.length > 0 ? `${providers.join(' / ')} 연결됨` : '로컬 분석 준비됨';
   }, [aiStatus, isStatusLoading]);
+
+  const dataStatusLabel = useMemo(() => {
+    if (isRecipeLoading) return '원가 데이터 동기화 중';
+    if (recipeError) return '매출·재고 기준으로 분석 중';
+    if (snapshot.recipeCount > 0) return `원가 레시피 ${snapshot.recipeCount}개 연결`;
+    return '원가 데이터 미연결';
+  }, [isRecipeLoading, recipeError, snapshot.recipeCount]);
 
   const summaryCards = [
     {
@@ -509,6 +659,12 @@ export default function AIAssistant({ isWidget = false }: AIAssistantProps) {
       value: `${snapshot.lowStockCount}개`,
       icon: Package
     },
+    ...(snapshot.recipeCount > 0 ? [{
+      id: 'margin',
+      label: '원가율 경고 메뉴',
+      value: `${snapshot.riskyRecipes.length}개`,
+      icon: AlertTriangle
+    }] : []),
     {
       id: 'peak',
       label: '피크 시간대',
@@ -544,9 +700,38 @@ export default function AIAssistant({ isWidget = false }: AIAssistantProps) {
     }
   };
 
+  const loadRecipeCosts = async () => {
+    setIsRecipeLoading(true);
+    setRecipeError(null);
+
+    try {
+      const response = await recipeCostApi.getAll();
+      setRecipes(response.data);
+    } catch (error) {
+      console.error('Recipe cost load error:', error);
+      setRecipes([]);
+      setRecipeError('레시피 원가 데이터를 불러오지 못했습니다.');
+    } finally {
+      setIsRecipeLoading(false);
+    }
+  };
+
   useEffect(() => {
     loadAIStatus();
+    loadRecipeCosts();
   }, []);
+
+  const refreshCopilot = async () => {
+    setIsRefreshing(true);
+
+    await Promise.allSettled([
+      refetch(),
+      loadAIStatus(),
+      loadRecipeCosts()
+    ]);
+
+    setIsRefreshing(false);
+  };
 
   const buildERPContext = (userMsg: string) => {
     const lowStockSummary = snapshot.lowStockItems.length > 0
@@ -559,6 +744,12 @@ export default function AIAssistant({ isWidget = false }: AIAssistantProps) {
     const topMenuSummary = snapshot.topProduct
       ? `${snapshot.topProduct.name} (${snapshot.topProduct.share.toFixed(1)}%, ${formatCurrency(snapshot.topProduct.revenue)})`
       : '집계 불가';
+
+    const marginSummary = snapshot.recipeCount > 0
+      ? snapshot.topRiskRecipe
+        ? `${snapshot.topRiskRecipe.menu_name} 경고 (${snapshot.topRiskRecipe.cost_ratio.toFixed(1)}%), 평균 원가율 ${snapshot.avgCostRatio.toFixed(1)}%`
+        : `평균 원가율 ${snapshot.avgCostRatio.toFixed(1)}%, 경고 메뉴 없음`
+      : '레시피 원가 데이터 미연결';
 
     return `
 [역할]
@@ -578,6 +769,8 @@ export default function AIAssistant({ isWidget = false }: AIAssistantProps) {
 - 피크 시간: ${snapshot.peakHour?.label || '집계 중'}
 - 저재고 품목 수: ${snapshot.lowStockCount}개
 - 저재고 상세: ${lowStockSummary}
+- 마진 상태: ${marginSummary}
+- 수익성 좋은 메뉴: ${snapshot.bestMarginRecipe ? `${snapshot.bestMarginRecipe.menu_name} (잔당 ${formatCurrency(snapshot.bestMarginRecipe.contributionMargin)})` : '집계 중'}
 - 전체 재고 품목 수: ${inventory.length}개
 
 [응답 방식]
@@ -654,17 +847,17 @@ ${userMsg}
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={loadAIStatus}
+              onClick={refreshCopilot}
               className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] text-slate-500 hover:bg-slate-50 transition-colors"
               type="button"
             >
-              <RefreshCw size={12} className={isStatusLoading ? 'animate-spin' : ''} />
-              상태 새로고침
+              <RefreshCw size={12} className={isRefreshing ? 'animate-spin' : ''} />
+              데이터 새로고침
             </button>
-            {apiError && (
+            {(apiError || recipeError) && (
               <div className="flex items-center gap-1 text-amber-600 text-xs">
                 <AlertCircle size={14} />
-                <span>실시간 연결 이슈</span>
+                <span>일부 데이터 연결 이슈</span>
               </div>
             )}
           </div>
@@ -679,11 +872,25 @@ ${userMsg}
                 <Sparkles size={13} />
                 <span>{statusLabel}</span>
               </div>
+              <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-medium backdrop-blur-sm">
+                <BarChart3 size={13} />
+                <span>{dataStatusLabel}</span>
+              </div>
               <div>
                 <h3 className="text-lg sm:text-xl font-bold">{storeProfile.name} AI 브리핑</h3>
                 <p className="mt-1 text-sm text-blue-100 leading-relaxed">
                   {snapshot.briefing}
                 </p>
+                {snapshot.recipeCount > 0 && (
+                  <p className="mt-2 text-xs text-blue-100/85 leading-relaxed">
+                    {snapshot.topRiskRecipe
+                      ? `마진 경고: ${snapshot.topRiskRecipe.menu_name} ${snapshot.topRiskRecipe.cost_ratio.toFixed(1)}%`
+                      : `평균 원가율 ${snapshot.avgCostRatio.toFixed(1)}%, 경고 메뉴 없음`}
+                    {snapshot.bestMarginRecipe
+                      ? ` · 수익성 좋은 메뉴: ${snapshot.bestMarginRecipe.menu_name}`
+                      : ''}
+                  </p>
+                )}
               </div>
             </div>
             <div className="text-xs text-blue-100/80">
@@ -691,7 +898,7 @@ ${userMsg}
             </div>
           </div>
 
-          <div className={`mt-4 grid gap-2 ${isWidget ? 'grid-cols-2' : 'grid-cols-2 xl:grid-cols-4'}`}>
+          <div className={`mt-4 grid gap-2 ${isWidget ? 'grid-cols-2' : snapshot.recipeCount > 0 ? 'grid-cols-2 xl:grid-cols-5' : 'grid-cols-2 xl:grid-cols-4'}`}>
             {summaryCards.map(card => {
               const Icon = card.icon;
               return (
@@ -841,9 +1048,11 @@ ${userMsg}
             <span className={isMobile ? '' : 'hidden lg:inline'}>분석 요청</span>
           </button>
         </div>
-        {apiError && (
+        {(apiError || recipeError) && (
           <p className="mt-2 text-xs text-amber-600">
-            실시간 응답에 실패해도 로컬 분석으로 계속 답변합니다. 상세 오류: {apiError}
+            {apiError
+              ? `실시간 응답에 실패해도 로컬 분석으로 계속 답변합니다. 상세 오류: ${apiError}`
+              : recipeError}
           </p>
         )}
       </div>

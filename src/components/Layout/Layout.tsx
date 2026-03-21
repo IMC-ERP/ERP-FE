@@ -14,6 +14,8 @@ import {
   Home,
   ClipboardList,
   ChefHat,
+  ScrollText,
+  BookOpen,
   Settings,
   HelpCircle,
   X,
@@ -116,11 +118,14 @@ export default function Layout() {
   const navItems = [
     { to: '/', icon: Home, label: '홈' },
     { to: '/dashboard', icon: LayoutDashboard, label: '경영 현황' },
+    { to: '/sales', icon: ScrollText, label: '매출 입력' },
     { to: '/period', icon: Calendar, label: '매출 분석' },
     { to: '/transactions', icon: ClipboardList, label: '거래 데이터 관리' },
     { to: '/inventory', icon: Package, label: '재고 관리' },
     { to: '/cost-recipe', icon: ChefHat, label: '원가/레시피 관리' },
-    { to: '/kpi', icon: BarChart3, label: 'KPI 현황' }
+    { to: '/recipes', icon: BookOpen, label: '메뉴 레시피' },
+    { to: '/kpi', icon: BarChart3, label: 'KPI 현황' },
+    { to: '/ai', icon: Bot, label: 'AI 코파일럿' }
   ];
 
   return (

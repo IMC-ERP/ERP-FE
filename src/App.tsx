@@ -4,7 +4,7 @@
  */
 
 import { lazy, Suspense } from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { DataProvider, useData } from './contexts/DataContext';
 import { AuthProvider } from './contexts/AuthContext';
 import Layout from './components/Layout/Layout';
@@ -176,7 +176,10 @@ function App() {
                   </Suspense>
                 )}
               />
+              <Route path="*" element={<Navigate to="/" replace />} />
             </Route>
+
+            <Route path="*" element={<Navigate to="/login" replace />} />
           </Routes>
         </BrowserRouter>
       </DataProvider>
