@@ -198,6 +198,7 @@ export default function Sales() {
                   <button
                     onClick={() => sale.id && handleDelete(sale.id)}
                     className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
+                    aria-label={`${sale.상품상세} 판매 내역 삭제`}
                   >
                     <Trash2 size={14} />
                   </button>
@@ -238,6 +239,7 @@ export default function Sales() {
                       <button
                         onClick={() => sale.id && handleDelete(sale.id)}
                         className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
+                        aria-label={`${sale.상품상세} 판매 내역 삭제`}
                       >
                         <Trash2 size={16} />
                       </button>

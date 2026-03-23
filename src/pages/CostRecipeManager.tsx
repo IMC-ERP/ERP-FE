@@ -116,7 +116,7 @@ const AddMaterialModal = ({
                     <h3 className="font-bold text-slate-800 text-lg flex items-center gap-2">
                         <Archive size={20} className="text-indigo-600" /> 새 원재료 추가
                     </h3>
-                    <button onClick={onClose} className="p-1 rounded-full hover:bg-slate-200 text-slate-500 transition-colors">
+                    <button onClick={onClose} className="p-1 rounded-full hover:bg-slate-200 text-slate-500 transition-colors" aria-label="원재료 추가 모달 닫기">
                         <X size={20} />
                     </button>
                 </div>
@@ -339,7 +339,7 @@ const AddRecipeModal = ({
                     <h3 className="font-bold text-slate-800 text-lg flex items-center gap-2">
                         <Plus size={20} className="text-indigo-600" /> 새 메뉴 추가
                     </h3>
-                    <button onClick={onClose} className="p-1 rounded-full hover:bg-slate-200 text-slate-500 transition-colors">
+                    <button onClick={onClose} className="p-1 rounded-full hover:bg-slate-200 text-slate-500 transition-colors" aria-label="메뉴 추가 모달 닫기">
                         <X size={20} />
                     </button>
                 </div>
@@ -463,6 +463,7 @@ const AddRecipeModal = ({
                                                     <button
                                                         onClick={() => handleRemoveIngredient(ing.id)}
                                                         className="text-slate-400 hover:text-red-500"
+                                                        aria-label={`${mat?.name ?? '재료'} 재료 행 삭제`}
                                                     >
                                                         <Trash2 size={16} />
                                                     </button>
@@ -573,6 +574,7 @@ const RecipeRow = ({
                     <button
                         onClick={(e) => { e.stopPropagation(); onDelete(recipe.id); }}
                         className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors"
+                        aria-label={`${recipe.name} 레시피 삭제`}
                     >
                         <Trash2 size={18} />
                     </button>
@@ -652,6 +654,7 @@ const RecipeRow = ({
                                                 <button
                                                     onClick={() => onRemoveIngredient(recipe.id, ing.id)}
                                                     className="text-slate-400 hover:text-red-500"
+                                                    aria-label={`${recipe.name}의 ${mat?.name ?? '재료'} 삭제`}
                                                 >
                                                     <Trash2 size={16} />
                                                 </button>
@@ -785,12 +788,14 @@ const MaterialTable = ({ materials, onUpdate, onDelete, onSave }: MaterialTableP
                                                 onClick={() => onSave(mat)}
                                                 className="text-slate-300 hover:text-indigo-600 transition-colors"
                                                 title="저장"
+                                                aria-label={`${mat.name} 원재료 저장`}
                                             >
                                                 <Save size={16} />
                                             </button>
                                             <button
                                                 onClick={() => onDelete(mat.id)}
                                                 className="text-slate-300 hover:text-red-500 transition-colors"
+                                                aria-label={`${mat.name} 원재료 삭제`}
                                             >
                                                 <Trash2 size={16} />
                                             </button>

@@ -144,6 +144,7 @@ export default function Dashboard() {
                 <button
                   onClick={() => setShowProfitDetails(!showProfitDetails)}
                   className="self-start sm:self-auto sm:mb-2 p-1 rounded-full hover:bg-white/20 transition-colors"
+                  aria-label={showProfitDetails ? '수익성 상세 접기' : '수익성 상세 펼치기'}
                 >
                   {showProfitDetails ? <ChevronDown size={28} /> : <ChevronRight size={28} />}
                 </button>
@@ -163,6 +164,7 @@ export default function Dashboard() {
                     <button
                       onClick={() => setIncludeUtilities(!includeUtilities)}
                       className={`relative w-8 h-4 rounded-full transition-colors duration-200 ${includeUtilities ? 'bg-slate-700' : 'bg-slate-300'}`}
+                      aria-label={includeUtilities ? '공과금 포함 끄기' : '공과금 포함 켜기'}
                     >
                       <div className={`absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full shadow-sm transition-transform duration-200 ${includeUtilities ? 'translate-x-4' : 'translate-x-0'}`} />
                     </button>
@@ -216,7 +218,7 @@ export default function Dashboard() {
         <div className="p-4 sm:p-6">
           <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">공과금 (세금과공과 제외)</div>
           <div className="flex items-start gap-2">
-            <button onClick={() => setShowUtilityDetails(!showUtilityDetails)} className="p-1 rounded-full hover:bg-slate-100 text-slate-400 transition-colors">
+            <button onClick={() => setShowUtilityDetails(!showUtilityDetails)} className="p-1 rounded-full hover:bg-slate-100 text-slate-400 transition-colors" aria-label={showUtilityDetails ? '공과금 상세 접기' : '공과금 상세 펼치기'}>
               {showUtilityDetails ? <ChevronDown size={24} /> : <ChevronRight size={24} />}
             </button>
             <h2 className="text-lg sm:text-xl font-bold text-slate-800 leading-snug">이번달 공과금은 <span className="text-amber-600">{currentMonthUtilitiesTotal.toLocaleString()}원</span> 입니다.</h2>
@@ -243,7 +245,7 @@ export default function Dashboard() {
                         <td className="px-4 py-3 font-medium text-slate-700">{item.name}</td>
                         <td className="px-4 py-3 text-right font-mono text-slate-600">{item.amount.toLocaleString()}원</td>
                         <td className="px-4 py-3 text-center"><button onClick={() => toggleItemType(item.id)} className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-colors ${item.type === 'recurring' ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' : 'bg-orange-50 text-orange-700 border border-orange-200'}`}>{item.type === 'recurring' ? '🔄 매달 반복' : '⚡ 이번달만'}</button></td>
-                        <td className="px-4 py-3 text-center"><button onClick={() => removeUtilityItem(item.id)} className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"><Trash2 size={16} /></button></td>
+                        <td className="px-4 py-3 text-center"><button onClick={() => removeUtilityItem(item.id)} className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors" aria-label={`${item.name} 공과금 항목 삭제`}><Trash2 size={16} /></button></td>
                       </tr>)))}
                   </tbody>
                 </table>

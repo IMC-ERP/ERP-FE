@@ -7,7 +7,7 @@ import { createContext, useContext, useState, useEffect, type ReactNode } from '
 import type { SaleItem, InventoryItem, StoreProfile, AppSettings } from '../types';
 import { salesApi, inventoryApi, type Sale, type InventoryItem as APIInventoryItem } from '../services/api';
 import { auth } from '../firebase';
-import { isPreviewModeEnabled } from '../utils/previewMode';
+import { isPreviewModeEnabled, subscribePreviewMode } from '../utils/previewMode';
 
 interface DataContextType {
     sales: SaleItem[];
@@ -25,7 +25,42 @@ interface DataContextType {
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
 const STORE_PROFILE_STORAGE_KEY = 'erp_store_profile';
+const PREVIEW_STORE_PROFILE_STORAGE_KEY = 'erp_store_profile_preview';
 const APP_SETTINGS_STORAGE_KEY = 'erp_app_settings';
+
+const getDefaultStoreProfile = (previewMode: boolean): StoreProfile => (
+    previewMode
+        ? {
+            name: "오렌지 브루 성수점",
+            ceoName: "이재호",
+            foundedYear: "2023",
+            location: "서울시 성동구 연무장길 21",
+            contact: "02-1234-5678"
+        }
+        : {
+            name: "Coffee ERP",
+            ceoName: "홍길동",
+            foundedYear: "2023",
+            location: "서울시 강남구 테헤란로 123",
+            contact: "02-1234-5678"
+        }
+);
+
+const getStoreProfileStorageKey = (previewMode: boolean) => (
+    previewMode ? PREVIEW_STORE_PROFILE_STORAGE_KEY : STORE_PROFILE_STORAGE_KEY
+);
+
+const readStoredProfile = (previewMode: boolean) => {
+    const storageKey = getStoreProfileStorageKey(previewMode);
+    const defaultProfile = getDefaultStoreProfile(previewMode);
+
+    try {
+        const saved = localStorage.getItem(storageKey);
+        return saved ? { ...defaultProfile, ...JSON.parse(saved) } : defaultProfile;
+    } catch {
+        return defaultProfile;
+    }
+};
 
 // API 응답을 프론트엔드 타입으로 변환
 const transformSale = (apiSale: Sale): SaleItem => ({
@@ -59,32 +94,10 @@ export const DataProvider = ({ children }: { children?: ReactNode }) => {
     const [inventory, setInventory] = useState<InventoryItem[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [previewMode, setPreviewMode] = useState(() => isPreviewModeEnabled());
 
     // Default Profile
-    const [storeProfile, setStoreProfile] = useState<StoreProfile>(() => {
-        const defaultProfile: StoreProfile = isPreviewModeEnabled()
-            ? {
-                name: "오렌지 브루 성수점",
-                ceoName: "이재호",
-                foundedYear: "2023",
-                location: "서울시 성동구 연무장길 21",
-                contact: "02-1234-5678"
-            }
-            : {
-                name: "Coffee ERP",
-                ceoName: "홍길동",
-                foundedYear: "2023",
-                location: "서울시 강남구 테헤란로 123",
-                contact: "02-1234-5678"
-        };
-
-        try {
-            const saved = localStorage.getItem(STORE_PROFILE_STORAGE_KEY);
-            return saved ? { ...defaultProfile, ...JSON.parse(saved) } : defaultProfile;
-        } catch {
-            return defaultProfile;
-        }
-    });
+    const [storeProfile, setStoreProfile] = useState<StoreProfile>(() => readStoredProfile(isPreviewModeEnabled()));
 
     // Default Settings
     const [appSettings, setAppSettings] = useState<AppSettings>(() => {
@@ -146,9 +159,17 @@ export const DataProvider = ({ children }: { children?: ReactNode }) => {
     };
 
     useEffect(() => {
-        if (isPreviewModeEnabled()) {
+        const unsubscribePreviewMode = subscribePreviewMode(() => {
+            setPreviewMode(isPreviewModeEnabled());
+        });
+
+        return () => unsubscribePreviewMode();
+    }, []);
+
+    useEffect(() => {
+        if (previewMode) {
             fetchData();
-            return;
+            return () => undefined;
         }
 
         // Auth 상태 변경 감지
@@ -164,11 +185,16 @@ export const DataProvider = ({ children }: { children?: ReactNode }) => {
         });
 
         return () => unsubscribe();
-    }, []);
+    }, [previewMode]);
 
     useEffect(() => {
-        localStorage.setItem(STORE_PROFILE_STORAGE_KEY, JSON.stringify(storeProfile));
-    }, [storeProfile]);
+        setStoreProfile(readStoredProfile(previewMode));
+    }, [previewMode]);
+
+    useEffect(() => {
+        const storageKey = getStoreProfileStorageKey(previewMode);
+        localStorage.setItem(storageKey, JSON.stringify(storeProfile));
+    }, [previewMode, storeProfile]);
 
     useEffect(() => {
         localStorage.setItem(APP_SETTINGS_STORAGE_KEY, JSON.stringify(appSettings));

@@ -837,7 +837,7 @@ export default function Inventory() {
             <div className="upload-header-left">
               <h2>{isMobile ? '영수증 촬영/업로드' : '영수증 이미지 통합 업로드'}</h2>
             </div>
-            <button className="btn-upload-close" onClick={handleCloseManualIntake}>
+            <button className="btn-upload-close" onClick={handleCloseManualIntake} aria-label="이미지 업로드 닫기">
               <X size={20} />
             </button>
           </div>
@@ -1404,7 +1404,7 @@ export default function Inventory() {
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h2>📦 새 재고 품목 등록</h2>
-              <button className="modal-close" onClick={handleCloseModal}>
+              <button className="modal-close" onClick={handleCloseModal} aria-label="재고 품목 등록 모달 닫기">
                 <X size={20} />
               </button>
             </div>

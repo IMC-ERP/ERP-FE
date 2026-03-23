@@ -276,6 +276,7 @@ export default function SettingsPage() {
                                                     ? 'bg-blue-600'
                                                     : 'bg-slate-300'
                                                 }`}
+                                            aria-label={`${item.label} ${appSettings.notifications[item.id as keyof typeof appSettings.notifications] ? '끄기' : '켜기'}`}
                                         >
                                             <div className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow-sm transition-transform ${appSettings.notifications[item.id as keyof typeof appSettings.notifications]
                                                     ? 'left-7'

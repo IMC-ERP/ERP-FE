@@ -6,7 +6,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { clearPreviewMode, setPreviewModeEnabled } from '../utils/previewMode';
+import { clearPreviewMode, isPreviewHost, setPreviewModeEnabled } from '../utils/previewMode';
 
 const LoginPage = () => {
     const { signInWithGoogle } = useAuth();
@@ -17,7 +17,7 @@ const LoginPage = () => {
     const host = typeof window !== 'undefined' ? window.location.hostname : '';
     const isIpHost = /^\d{1,3}(\.\d{1,3}){3}$/.test(host);
     const isMobileViewport = typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches;
-    const allowPreviewMode = Boolean(host === 'localhost' || isIpHost || import.meta.env.DEV);
+    const allowPreviewMode = isPreviewHost();
 
     const handleGoogleAuth = async (_intent: 'login' | 'signup') => {
         setIsLoading(true);

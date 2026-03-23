@@ -324,6 +324,7 @@ export default function Recipes() {
                   <button
                     className="menu-expand-btn"
                     onClick={() => toggleMenu(recipe.menu_name)}
+                    aria-label={expandedMenus.has(recipe.menu_name) ? `${recipe.menu_name} 상세 접기` : `${recipe.menu_name} 상세 펼치기`}
                   >
                     {expandedMenus.has(recipe.menu_name) ? (
                       <ChevronDown size={20} />
@@ -342,6 +343,7 @@ export default function Recipes() {
                     <button
                       className="btn-delete-menu"
                       onClick={() => handleDeleteMenu(recipe.menu_name)}
+                      aria-label={`${recipe.menu_name} 메뉴 삭제`}
                     >
                       <Trash2 size={18} />
                     </button>
@@ -451,6 +453,7 @@ export default function Recipes() {
                           <button
                             className="menu-expand-btn"
                             onClick={() => toggleMenu(recipe.menu_name)}
+                            aria-label={expandedMenus.has(recipe.menu_name) ? `${recipe.menu_name} 상세 접기` : `${recipe.menu_name} 상세 펼치기`}
                           >
                             {expandedMenus.has(recipe.menu_name) ? (
                               <ChevronDown size={20} />
@@ -470,6 +473,7 @@ export default function Recipes() {
                           <button
                             className="btn-delete-menu"
                             onClick={() => handleDeleteMenu(recipe.menu_name)}
+                            aria-label={`${recipe.menu_name} 메뉴 삭제`}
                           >
                             <Trash2 size={18} />
                           </button>
@@ -560,7 +564,7 @@ export default function Recipes() {
                   <p>메뉴 원가와 레시피를 상세히 설정합니다.</p>
                 </div>
               </div>
-              <button className="modal-close-btn" onClick={handleCloseNewMenu}>
+              <button className="modal-close-btn" onClick={handleCloseNewMenu} aria-label="새 메뉴 등록 모달 닫기">
                 <X size={24} />
               </button>
             </div>
@@ -743,6 +747,7 @@ export default function Recipes() {
                               <button
                                 className="btn-remove-ingredient"
                                 onClick={() => handleRemoveIngredient(ingredient.id)}
+                                aria-label={`${ingredient.name || '신규 재료'} 삭제`}
                               >
                                 <Trash2 size={16} />
                               </button>

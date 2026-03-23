@@ -89,6 +89,23 @@ interface ActionCard {
   prompt: string;
 }
 
+interface GuidanceCard {
+  id: string;
+  tone: InsightTone;
+  label: string;
+  title: string;
+  summary: string;
+  detail: string;
+  prompt: string;
+}
+
+interface ChecklistItem {
+  id: string;
+  status: 'urgent' | 'watch' | 'ready';
+  title: string;
+  description: string;
+}
+
 const MODE_LABELS: Record<AssistantMode, { title: string; caption: string }> = {
   briefing: { title: '경영 브리핑', caption: '대표가 바로 볼 숫자와 리스크' },
   inventory: { title: '재고 운영', caption: '저재고와 발주 우선순위' },
@@ -473,6 +490,165 @@ const buildModeActions = (mode: AssistantMode, snapshot: AnalyticsSnapshot): Act
   }
 };
 
+const buildGuidanceCards = (snapshot: AnalyticsSnapshot): GuidanceCard[] => {
+  const cards: GuidanceCard[] = [];
+
+  if (snapshot.lowStockItems.length > 0) {
+    const urgent = snapshot.lowStockItems[0];
+    cards.push({
+      id: 'guide-stock',
+      tone: 'critical',
+      label: '오늘 바로',
+      title: `${urgent.name_ko} 발주 확인`,
+      summary: `안전재고보다 ${urgent.gap}${urgent.uom} 부족합니다.`,
+      detail: `현재 ${urgent.currentStock}${urgent.uom}, 안전 ${urgent.safetyStock}${urgent.uom}입니다. 같은 계열 품목까지 함께 묶어 발주 여부를 점검하세요.`,
+      prompt: `${urgent.name_ko}를 포함한 저재고 품목 발주 우선순위를 정리해줘. 오늘 바로 끊길 수 있는 품목부터 알려줘.`
+    });
+  } else {
+    cards.push({
+      id: 'guide-stock-stable',
+      tone: 'info',
+      label: '재고 안정',
+      title: '긴급 발주 품목 없음',
+      summary: `현재 안전재고 미만은 없고 관찰 대상은 ${snapshot.watchlistCount}개입니다.`,
+      detail: '오늘은 급한 발주보다 안전재고 근처 품목을 묶어 예방 점검하는 편이 효율적입니다.',
+      prompt: `현재 재고 기준으로 예방 발주가 필요한 품목을 정리해줘. 관찰 대상 ${snapshot.watchlistCount}개를 중심으로 알려줘.`
+    });
+  }
+
+  if (snapshot.topRiskRecipe) {
+    cards.push({
+      id: 'guide-margin',
+      tone: 'critical',
+      label: '오늘 바로',
+      title: `${snapshot.topRiskRecipe.menu_name} 원가율 재점검`,
+      summary: `원가율 ${snapshot.topRiskRecipe.cost_ratio.toFixed(1)}%, 최근 판매 ${snapshot.topRiskRecipe.recentQty}건입니다.`,
+      detail: `잔당 공헌이익은 ${formatCurrency(snapshot.topRiskRecipe.contributionMargin)}입니다. 가격, 용량, 토핑 구성 중 무엇을 먼저 손볼지 판단이 필요합니다.`,
+      prompt: `${snapshot.topRiskRecipe.menu_name}의 원가율을 안정권으로 돌리려면 가격, 구성, 레시피 중 무엇을 먼저 조정해야 할지 우선순위를 정리해줘.`
+    });
+  } else if (snapshot.recipeCount > 0) {
+    cards.push({
+      id: 'guide-margin-stable',
+      tone: 'info',
+      label: '마진 안정',
+      title: '원가율 급한 메뉴 없음',
+      summary: `레시피 ${snapshot.recipeCount}개 기준 평균 원가율은 ${snapshot.avgCostRatio.toFixed(1)}%입니다.`,
+      detail: '당장 위험한 메뉴가 없다면 수익성이 좋은 메뉴를 더 잘 보이게 만드는 쪽이 효율적입니다.',
+      prompt: `현재 원가율이 안정적인 상태에서 수익성이 좋은 메뉴를 더 잘 팔 수 있는 실행안을 정리해줘.`
+    });
+  } else {
+    cards.push({
+      id: 'guide-margin-missing',
+      tone: 'info',
+      label: '데이터 확인',
+      title: '레시피 원가 데이터 연결 필요',
+      summary: '매출과 재고는 읽고 있지만 메뉴별 마진 진단은 제한적입니다.',
+      detail: 'AI 코파일럿의 마진 판단을 더 정확하게 만들려면 레시피 원가 데이터 연결이 우선입니다.',
+      prompt: '레시피 원가 데이터가 없을 때도 운영자가 먼저 확인할 수 있는 마진 체크리스트를 정리해줘.'
+    });
+  }
+
+  if (snapshot.bestMarginRecipe) {
+    cards.push({
+      id: 'guide-growth',
+      tone: 'opportunity',
+      label: '오늘 매출',
+      title: `${snapshot.bestMarginRecipe.menu_name} 전면 노출`,
+      summary: `잔당 공헌이익 ${formatCurrency(snapshot.bestMarginRecipe.contributionMargin)}, 최근 판매 ${snapshot.bestMarginRecipe.recentQty}건입니다.`,
+      detail: '수익성이 좋고 최근 판매도 따라오는 메뉴라면 진열, 세트, 멘트 우선순위를 여기에 두는 편이 좋습니다.',
+      prompt: `${snapshot.bestMarginRecipe.menu_name}를 오늘 더 잘 팔기 위한 직원 멘트, 세트 구성, 진열 포인트를 정리해줘.`
+    });
+  } else if (snapshot.topProduct) {
+    cards.push({
+      id: 'guide-top-product',
+      tone: 'opportunity',
+      label: '오늘 매출',
+      title: `${snapshot.topProduct.name} 업셀 조합 설계`,
+      summary: `최근 7일 매출 비중 ${snapshot.topProduct.share.toFixed(1)}%인 핵심 메뉴입니다.`,
+      detail: '베스트 메뉴가 명확하면 추가 메뉴를 붙여 객단가를 올릴 여지가 큽니다.',
+      prompt: `${snapshot.topProduct.name}를 중심으로 객단가를 올릴 업셀 조합과 직원 멘트를 정리해줘.`
+    });
+  }
+
+  if ((snapshot.peakHour || snapshot.peakWeekday) && cards.length < 4) {
+    cards.push({
+      id: 'guide-peak',
+      tone: 'info',
+      label: '피크 전',
+      title: `${snapshot.peakHour?.label || '피크 시간'} 준비 점검`,
+      summary: `${snapshot.peakWeekday?.label || '집계 중'}요일 ${snapshot.peakHour?.label || '시간대 집계 중'}에 강합니다.`,
+      detail: '피크 직전 제조 준비량과 인력 배치만 맞춰도 체감 운영 품질이 확 달라집니다.',
+      prompt: `${snapshot.peakWeekday?.label || '강한 요일'} ${snapshot.peakHour?.label || '피크 시간대'} 전에 준비할 체크리스트를 정리해줘.`
+    });
+  }
+
+  return cards.slice(0, 3);
+};
+
+const buildChecklistItems = (snapshot: AnalyticsSnapshot): ChecklistItem[] => {
+  const items: ChecklistItem[] = [];
+
+  if (snapshot.lowStockItems.length > 0) {
+    const urgent = snapshot.lowStockItems[0];
+    items.push({
+      id: 'check-stock',
+      status: 'urgent',
+      title: `${urgent.name_ko} 발주 결정`,
+      description: `안전재고보다 ${urgent.gap}${urgent.uom} 낮습니다. 오늘 입고 일정부터 확인하세요.`
+    });
+  } else {
+    items.push({
+      id: 'check-stock-ready',
+      status: 'ready',
+      title: '긴급 발주 없음',
+      description: `현재 안전재고 미만은 없고 관찰 대상은 ${snapshot.watchlistCount}개입니다.`
+    });
+  }
+
+  if (snapshot.topRiskRecipe) {
+    items.push({
+      id: 'check-margin',
+      status: 'urgent',
+      title: `${snapshot.topRiskRecipe.menu_name} 원가율 확인`,
+      description: `원가율 ${snapshot.topRiskRecipe.cost_ratio.toFixed(1)}%입니다. 가격 또는 구성 조정 검토가 필요합니다.`
+    });
+  } else if (snapshot.recipeCount > 0) {
+    items.push({
+      id: 'check-margin-ready',
+      status: 'ready',
+      title: '원가율 급한 메뉴 없음',
+      description: `레시피 ${snapshot.recipeCount}개가 연결되어 있고 평균 원가율은 ${snapshot.avgCostRatio.toFixed(1)}%입니다.`
+    });
+  } else {
+    items.push({
+      id: 'check-margin-missing',
+      status: 'watch',
+      title: '레시피 원가 연결',
+      description: '메뉴별 수익성 진단 정확도를 높이려면 레시피 원가 데이터가 필요합니다.'
+    });
+  }
+
+  if (snapshot.peakHour || snapshot.peakWeekday) {
+    items.push({
+      id: 'check-peak',
+      status: 'watch',
+      title: `${snapshot.peakHour?.label || '피크 시간'} 준비`,
+      description: `${snapshot.peakWeekday?.label || '강한 요일'} 기준으로 피크 직전 인력과 제조 준비량을 점검하세요.`
+    });
+  }
+
+  if (snapshot.bestMarginRecipe) {
+    items.push({
+      id: 'check-growth',
+      status: 'watch',
+      title: `${snapshot.bestMarginRecipe.menu_name} 노출 점검`,
+      description: `잔당 ${formatCurrency(snapshot.bestMarginRecipe.contributionMargin)} 남는 메뉴입니다. 오늘 전면 배치 후보로 보세요.`
+    });
+  }
+
+  return items.slice(0, 4);
+};
+
 const hasKeyword = (text: string, keywords: string[]) => keywords.some(keyword => text.includes(keyword));
 
 const buildLocalFallbackResponse = (
@@ -481,6 +657,8 @@ const buildLocalFallbackResponse = (
   inventoryCount: number
 ) => {
   const normalized = userPrompt.toLowerCase();
+  const guidanceCards = buildGuidanceCards(snapshot);
+  const checklistItems = buildChecklistItems(snapshot);
   const topLowStocks = snapshot.lowStockItems
     .slice(0, 3)
     .map(item => `${item.name_ko}(${item.currentStock}${item.uom} / 안전 ${item.safetyStock}${item.uom})`)
@@ -505,6 +683,18 @@ const buildLocalFallbackResponse = (
         : `- 원가 상태: 레시피 ${snapshot.recipeCount}개 / 평균 원가율 ${snapshot.avgCostRatio.toFixed(1)}%`
       : '- 마진 상태: 레시피 원가 데이터가 아직 연결되지 않았습니다.'
   ];
+
+  if (hasKeyword(normalized, ['브리핑', '체크리스트', '우선순위', '핵심', '요약'])) {
+    return [
+      ...briefingLines,
+      '',
+      '오늘 실행 보드',
+      ...guidanceCards.map((card, index) => `${index + 1}. ${card.title} - ${card.summary}`),
+      '',
+      '운영 체크리스트',
+      ...checklistItems.map((item, index) => `${index + 1}. ${item.title} - ${item.description}`)
+    ].join('\n');
+  }
 
   if (hasKeyword(normalized, ['재고', '발주', 'stock', 'inventory'])) {
     return [
@@ -598,6 +788,18 @@ const getInsightToneClasses = (tone: InsightTone) => {
   return 'border-blue-200 bg-blue-50/80 text-blue-900';
 };
 
+const getChecklistStatusClasses = (status: ChecklistItem['status']) => {
+  if (status === 'urgent') {
+    return 'border-red-200 bg-red-50 text-red-700';
+  }
+
+  if (status === 'watch') {
+    return 'border-amber-200 bg-amber-50 text-amber-700';
+  }
+
+  return 'border-emerald-200 bg-emerald-50 text-emerald-700';
+};
+
 export default function AIAssistant({ isWidget = false }: AIAssistantProps) {
   const { sales, inventory, storeProfile, refetch } = useData();
   const [messages, setMessages] = useState<Message[]>([
@@ -622,6 +824,8 @@ export default function AIAssistant({ isWidget = false }: AIAssistantProps) {
   const snapshot = useMemo(() => buildAnalyticsSnapshot(sales, inventory, recipes), [sales, inventory, recipes]);
   const insightCards = useMemo(() => buildInsightCards(snapshot), [snapshot]);
   const actionCards = useMemo(() => buildModeActions(activeMode, snapshot), [activeMode, snapshot]);
+  const guidanceCards = useMemo(() => buildGuidanceCards(snapshot), [snapshot]);
+  const checklistItems = useMemo(() => buildChecklistItems(snapshot), [snapshot]);
 
   const statusLabel = useMemo(() => {
     if (isStatusLoading) return 'AI 상태 확인 중';
@@ -751,6 +955,14 @@ export default function AIAssistant({ isWidget = false }: AIAssistantProps) {
         : `평균 원가율 ${snapshot.avgCostRatio.toFixed(1)}%, 경고 메뉴 없음`
       : '레시피 원가 데이터 미연결';
 
+    const executionBoard = guidanceCards
+      .map(card => `${card.title}: ${card.summary}`)
+      .join(' / ');
+
+    const checklistSummary = checklistItems
+      .map(item => `${item.title}: ${item.description}`)
+      .join(' / ');
+
     return `
 [역할]
 당신은 카페 ERP 경영 코파일럿이다. 숫자를 짧게 요약하고, 바로 실행할 액션을 우선 제안한다.
@@ -772,6 +984,8 @@ export default function AIAssistant({ isWidget = false }: AIAssistantProps) {
 - 마진 상태: ${marginSummary}
 - 수익성 좋은 메뉴: ${snapshot.bestMarginRecipe ? `${snapshot.bestMarginRecipe.menu_name} (잔당 ${formatCurrency(snapshot.bestMarginRecipe.contributionMargin)})` : '집계 중'}
 - 전체 재고 품목 수: ${inventory.length}개
+- 오늘 실행 보드: ${executionBoard || '집계 중'}
+- 운영 체크리스트: ${checklistSummary || '집계 중'}
 
 [응답 방식]
 - 한국어로 답변한다.
@@ -898,11 +1112,11 @@ ${userMsg}
             </div>
           </div>
 
-          <div className={`mt-4 grid gap-2 ${isWidget ? 'grid-cols-2' : snapshot.recipeCount > 0 ? 'grid-cols-2 xl:grid-cols-5' : 'grid-cols-2 xl:grid-cols-4'}`}>
-            {summaryCards.map(card => {
-              const Icon = card.icon;
-              return (
-                <div key={card.id} className="rounded-xl border border-white/15 bg-white/10 p-3 backdrop-blur-sm">
+        <div className={`mt-4 grid gap-2 ${isWidget ? 'grid-cols-2' : snapshot.recipeCount > 0 ? 'grid-cols-2 xl:grid-cols-5' : 'grid-cols-2 xl:grid-cols-4'}`}>
+          {summaryCards.map(card => {
+            const Icon = card.icon;
+            return (
+              <div key={card.id} className="rounded-xl border border-white/15 bg-white/10 p-3 backdrop-blur-sm">
                   <div className="mb-2 flex items-center gap-2 text-[11px] text-blue-100/85">
                     <Icon size={13} />
                     <span>{card.label}</span>
@@ -911,6 +1125,58 @@ ${userMsg}
                 </div>
               );
             })}
+          </div>
+        </div>
+
+        <div>
+          <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-800">
+            <Sparkles size={15} className="text-indigo-600" />
+            오늘 실행 보드
+          </div>
+          <div className={`grid gap-3 ${isWidget ? 'grid-cols-1' : 'grid-cols-1 xl:grid-cols-3'}`}>
+            {guidanceCards.map(card => (
+              <button
+                key={card.id}
+                type="button"
+                onClick={() => handleSend(card.prompt)}
+                className={`rounded-2xl border p-4 text-left transition-all hover:shadow-md ${getInsightToneClasses(card.tone)}`}
+              >
+                <div className="mb-2 flex items-center justify-between gap-3">
+                  <span className="inline-flex rounded-full border border-current/20 bg-white/50 px-2.5 py-1 text-[11px] font-semibold">
+                    {card.label}
+                  </span>
+                  <ArrowRight size={14} className="opacity-70" />
+                </div>
+                <h4 className="text-sm font-semibold">{card.title}</h4>
+                <p className="mt-2 text-sm leading-relaxed opacity-90">{card.summary}</p>
+                <p className="mt-2 text-xs leading-relaxed opacity-80">{card.detail}</p>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-800">
+            <Clock3 size={15} className="text-slate-600" />
+            운영 체크리스트
+          </div>
+          <div className="grid gap-2">
+            {checklistItems.map(item => (
+              <div
+                key={item.id}
+                className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+              >
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <h4 className="text-sm font-semibold text-slate-800">{item.title}</h4>
+                    <p className="mt-1 text-xs leading-relaxed text-slate-500">{item.description}</p>
+                  </div>
+                  <span className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold ${getChecklistStatusClasses(item.status)}`}>
+                    {item.status === 'urgent' ? '긴급' : item.status === 'watch' ? '점검' : '안정'}
+                  </span>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
 
