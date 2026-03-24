@@ -324,6 +324,7 @@ export default function Recipes() {
                   <button
                     className="menu-expand-btn"
                     onClick={() => toggleMenu(recipe.menu_name)}
+                    aria-label={expandedMenus.has(recipe.menu_name) ? `${recipe.menu_name} 상세 접기` : `${recipe.menu_name} 상세 펼치기`}
                   >
                     {expandedMenus.has(recipe.menu_name) ? (
                       <ChevronDown size={20} />
@@ -342,6 +343,7 @@ export default function Recipes() {
                     <button
                       className="btn-delete-menu"
                       onClick={() => handleDeleteMenu(recipe.menu_name)}
+                      aria-label={`${recipe.menu_name} 메뉴 삭제`}
                     >
                       <Trash2 size={18} />
                     </button>
@@ -374,26 +376,28 @@ export default function Recipes() {
                     </div>
                     <div className="recipe-section">
                       <h5>📋 레시피 구성 (재료)</h5>
-                      <table className="recipe-table">
-                        <thead>
-                          <tr>
-                            <th>재료 품목</th>
-                            <th>사용량</th>
-                            <th>단위 원가</th>
-                            <th>원가</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {recipe.ingredients.map((ingredient, idx) => (
-                            <tr key={idx}>
-                              <td>{ingredient.name}</td>
-                              <td>{ingredient.usage}</td>
-                              <td>{ingredient.cost_per_unit.toFixed(2)}원</td>
-                              <td>{ingredient.cost.toLocaleString()}원</td>
+                      <div className="responsive-table-shell">
+                        <table className="recipe-table">
+                          <thead>
+                            <tr>
+                              <th>재료 품목</th>
+                              <th>사용량</th>
+                              <th>단위 원가</th>
+                              <th>원가</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                          </thead>
+                          <tbody>
+                            {recipe.ingredients.map((ingredient, idx) => (
+                              <tr key={idx}>
+                                <td>{ingredient.name}</td>
+                                <td>{ingredient.usage}</td>
+                                <td>{ingredient.cost_per_unit.toFixed(2)}원</td>
+                                <td>{ingredient.cost.toLocaleString()}원</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
                     <div className="recipe-total">
                       <div className="total-label">레시피 총 원가 (Food Cost)</div>
@@ -449,6 +453,7 @@ export default function Recipes() {
                           <button
                             className="menu-expand-btn"
                             onClick={() => toggleMenu(recipe.menu_name)}
+                            aria-label={expandedMenus.has(recipe.menu_name) ? `${recipe.menu_name} 상세 접기` : `${recipe.menu_name} 상세 펼치기`}
                           >
                             {expandedMenus.has(recipe.menu_name) ? (
                               <ChevronDown size={20} />
@@ -468,6 +473,7 @@ export default function Recipes() {
                           <button
                             className="btn-delete-menu"
                             onClick={() => handleDeleteMenu(recipe.menu_name)}
+                            aria-label={`${recipe.menu_name} 메뉴 삭제`}
                           >
                             <Trash2 size={18} />
                           </button>
@@ -505,26 +511,28 @@ export default function Recipes() {
                           {/* 레시피 구성 */}
                           <div className="recipe-section">
                             <h5>📋 레시피 구성 (재료)</h5>
-                            <table className="recipe-table">
-                              <thead>
-                                <tr>
-                                  <th>재료 품목</th>
-                                  <th>사용량</th>
-                                  <th>단위 원가</th>
-                                  <th>원가</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {recipe.ingredients.map((ingredient, idx) => (
-                                  <tr key={idx}>
-                                    <td>{ingredient.name}</td>
-                                    <td>{ingredient.usage}</td>
-                                    <td>{ingredient.cost_per_unit.toFixed(2)}원</td>
-                                    <td>{ingredient.cost.toLocaleString()}원</td>
+                            <div className="responsive-table-shell">
+                              <table className="recipe-table">
+                                <thead>
+                                  <tr>
+                                    <th>재료 품목</th>
+                                    <th>사용량</th>
+                                    <th>단위 원가</th>
+                                    <th>원가</th>
                                   </tr>
-                                ))}
-                              </tbody>
-                            </table>
+                                </thead>
+                                <tbody>
+                                  {recipe.ingredients.map((ingredient, idx) => (
+                                    <tr key={idx}>
+                                      <td>{ingredient.name}</td>
+                                      <td>{ingredient.usage}</td>
+                                      <td>{ingredient.cost_per_unit.toFixed(2)}원</td>
+                                      <td>{ingredient.cost.toLocaleString()}원</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
                           </div>
 
                           {/* 레시피 총 원가 */}
@@ -556,7 +564,7 @@ export default function Recipes() {
                   <p>메뉴 원가와 레시피를 상세히 설정합니다.</p>
                 </div>
               </div>
-              <button className="modal-close-btn" onClick={handleCloseNewMenu}>
+              <button className="modal-close-btn" onClick={handleCloseNewMenu} aria-label="새 메뉴 등록 모달 닫기">
                 <X size={24} />
               </button>
             </div>
@@ -739,6 +747,7 @@ export default function Recipes() {
                               <button
                                 className="btn-remove-ingredient"
                                 onClick={() => handleRemoveIngredient(ingredient.id)}
+                                aria-label={`${ingredient.name || '신규 재료'} 삭제`}
                               >
                                 <Trash2 size={16} />
                               </button>

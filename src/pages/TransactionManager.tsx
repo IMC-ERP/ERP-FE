@@ -112,21 +112,21 @@ const HistoryView = () => {
     }, [sales, editingId]);
 
     return (
-        <div className="space-y-4 animate-fade-in relative">
+        <div className="space-y-4 md:space-y-5 animate-fade-in relative min-w-0">
             {/* Advanced Filter Panel */}
-            <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+            <div className="bg-white p-4 md:p-5 rounded-xl border border-slate-200 shadow-sm">
                 <div className="flex items-center gap-2 mb-4 text-slate-800 font-bold border-b border-slate-100 pb-2">
                     <Filter size={18} className="text-blue-600" />
                     <span>상세 검색 필터</span>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4 md:gap-6">
                     {/* Date Range (2 columns span) */}
                     <div className="space-y-1 lg:col-span-2">
                         <label className="text-xs font-semibold text-slate-500 flex items-center gap-1">
                             <Calendar size={12} /> 날짜 범위
                         </label>
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                             <input
                                 type="date"
                                 value={startDate}
@@ -148,7 +148,7 @@ const HistoryView = () => {
                         <label className="text-xs font-semibold text-slate-500 flex items-center gap-1">
                             <Clock size={12} /> 시간 범위
                         </label>
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                             <input
                                 type="time"
                                 value={startTime}
@@ -195,7 +195,7 @@ const HistoryView = () => {
                     </div>
                 </div>
 
-                <div className="flex justify-between items-center mt-4 pt-3 border-t border-slate-100">
+                <div className="flex flex-col gap-2 sm:flex-row sm:justify-between sm:items-center mt-4 pt-3 border-t border-slate-100">
                     <div className="text-xs text-slate-500">
                         검색 결과: <span className="font-bold text-blue-600">{filteredSales.length}</span> 건
                     </div>
@@ -209,10 +209,11 @@ const HistoryView = () => {
             </div>
 
             {/* Data Table Container */}
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col h-[600px] relative">
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col md:h-[70vh] md:max-h-[700px] relative min-w-0">
                 {/* Fixed Header with Sticky positioning */}
-                <div className="overflow-auto flex-1 custom-scrollbar">
-                    <table className="w-full text-sm text-left border-collapse">
+                <div className="overflow-auto flex-1 custom-scrollbar min-w-0">
+                    <div className="responsive-table-shell">
+                    <table className="w-full min-w-[760px] text-sm text-left border-collapse">
                         <thead className="bg-slate-50 text-slate-500 uppercase font-semibold border-b border-slate-200 sticky top-0 z-10 shadow-sm">
                             <tr>
                                 <th className="px-6 py-3 whitespace-nowrap bg-slate-50">날짜</th>
@@ -315,20 +316,21 @@ const HistoryView = () => {
                             )}
                         </tbody>
                     </table>
+                    </div>
                 </div>
 
                 {/* Floating Save Button */}
                 {editingId && (
-                    <div className="absolute bottom-6 right-8 flex gap-3">
+                    <div className="absolute left-4 right-4 bottom-4 flex flex-col gap-3 sm:left-auto sm:right-8 sm:flex-row">
                         <button
                             onClick={cancelEdit}
-                            className="flex items-center gap-2 px-4 py-3 bg-white border border-slate-300 text-slate-600 rounded-full shadow-lg hover:bg-slate-50 font-bold transition-all"
+                            className="flex items-center justify-center gap-2 px-4 py-3 bg-white border border-slate-300 text-slate-600 rounded-full shadow-lg hover:bg-slate-50 font-bold transition-all"
                         >
                             <X size={20} /> 취소
                         </button>
                         <button
                             onClick={initiateSave}
-                            className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-full shadow-xl hover:bg-blue-700 font-bold transition-all hover:scale-105 ring-4 ring-blue-100"
+                            className="flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-full shadow-xl hover:bg-blue-700 font-bold transition-all hover:scale-105 ring-4 ring-blue-100"
                         >
                             <Save size={20} /> 변경사항 저장하기
                         </button>
@@ -338,9 +340,12 @@ const HistoryView = () => {
 
             {/* Note for scrolling */}
             {filteredSales.length > 20 && !editingId && (
-                <div className="text-center text-xs text-slate-400">
+                <div className="text-center text-xs text-slate-400 px-2">
                     * 내역이 많을 경우 목록을 스크롤하여 확인하세요. 행을 더블클릭하여 수정할 수 있습니다.
                 </div>
+            )}
+            {!editingId && (
+                <p className="responsive-table-hint sm:hidden text-center">표는 좌우로 밀어서 확인할 수 있습니다.</p>
             )}
 
             {/* Confirmation Modal */}
@@ -360,7 +365,8 @@ const HistoryView = () => {
                         </div>
 
                         <div className="p-6 space-y-4">
-                            <div className="grid grid-cols-11 gap-2 items-center text-sm">
+                            <div className="overflow-x-auto">
+                                <div className="grid min-w-[420px] grid-cols-11 gap-2 items-center text-sm">
                                 {/* Header */}
                                 <div className="col-span-5 font-bold text-slate-500 text-center">변경 전</div>
                                 <div className="col-span-1 flex justify-center"></div>
@@ -398,7 +404,7 @@ const HistoryView = () => {
                             </div>
 
                             {/* No visible changes check */}
-                            {originalData.itemDetail === editForm.itemDetail &&
+                                {originalData.itemDetail === editForm.itemDetail &&
                                 originalData.qty === editForm.qty &&
                                 originalData.price === editForm.price &&
                                 originalData.date === editForm.date &&
@@ -409,6 +415,7 @@ const HistoryView = () => {
                                     </div>
                                 )
                             }
+                            </div>
                         </div>
 
                         <div className="p-4 bg-slate-50 flex justify-end gap-3 border-t border-slate-100">
@@ -480,9 +487,9 @@ const AddView = () => {
     };
 
     return (
-        <div className="space-y-8 animate-fade-in">
+        <div className="space-y-6 md:space-y-8 animate-fade-in">
             {/* Quick Select Cards */}
-            <div className="bg-slate-50 p-6 rounded-xl border border-slate-100">
+            <div className="bg-slate-50 p-4 md:p-6 rounded-xl border border-slate-100">
                 <h3 className="text-sm font-bold text-amber-700 mb-4 flex items-center gap-2 uppercase tracking-wide">
                     <span>🏆</span> 자주 찾는 메뉴 (Top 7)
                 </h3>
@@ -504,7 +511,7 @@ const AddView = () => {
             </div>
 
             {/* Manual Entry Form */}
-            <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm max-w-2xl mx-auto">
+            <div className="bg-white p-5 sm:p-6 md:p-8 rounded-2xl border border-slate-200 shadow-sm max-w-2xl mx-auto">
                 <h3 className="font-bold text-slate-800 mb-6 flex items-center gap-2">
                     <PlusCircle size={20} className="text-blue-600" />
                     상세 거래 입력
@@ -521,7 +528,7 @@ const AddView = () => {
                         />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6">
                         <div>
                             <label className="block text-sm font-medium text-slate-700 mb-2">수량</label>
                             <input
@@ -553,7 +560,7 @@ const AddView = () => {
                         />
                     </div>
 
-                    <div className="bg-slate-50 p-4 rounded-lg flex justify-between items-center">
+                    <div className="bg-slate-50 p-4 rounded-lg flex flex-col gap-2 sm:flex-row sm:justify-between sm:items-center">
                         <span className="text-slate-600 font-medium">💰 계산된 수익</span>
                         <span className="text-xl font-bold text-blue-600">{(price * qty).toLocaleString()}원</span>
                     </div>
@@ -861,9 +868,9 @@ const DailySalesAddView = () => {
                 )}
 
                 {!isOcrLoading && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
                         {/* OCR Scan Card */}
-                        <div className="bg-white p-8 rounded-2xl border border-slate-200 hover:border-blue-500 hover:shadow-xl transition-all group relative overflow-hidden">
+                        <div className="bg-white p-5 sm:p-6 md:p-8 rounded-2xl border border-slate-200 hover:border-blue-500 hover:shadow-xl transition-all group relative overflow-hidden">
                             <div className="absolute top-0 right-0 w-32 h-32 bg-blue-50 rounded-bl-full -mr-10 -mt-10 transition-transform group-hover:scale-110"></div>
 
                             <div className="relative z-10">
@@ -897,7 +904,7 @@ const DailySalesAddView = () => {
                         </div>
 
                         {/* Manual Entry Card */}
-                        <div className="bg-white p-8 rounded-2xl border border-slate-200 hover:border-green-500 hover:shadow-xl transition-all group relative overflow-hidden">
+                        <div className="bg-white p-5 sm:p-6 md:p-8 rounded-2xl border border-slate-200 hover:border-green-500 hover:shadow-xl transition-all group relative overflow-hidden">
                             <div className="absolute top-0 right-0 w-32 h-32 bg-green-50 rounded-bl-full -mr-10 -mt-10 transition-transform group-hover:scale-110"></div>
 
                             <div className="relative z-10">
@@ -929,11 +936,11 @@ const DailySalesAddView = () => {
     // OCR 모드
     if (mode === 'ocr') {
         return (
-            <div className="max-w-4xl mx-auto space-y-6 animate-fade-in">
-                <div className="flex items-center justify-between">
-                    <h3 className="text-xl font-bold text-slate-800">매출 영수증 업로드</h3>
-                    <button
-                        onClick={() => {
+                <div className="max-w-4xl mx-auto space-y-6 animate-fade-in">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <h3 className="text-xl font-bold text-slate-800">매출 영수증 업로드</h3>
+                        <button
+                            onClick={() => {
                             setMode('select');
                             setOcrResult(null);
                         }}
@@ -1014,7 +1021,8 @@ const DailySalesAddView = () => {
                             />
                         </div>
 
-                        <table className="w-full text-sm">
+                        <div className="responsive-table-shell">
+                        <table className="w-full min-w-[720px] text-sm">
                             <thead className="bg-slate-50">
                                 <tr>
                                     <th className="p-3 text-left">상품명</th>
@@ -1106,6 +1114,9 @@ const DailySalesAddView = () => {
                                 })}
                             </tbody>
                         </table>
+                        </div>
+
+                        <p className="responsive-table-hint sm:hidden">표는 좌우로 밀어서 확인할 수 있습니다.</p>
 
                         <button
                             onClick={handleAddOcrRow}
@@ -1131,8 +1142,8 @@ const DailySalesAddView = () => {
     // 수기 입력 모드
     if (mode === 'manual') {
         return (
-            <div className="max-w-4xl mx-auto space-y-6 animate-fade-in">
-                <div className="flex items-center justify-between">
+                <div className="max-w-4xl mx-auto space-y-6 animate-fade-in">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <h3 className="text-xl font-bold text-slate-800">매출 데이터 입력</h3>
                     <button
                         onClick={() => {
@@ -1161,7 +1172,7 @@ const DailySalesAddView = () => {
                     </div>
 
                     <div className="space-y-3">
-                        <div className="grid grid-cols-12 gap-3 text-sm font-bold text-slate-500 px-3">
+                        <div className="hidden md:grid grid-cols-12 gap-3 text-sm font-bold text-slate-500 px-3">
                             <div className="col-span-4">상품명</div>
                             <div className="col-span-2 text-right">수량</div>
                             <div className="col-span-2 text-right">판매 단가</div>
@@ -1178,8 +1189,9 @@ const DailySalesAddView = () => {
 
                             return (
                                 <div key={index} className="relative">
-                                    <div className="grid grid-cols-12 gap-3 items-center bg-slate-50 p-3 rounded-lg">
-                                        <div className="col-span-4 relative">
+                                    <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-start md:items-center bg-slate-50 p-3 rounded-lg">
+                                        <div className="md:col-span-4 relative">
+                                            <label className="block md:hidden text-xs font-bold text-slate-500 mb-1">상품명</label>
                                             <input
                                                 type="text"
                                                 value={item.menu}
@@ -1211,28 +1223,33 @@ const DailySalesAddView = () => {
                                                 </div>
                                             )}
                                         </div>
-                                        <div className="col-span-2">
-                                            <input
-                                                type="number"
-                                                min="1"
-                                                value={item.quantity}
-                                                onChange={(e) => handleQuantityChange(index, parseInt(e.target.value) || 1)}
-                                                className="w-full p-2 border border-slate-300 rounded text-right"
-                                            />
-                                        </div>
-                                        <div className="col-span-2 text-right text-blue-600 font-mono text-sm">
-                                            {item.selling_price.toLocaleString()}원
-                                        </div>
-                                        <div className="col-span-3 text-right font-bold text-slate-800">
-                                            {(item.selling_price * item.quantity).toLocaleString()}원
-                                        </div>
-                                        <div className="col-span-1 flex justify-end">
-                                            <button
-                                                onClick={() => handleDeleteRow(index)}
-                                                className="text-red-500 hover:text-red-700"
-                                            >
-                                                <Trash2 size={18} />
-                                            </button>
+                                        <div className="grid grid-cols-2 gap-3 md:col-span-8 md:grid-cols-7">
+                                            <div className="md:col-span-2">
+                                                <label className="block md:hidden text-xs font-bold text-slate-500 mb-1">수량</label>
+                                                <input
+                                                    type="number"
+                                                    min="1"
+                                                    value={item.quantity}
+                                                    onChange={(e) => handleQuantityChange(index, parseInt(e.target.value) || 1)}
+                                                    className="w-full p-2 border border-slate-300 rounded text-right"
+                                                />
+                                            </div>
+                                            <div className="md:col-span-2 text-right text-blue-600 font-mono text-sm">
+                                                <label className="block md:hidden text-xs font-bold text-slate-500 mb-1 text-left">판매 단가</label>
+                                                <div className="rounded border border-transparent px-1 py-2">{item.selling_price.toLocaleString()}원</div>
+                                            </div>
+                                            <div className="md:col-span-2 text-right font-bold text-slate-800">
+                                                <label className="block md:hidden text-xs font-bold text-slate-500 mb-1 text-left">합계</label>
+                                                <div className="rounded border border-transparent px-1 py-2">{(item.selling_price * item.quantity).toLocaleString()}원</div>
+                                            </div>
+                                            <div className="col-span-2 md:col-span-1 flex justify-end items-end">
+                                                <button
+                                                    onClick={() => handleDeleteRow(index)}
+                                                    className="text-red-500 hover:text-red-700"
+                                                >
+                                                    <Trash2 size={18} />
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -1405,13 +1422,13 @@ const DailySalesListView = () => {
     }
 
     return (
-        <div className="space-y-4 animate-fade-in">
+        <div className="space-y-4 animate-fade-in min-w-0">
             {salesData.map((data) => {
                 const isExpanded = expandedDates.has(data.date);
                 return (
                     <div key={data.date} className="bg-white rounded-xl border border-slate-200 overflow-hidden">
                         <div
-                            className="p-5 flex items-center justify-between cursor-pointer hover:bg-slate-50 transition-colors"
+                            className="p-4 sm:p-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between cursor-pointer hover:bg-slate-50 transition-colors"
                             onClick={() => toggleExpand(data.date)}
                         >
                             <div className="flex items-center gap-4">
@@ -1420,7 +1437,7 @@ const DailySalesListView = () => {
                                     <p className="text-sm text-slate-500">총 {data.sales_by_menu.length}개 메뉴</p>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-4">
+                            <div className="flex items-center justify-between sm:justify-start gap-4">
                                 <div className="text-right">
                                     <p className="text-sm text-slate-500">일일 총 매출</p>
                                     <p className="text-xl font-bold text-blue-600">{data.total_amount.toLocaleString()}원</p>
@@ -1431,35 +1448,37 @@ const DailySalesListView = () => {
 
                         {isExpanded && (
                             <div className="border-t border-slate-200">
-                                <table className="w-full text-sm">
-                                    <thead className="bg-slate-50">
-                                        <tr>
-                                            <th className="p-3 text-left">메뉴</th>
-                                            <th className="p-3 text-right">수량</th>
-                                            <th className="p-3 text-right">판매 금액</th>
-                                            <th className="p-3 text-center">작업</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {data.sales_by_menu.map((item, index) => (
-                                            <tr key={index} className="border-t border-slate-100">
-                                                <td className="p-3 font-medium text-slate-800">{item.menu}</td>
-                                                <td className="p-3 text-right font-mono">{item.quantity}</td>
-                                                <td className="p-3 text-right font-mono text-blue-600">
-                                                    {item.sales_amount?.toLocaleString()}원
-                                                </td>
-                                                <td className="p-3 text-center">
-                                                    <button
-                                                        onClick={() => handleDeleteMenu(data.date, item.menu)}
-                                                        className="text-red-500 hover:text-red-700"
-                                                    >
-                                                        <Trash2 size={16} />
-                                                    </button>
-                                                </td>
+                                <div className="responsive-table-shell">
+                                    <table className="w-full min-w-[560px] text-sm">
+                                        <thead className="bg-slate-50">
+                                            <tr>
+                                                <th className="p-3 text-left">메뉴</th>
+                                                <th className="p-3 text-right">수량</th>
+                                                <th className="p-3 text-right">판매 금액</th>
+                                                <th className="p-3 text-center">작업</th>
                                             </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
+                                        </thead>
+                                        <tbody>
+                                            {data.sales_by_menu.map((item, index) => (
+                                                <tr key={index} className="border-t border-slate-100">
+                                                    <td className="p-3 font-medium text-slate-800">{item.menu}</td>
+                                                    <td className="p-3 text-right font-mono">{item.quantity}</td>
+                                                    <td className="p-3 text-right font-mono text-blue-600">
+                                                        {item.sales_amount?.toLocaleString()}원
+                                                    </td>
+                                                    <td className="p-3 text-center">
+                                                        <button
+                                                            onClick={() => handleDeleteMenu(data.date, item.menu)}
+                                                            className="text-red-500 hover:text-red-700"
+                                                        >
+                                                            <Trash2 size={16} />
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
                                 <div className="p-4 bg-slate-50 flex justify-end gap-3">
                                     <button
                                         onClick={() => handleDeleteDate(data.date)}
@@ -1483,19 +1502,19 @@ export default function TransactionManager() {
     const [activeTab, setActiveTab] = useState("dailySalesAdd");
 
     return (
-        <div className="space-y-6 animate-fade-in">
+        <div className="space-y-5 md:space-y-6 animate-fade-in min-w-0">
             <header>
-                <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                <h2 className="text-xl md:text-2xl font-bold text-slate-800 flex items-center gap-2">
                     📋 거래 데이터 관리
                 </h2>
                 <p className="text-sm text-slate-500">전체 거래 내역을 조회하거나 새로운 매출 데이터를 등록할 수 있습니다.</p>
             </header>
 
             {/* Tabs */}
-            <div className="flex gap-2 border-b border-slate-200 overflow-x-auto pb-1">
+            <div className="flex gap-2 border-b border-slate-200 overflow-x-auto pb-1 scrollbar-hide">
                 <button
                     onClick={() => setActiveTab("dailySalesAdd")}
-                    className={`flex items-center gap-2 px-6 py-3 text-sm font-bold rounded-t-lg transition-colors whitespace-nowrap ${activeTab === "dailySalesAdd"
+                    className={`flex items-center gap-2 px-4 sm:px-6 py-3 text-xs sm:text-sm font-bold rounded-t-lg transition-colors whitespace-nowrap ${activeTab === "dailySalesAdd"
                         ? "bg-white text-blue-600 border-b-2 border-blue-600"
                         : "text-slate-500 hover:text-slate-800 hover:bg-slate-50"
                         }`}
@@ -1505,7 +1524,7 @@ export default function TransactionManager() {
                 </button>
                 <button
                     onClick={() => setActiveTab("dailySalesList")}
-                    className={`flex items-center gap-2 px-6 py-3 text-sm font-bold rounded-t-lg transition-colors whitespace-nowrap ${activeTab === "dailySalesList"
+                    className={`flex items-center gap-2 px-4 sm:px-6 py-3 text-xs sm:text-sm font-bold rounded-t-lg transition-colors whitespace-nowrap ${activeTab === "dailySalesList"
                         ? "bg-white text-blue-600 border-b-2 border-blue-600"
                         : "text-slate-500 hover:text-slate-800 hover:bg-slate-50"
                         }`}
@@ -1515,7 +1534,7 @@ export default function TransactionManager() {
                 </button>
                 <button
                     onClick={() => setActiveTab("history")}
-                    className={`flex items-center gap-2 px-6 py-3 text-sm font-bold rounded-t-lg transition-colors whitespace-nowrap ${activeTab === "history"
+                    className={`flex items-center gap-2 px-4 sm:px-6 py-3 text-xs sm:text-sm font-bold rounded-t-lg transition-colors whitespace-nowrap ${activeTab === "history"
                         ? "bg-white text-blue-600 border-b-2 border-blue-600"
                         : "text-slate-500 hover:text-slate-800 hover:bg-slate-50"
                         }`}
@@ -1525,7 +1544,7 @@ export default function TransactionManager() {
                 </button>
                 <button
                     onClick={() => setActiveTab("add")}
-                    className={`flex items-center gap-2 px-6 py-3 text-sm font-bold rounded-t-lg transition-colors whitespace-nowrap ${activeTab === "add"
+                    className={`flex items-center gap-2 px-4 sm:px-6 py-3 text-xs sm:text-sm font-bold rounded-t-lg transition-colors whitespace-nowrap ${activeTab === "add"
                         ? "bg-white text-blue-600 border-b-2 border-blue-600"
                         : "text-slate-500 hover:text-slate-800 hover:bg-slate-50"
                         }`}

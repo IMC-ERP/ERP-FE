@@ -5,7 +5,7 @@
 
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { RefreshCw, ChevronDown, ChevronUp, Plus, X, Trash2 } from 'lucide-react';
+import { RefreshCw, ChevronDown, ChevronUp, Plus, X, Trash2, Camera, ImageIcon } from 'lucide-react';
 import { inventoryApi, stockIntakeApi, ocrApi, type InventoryItem, type StockIntake, type OCRReceiptData, type StockIntakeRecord } from '../services/api';
 import './Inventory.css';
 
@@ -64,6 +64,14 @@ export default function Inventory() {
   const [isOCRProcessing, setIsOCRProcessing] = useState(false);
   const [ocrError, setOcrError] = useState<{ message: string; suggestion: string } | null>(null);
   const [isDragging, setIsDragging] = useState(false); // 드래그 상태
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
 
   // 재고 입고 기록 관련 상태
   const [intakeHistory, setIntakeHistory] = useState<StockIntakeRecord[]>([]);
@@ -72,14 +80,18 @@ export default function Inventory() {
 
   // 자동완성 드롭다운 상태
   const [activeSearchIndex, setActiveSearchIndex] = useState<number | null>(null);
-  const [dropdownPosition, setDropdownPosition] = useState<{ top: number; left: number } | null>(null);
+  const [dropdownPosition, setDropdownPosition] = useState<{ top: number; left: number; width: number } | null>(null);
 
   const handleInputFocus = (index: number, e: React.FocusEvent<HTMLInputElement> | React.MouseEvent<HTMLInputElement>) => {
     setActiveSearchIndex(index);
     const rect = e.currentTarget.getBoundingClientRect();
+    const viewportWidth = window.innerWidth;
+    const desiredWidth = Math.min(Math.max(rect.width, 240), viewportWidth - 24);
+    const maxLeft = window.scrollX + viewportWidth - desiredWidth - 12;
     setDropdownPosition({
       top: rect.bottom + window.scrollY,
-      left: rect.left + window.scrollX
+      left: Math.max(window.scrollX + 12, Math.min(rect.left + window.scrollX, maxLeft)),
+      width: desiredWidth
     });
   };
 
@@ -508,6 +520,47 @@ export default function Inventory() {
     return acc;
   }, {} as Record<string, InventoryItem[]>);
 
+  const totalInventoryValue = inventory.reduce((sum, item) => (
+    sum + (item.quantity_on_hand * item.unit_cost)
+  ), 0);
+
+  const averageUnitCost = inventory.length > 0
+    ? inventory.reduce((sum, item) => sum + item.unit_cost, 0) / inventory.length
+    : 0;
+
+  const expensiveItems = [...inventory]
+    .filter(item => item.unit_cost > 0)
+    .sort((a, b) => b.unit_cost - a.unit_cost)
+    .slice(0, 8);
+
+  const categoryValueSummary = Object.entries(
+    inventory.reduce((acc, item) => {
+      const currentValue = acc[item.category] || 0;
+      acc[item.category] = currentValue + (item.quantity_on_hand * item.unit_cost);
+      return acc;
+    }, {} as Record<string, number>)
+  )
+    .sort(([, valueA], [, valueB]) => valueB - valueA)
+    .slice(0, 6);
+
+  const forecastItems = inventory
+    .filter(item => item.safety_stock > 0)
+    .map(item => {
+      const coverage = item.quantity_on_hand / item.safety_stock;
+      const suggestedOrder = Math.max(item.max_stock_level - item.quantity_on_hand, 0);
+
+      return {
+        ...item,
+        coverage,
+        suggestedOrder
+      };
+    })
+    .sort((a, b) => a.coverage - b.coverage);
+
+  const atRiskForecastItems = forecastItems.filter(item => item.coverage < 1);
+  const warningForecastItems = forecastItems.filter(item => item.coverage >= 1 && item.coverage < 1.5);
+  const stableForecastItems = forecastItems.filter(item => item.coverage >= 1.5);
+
   const renderInventoryCard = (item: InventoryItem) => {
     const percentage = getStockPercentage(item.quantity_on_hand, item.max_stock_level);
     const status = getStockStatus(percentage);
@@ -602,6 +655,164 @@ export default function Inventory() {
     </div>
   );
 
+  const renderPricingTab = () => (
+    <div className="space-y-4 md:space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+          <p className="text-xs font-bold tracking-[0.2em] text-slate-400 uppercase mb-2">Inventory Value</p>
+          <p className="text-2xl font-bold text-slate-800">{Math.round(totalInventoryValue).toLocaleString()}원</p>
+          <p className="mt-2 text-sm text-slate-500">현재고와 단가 기준 총 재고가치입니다.</p>
+        </div>
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+          <p className="text-xs font-bold tracking-[0.2em] text-slate-400 uppercase mb-2">Avg Unit Cost</p>
+          <p className="text-2xl font-bold text-slate-800">{Math.round(averageUnitCost).toLocaleString()}원</p>
+          <p className="mt-2 text-sm text-slate-500">등록된 품목의 평균 단가입니다.</p>
+        </div>
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+          <p className="text-xs font-bold tracking-[0.2em] text-slate-400 uppercase mb-2">Cost Focus</p>
+          <p className="text-2xl font-bold text-slate-800">{expensiveItems.length}개</p>
+          <p className="mt-2 text-sm text-slate-500">단가가 높은 핵심 품목을 우선 확인하세요.</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-[1.4fr_1fr] gap-4">
+        <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b border-slate-100">
+            <h3 className="text-lg font-bold text-slate-800">단가 모니터링 TOP 품목</h3>
+            <p className="text-sm text-slate-500 mt-1">현재 등록된 단가 기준으로 영향이 큰 품목입니다.</p>
+          </div>
+          <div className="responsive-table-shell">
+            <table className="w-full min-w-[620px] text-sm">
+              <thead className="bg-slate-50 text-slate-500">
+                <tr>
+                  <th className="px-4 py-3 text-left">품목</th>
+                  <th className="px-4 py-3 text-left">카테고리</th>
+                  <th className="px-4 py-3 text-right">단가</th>
+                  <th className="px-4 py-3 text-right">현재고</th>
+                  <th className="px-4 py-3 text-right">재고가치</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {expensiveItems.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-10 text-center text-slate-400">
+                      등록된 단가 정보가 없습니다.
+                    </td>
+                  </tr>
+                ) : expensiveItems.map(item => (
+                  <tr key={item.id} className="hover:bg-slate-50">
+                    <td className="px-4 py-3 font-medium text-slate-800">{item.id}</td>
+                    <td className="px-4 py-3 text-slate-500">{item.category}</td>
+                    <td className="px-4 py-3 text-right text-slate-700">{Math.round(item.unit_cost).toLocaleString()}원</td>
+                    <td className="px-4 py-3 text-right text-slate-700">{item.quantity_on_hand.toLocaleString()}{item.uom}</td>
+                    <td className="px-4 py-3 text-right font-semibold text-slate-800">
+                      {Math.round(item.quantity_on_hand * item.unit_cost).toLocaleString()}원
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+          <h3 className="text-lg font-bold text-slate-800">카테고리별 재고가치</h3>
+          <p className="text-sm text-slate-500 mt-1 mb-4">금액 비중이 큰 카테고리를 먼저 관리하세요.</p>
+          <div className="space-y-3">
+            {categoryValueSummary.length === 0 ? (
+              <p className="text-sm text-slate-400">카테고리별 단가 정보가 없습니다.</p>
+            ) : categoryValueSummary.map(([category, value]) => (
+              <div key={category}>
+                <div className="flex items-center justify-between text-sm mb-1">
+                  <span className="font-medium text-slate-700">{category}</span>
+                  <span className="text-slate-500">{Math.round(value).toLocaleString()}원</span>
+                </div>
+                <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-amber-500 to-orange-500"
+                    style={{ width: `${totalInventoryValue > 0 ? (value / totalInventoryValue) * 100 : 0}%` }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+
+  const renderForecastTab = () => (
+    <div className="space-y-4 md:space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-white rounded-2xl border border-red-200 shadow-sm p-5">
+          <p className="text-xs font-bold tracking-[0.2em] text-red-400 uppercase mb-2">At Risk</p>
+          <p className="text-2xl font-bold text-red-600">{atRiskForecastItems.length}개</p>
+          <p className="mt-2 text-sm text-slate-500">안전재고보다 낮아 즉시 확인이 필요한 품목입니다.</p>
+        </div>
+        <div className="bg-white rounded-2xl border border-amber-200 shadow-sm p-5">
+          <p className="text-xs font-bold tracking-[0.2em] text-amber-500 uppercase mb-2">Watchlist</p>
+          <p className="text-2xl font-bold text-amber-600">{warningForecastItems.length}개</p>
+          <p className="mt-2 text-sm text-slate-500">안전재고 근처에 있어 모니터링이 필요한 품목입니다.</p>
+        </div>
+        <div className="bg-white rounded-2xl border border-emerald-200 shadow-sm p-5">
+          <p className="text-xs font-bold tracking-[0.2em] text-emerald-500 uppercase mb-2">Stable</p>
+          <p className="text-2xl font-bold text-emerald-600">{stableForecastItems.length}개</p>
+          <p className="mt-2 text-sm text-slate-500">안전재고 대비 여유가 있는 품목입니다.</p>
+        </div>
+      </div>
+
+      <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="px-5 py-4 border-b border-slate-100">
+          <h3 className="text-lg font-bold text-slate-800">수요 대응 우선순위</h3>
+          <p className="text-sm text-slate-500 mt-1">안전재고 대비 현재고를 기준으로 발주 우선순위를 정리했습니다.</p>
+        </div>
+        <div className="responsive-table-shell">
+          <table className="w-full min-w-[720px] text-sm">
+            <thead className="bg-slate-50 text-slate-500">
+              <tr>
+                <th className="px-4 py-3 text-left">품목</th>
+                <th className="px-4 py-3 text-left">카테고리</th>
+                <th className="px-4 py-3 text-right">현재고</th>
+                <th className="px-4 py-3 text-right">안전재고</th>
+                <th className="px-4 py-3 text-right">커버리지</th>
+                <th className="px-4 py-3 text-right">권장 발주량</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {forecastItems.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-4 py-10 text-center text-slate-400">
+                    안전재고가 설정된 품목이 없습니다.
+                  </td>
+                </tr>
+              ) : forecastItems.slice(0, 12).map(item => (
+                <tr key={item.id} className="hover:bg-slate-50">
+                  <td className="px-4 py-3 font-medium text-slate-800">{item.id}</td>
+                  <td className="px-4 py-3 text-slate-500">{item.category}</td>
+                  <td className="px-4 py-3 text-right text-slate-700">{item.quantity_on_hand.toLocaleString()}{item.uom}</td>
+                  <td className="px-4 py-3 text-right text-slate-700">{item.safety_stock.toLocaleString()}{item.uom}</td>
+                  <td className="px-4 py-3 text-right">
+                    <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${item.coverage < 1
+                      ? 'bg-red-100 text-red-700'
+                      : item.coverage < 1.5
+                        ? 'bg-amber-100 text-amber-700'
+                        : 'bg-emerald-100 text-emerald-700'
+                      }`}>
+                      {item.coverage.toFixed(2)}x
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-right font-semibold text-slate-800">
+                    {item.suggestedOrder > 0 ? `${Math.round(item.suggestedOrder).toLocaleString()}${item.uom}` : '-'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  );
+
 
   const renderReceivingTab = () => {
     // OCR 처리 중: 로딩 화면 표시
@@ -620,13 +831,13 @@ export default function Inventory() {
     // 이미지 업로드 전용 페이지
     if (isImageUploadMode) {
       return (
-        <div className="receiving-tab image-upload-view">
+        <div className={`receiving-tab image-upload-view ${isMobile ? 'mobile-upload-page' : ''}`}>
           {/* 헤더 */}
           <div className="upload-header">
             <div className="upload-header-left">
-              <h2>영수증 이미지 통합 업로드</h2>
+              <h2>{isMobile ? '영수증 촬영/업로드' : '영수증 이미지 통합 업로드'}</h2>
             </div>
-            <button className="btn-upload-close" onClick={handleCloseManualIntake}>
+            <button className="btn-upload-close" onClick={handleCloseManualIntake} aria-label="이미지 업로드 닫기">
               <X size={20} />
             </button>
           </div>
@@ -642,35 +853,89 @@ export default function Inventory() {
             </div>
           )}
 
-          {/* 드래그 앤 드롭 영역 */}
-          <div
-            className={`drag-drop-zone ${isDragging ? 'dragging' : ''}`}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-          >
-            <div className="upload-icon-wrapper">
-              <div className="upload-icon">📤</div>
+          {isMobile ? (
+            /* ===== 모바일: 풀스크린 히어로 업로드 UI ===== */
+            <div className="mobile-upload-hero">
+              {/* 상단 일러스트 영역 */}
+              <div className="mobile-upload-hero-top">
+                <div className="mobile-upload-icon-ring">
+                  <Camera size={40} className="mobile-upload-hero-icon" />
+                </div>
+                <h3 className="mobile-upload-hero-title">영수증을 스캔하세요</h3>
+                <p className="mobile-upload-hero-desc">
+                  AI가 품목·수량·단가를 자동으로 인식합니다
+                </p>
+              </div>
+
+              {/* 버튼 영역 */}
+              <div className="mobile-upload-actions">
+                <button
+                  className="mobile-action-btn primary-action"
+                  onClick={() => document.getElementById('camera-capture-input')?.click()}
+                >
+                  <div className="mobile-action-icon-wrap">
+                    <Camera size={26} />
+                  </div>
+                  <div className="mobile-action-text">
+                    <span className="mobile-action-title">카메라로 촬영</span>
+                    <span className="mobile-action-sub">영수증에 카메라를 대고 찍어주세요</span>
+                  </div>
+                  <div className="mobile-action-arrow">›</div>
+                </button>
+
+                <div className="mobile-upload-divider">
+                  <span>또는</span>
+                </div>
+
+                <button
+                  className="mobile-action-btn secondary-action"
+                  onClick={() => document.getElementById('gallery-file-input')?.click()}
+                >
+                  <div className="mobile-action-icon-wrap">
+                    <ImageIcon size={24} />
+                  </div>
+                  <div className="mobile-action-text">
+                    <span className="mobile-action-title">갤러리에서 선택</span>
+                    <span className="mobile-action-sub">저장된 영수증 사진을 불러옵니다</span>
+                  </div>
+                  <div className="mobile-action-arrow">›</div>
+                </button>
+              </div>
+
+              {/* 하단 팁 */}
+              <div className="mobile-upload-tip">
+                💡 <strong>잘 찍는 팁</strong>: 영수증을 평평하게 펴고, 밝은 곳에서 촬영하세요
+              </div>
+
+              {/* hidden inputs */}
+              <input type="file" id="camera-capture-input" accept="image/*"
+                capture="environment" onChange={handleFileInputChange} style={{ display: 'none' }} />
+              <input type="file" id="gallery-file-input" accept="image/*"
+                multiple onChange={handleFileInputChange} style={{ display: 'none' }} />
             </div>
-            <h3>여기를 클릭하여 영수증 이미지(들)을 추가하세요</h3>
-            <p className="upload-instruction">드래그 앤 드롭으로도 업로드 가능합니다</p>
-
-            <input
-              type="file"
-              id="drag-drop-file-input"
-              accept="image/*"
-              multiple
-              onChange={handleFileInputChange}
-              style={{ display: 'none' }}
-            />
-
-            <button
-              className="btn-file-browse"
-              onClick={() => document.getElementById('drag-drop-file-input')?.click()}
+          ) : (
+            /* ===== 데스크탑: 드래그 앤 드롭 ===== */
+            <div
+              className={`drag-drop-zone ${isDragging ? 'dragging' : ''}`}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
             >
-              파일 찾기
-            </button>
-          </div>
+              <div className="upload-icon-wrapper">
+                <div className="upload-icon">📤</div>
+              </div>
+              <h3>여기를 클릭하여 영수증 이미지(들)을 추가하세요</h3>
+              <p className="upload-instruction">드래그 앤 드롭으로도 업로드 가능합니다</p>
+
+              <input type="file" id="drag-drop-file-input" accept="image/*" multiple
+                onChange={handleFileInputChange} style={{ display: 'none' }} />
+
+              <button className="btn-file-browse"
+                onClick={() => document.getElementById('drag-drop-file-input')?.click()}>
+                파일 찾기
+              </button>
+            </div>
+          )}
         </div>
       );
     }
@@ -751,10 +1016,11 @@ export default function Inventory() {
                               onClick={() => setActiveSearchIndex(null)}
                             />
                             <div
-                              className="absolute z-[9999] w-64 bg-white border border-slate-300 rounded-lg shadow-xl max-h-60 overflow-y-auto"
+                              className="absolute z-[9999] bg-white border border-slate-300 rounded-lg shadow-xl max-h-60 overflow-y-auto"
                               style={{
                                 top: `${dropdownPosition.top}px`,
                                 left: `${dropdownPosition.left}px`,
+                                width: `${dropdownPosition.width}px`,
                               }}
                             >
                               {inventory
@@ -976,8 +1242,10 @@ export default function Inventory() {
         <div className="intake-header-inline">
           <div className="intake-header-left">
             <span className="intake-icon">📋</span>
-            <h2>재고 입고 기록</h2>
-            <p style={{ fontSize: '0.875rem', color: '#64748b', marginTop: '4px' }}>최근 100개의 입고 기록을 표시합니다. 삭제 시 재고는 되돌려지지 않습니다.</p>
+            <div>
+              <h2>재고 입고 기록</h2>
+              <p className="intake-header-copy">최근 100개의 입고 기록을 표시합니다. 삭제 시 재고는 되돌려지지 않습니다.</p>
+            </div>
           </div>
           <button className="btn btn-secondary" onClick={fetchIntakeHistory} disabled={loadingHistory}>
             <RefreshCw size={18} className={loadingHistory ? 'animate-spin' : ''} />
@@ -1122,18 +1390,10 @@ export default function Inventory() {
         ) : (
           <>
             {activeTab === 'overview' && renderOverviewTab()}
-            {activeTab === 'pricing' && (
-              <div className="empty-tab">
-                <p>💰 시세 모니터링 기능은 준비 중입니다.</p>
-              </div>
-            )}
+            {activeTab === 'pricing' && renderPricingTab()}
             {activeTab === 'receiving' && renderReceivingTab()}
             {activeTab === 'history' && renderHistoryTab()}
-            {activeTab === 'forecast' && (
-              <div className="empty-tab">
-                <p>📈 수요예측 기능은 준비 중입니다.</p>
-              </div>
-            )}
+            {activeTab === 'forecast' && renderForecastTab()}
           </>
         )}
       </div>
@@ -1144,7 +1404,7 @@ export default function Inventory() {
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h2>📦 새 재고 품목 등록</h2>
-              <button className="modal-close" onClick={handleCloseModal}>
+              <button className="modal-close" onClick={handleCloseModal} aria-label="재고 품목 등록 모달 닫기">
                 <X size={20} />
               </button>
             </div>
