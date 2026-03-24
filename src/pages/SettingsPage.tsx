@@ -50,9 +50,9 @@ export default function SettingsPage() {
     ];
 
     return (
-        <div className="max-w-4xl mx-auto space-y-6 animate-fade-in">
+        <div className="max-w-4xl mx-auto space-y-5 md:space-y-6 animate-fade-in">
             <header>
-                <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                <h2 className="text-xl md:text-2xl font-bold text-slate-800 flex items-center gap-2">
                     ⚙️ 설정 (Settings)
                 </h2>
                 <p className="text-sm text-slate-500">매장 정보 및 시스템 환경을 설정합니다.</p>
@@ -61,24 +61,24 @@ export default function SettingsPage() {
             <div className="flex flex-col md:flex-row gap-6">
                 {/* Settings Sidebar */}
                 <div className="w-full md:w-64 flex-shrink-0">
-                    <nav className="flex flex-row md:flex-col bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+                    <nav className="flex gap-2 md:gap-0 md:flex-col overflow-x-auto md:overflow-hidden scrollbar-hide">
                         <button
                             onClick={() => setActiveTab('profile')}
-                            className={`flex-1 md:flex-none flex items-center gap-3 px-4 py-3 text-sm font-medium transition-colors ${activeTab === 'profile' ? 'bg-blue-50 text-blue-700 border-l-4 border-blue-600' : 'text-slate-600 hover:bg-slate-50'
+                            className={`flex-shrink-0 md:flex-none flex items-center justify-center md:justify-start gap-2 md:gap-3 px-4 py-3 text-sm font-medium transition-colors rounded-xl md:rounded-none border md:border-x md:border-t md:first:rounded-t-xl md:last:rounded-b-xl shadow-sm whitespace-nowrap ${activeTab === 'profile' ? 'bg-blue-50 text-blue-700 border-blue-200 md:border-l-4 md:border-blue-600' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
                                 }`}
                         >
                             <Store size={18} /> 매장 프로필
                         </button>
                         <button
                             onClick={() => setActiveTab('display')}
-                            className={`flex-1 md:flex-none flex items-center gap-3 px-4 py-3 text-sm font-medium transition-colors ${activeTab === 'display' ? 'bg-blue-50 text-blue-700 border-l-4 border-blue-600' : 'text-slate-600 hover:bg-slate-50'
+                            className={`flex-shrink-0 md:flex-none flex items-center justify-center md:justify-start gap-2 md:gap-3 px-4 py-3 text-sm font-medium transition-colors rounded-xl md:rounded-none border md:border-x shadow-sm whitespace-nowrap ${activeTab === 'display' ? 'bg-blue-50 text-blue-700 border-blue-200 md:border-l-4 md:border-blue-600' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
                                 }`}
                         >
                             <Monitor size={18} /> 디스플레이
                         </button>
                         <button
                             onClick={() => setActiveTab('notification')}
-                            className={`flex-1 md:flex-none flex items-center gap-3 px-4 py-3 text-sm font-medium transition-colors ${activeTab === 'notification' ? 'bg-blue-50 text-blue-700 border-l-4 border-blue-600' : 'text-slate-600 hover:bg-slate-50'
+                            className={`flex-shrink-0 md:flex-none flex items-center justify-center md:justify-start gap-2 md:gap-3 px-4 py-3 text-sm font-medium transition-colors rounded-xl md:rounded-none border md:border-x md:border-b shadow-sm whitespace-nowrap ${activeTab === 'notification' ? 'bg-blue-50 text-blue-700 border-blue-200 md:border-l-4 md:border-blue-600' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
                                 }`}
                         >
                             <Bell size={18} /> 알림 설정
@@ -87,7 +87,7 @@ export default function SettingsPage() {
                 </div>
 
                 {/* Settings Content */}
-                <div className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm p-8 min-h-[500px]">
+                <div className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm p-5 sm:p-6 md:p-8 min-h-0 md:min-h-[500px]">
 
                     {/* --- Profile Tab --- */}
                     {activeTab === 'profile' && (
@@ -95,7 +95,7 @@ export default function SettingsPage() {
                             <h3 className="text-lg font-bold text-slate-800 border-b border-slate-100 pb-3 mb-6">매장 기본 정보</h3>
 
                             {/* Logo Upload */}
-                            <div className="flex items-center gap-6">
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6">
                                 <div className="w-24 h-24 rounded-full bg-slate-100 border-2 border-dashed border-slate-300 flex items-center justify-center overflow-hidden relative group">
                                     {tempProfile.logoUrl ? (
                                         <img src={tempProfile.logoUrl} alt="Logo" className="w-full h-full object-cover" />
@@ -164,7 +164,7 @@ export default function SettingsPage() {
                             <div className="pt-4 flex justify-end">
                                 <button
                                     onClick={saveProfile}
-                                    className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition-all shadow-md active:scale-95"
+                                    className="flex w-full sm:w-auto items-center justify-center gap-2 px-6 py-2.5 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition-all shadow-md active:scale-95"
                                 >
                                     {saved ? <Check size={18} /> : <Save size={18} />}
                                     {saved ? '저장됨!' : '변경사항 저장'}
@@ -207,7 +207,7 @@ export default function SettingsPage() {
                             {/* Dark Mode */}
                             <div>
                                 <label className="block text-sm font-bold text-slate-700 mb-3">화면 모드</label>
-                                <div className="flex gap-4">
+                                <div className="flex flex-col sm:flex-row gap-4">
                                     <button
                                         onClick={() => updateAppSettings({ darkMode: false })}
                                         className={`flex-1 p-4 rounded-xl border flex flex-col items-center gap-3 transition-all ${!appSettings.darkMode ? 'border-blue-500 bg-blue-50 text-blue-700 ring-1 ring-blue-500' : 'border-slate-200 hover:bg-slate-50'
@@ -230,7 +230,7 @@ export default function SettingsPage() {
                             {/* Font Size */}
                             <div>
                                 <label className="block text-sm font-bold text-slate-700 mb-3">글자 크기</label>
-                                <div className="bg-slate-100 p-1 rounded-lg flex">
+                                <div className="bg-slate-100 p-1 rounded-lg flex flex-col sm:flex-row">
                                     {(['small', 'medium', 'large'] as const).map((size) => (
                                         <button
                                             key={size}
@@ -260,7 +260,7 @@ export default function SettingsPage() {
                                     { id: 'dailyReport', label: '일일 매출 리포트', desc: '매일 마감 시 매출 요약을 알림으로 받습니다.' },
                                     { id: 'marketing', label: '마케팅/이벤트 정보', desc: '새로운 기능이나 이벤트 소식을 받습니다.' }
                                 ].map(item => (
-                                    <div key={item.id} className="flex items-center justify-between p-4 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors">
+                                    <div key={item.id} className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-4 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors">
                                         <div>
                                             <div className="font-bold text-slate-800 text-sm">{item.label}</div>
                                             <div className="text-xs text-slate-500 mt-0.5">{item.desc}</div>
@@ -276,6 +276,7 @@ export default function SettingsPage() {
                                                     ? 'bg-blue-600'
                                                     : 'bg-slate-300'
                                                 }`}
+                                            aria-label={`${item.label} ${appSettings.notifications[item.id as keyof typeof appSettings.notifications] ? '끄기' : '켜기'}`}
                                         >
                                             <div className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow-sm transition-transform ${appSettings.notifications[item.id as keyof typeof appSettings.notifications]
                                                     ? 'left-7'

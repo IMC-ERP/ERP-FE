@@ -3,7 +3,7 @@
  * GCP-ERP 스타일 매출 분석 - Migrated from GCP-ERP-web-build-2.0-main
  */
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useData } from '../contexts/DataContext';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, CartesianGrid, Treemap, Legend } from 'recharts';
 import { WEEKDAY_ORDER } from '../constants';
@@ -29,6 +29,7 @@ const CustomTreemapContent = (props: any) => {
 export default function PeriodAnalysis() {
     const { sales, isLoading } = useData();
     const [activeTab, setActiveTab] = useState("trend");
+    const [isMobile, setIsMobile] = useState(false);
 
     // Trend Tab State
     const [startDate, setStartDate] = useState("2025-10-25");
@@ -44,6 +45,13 @@ export default function PeriodAnalysis() {
     const [periodA, setPeriodA] = useState("2024-11");
     const [periodB, setPeriodB] = useState("2025-11");
     const [compareCategory, setCompareCategory] = useState("All");
+
+    useEffect(() => {
+        const checkMobile = () => setIsMobile(window.innerWidth < 768);
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    }, []);
 
     // --- TREND LOGIC ---
     const filteredSales = useMemo(() => {
@@ -226,7 +234,7 @@ export default function PeriodAnalysis() {
         if (compareMode === 'quarter') {
             const [year, quarter] = value.includes('-') ? value.split('-') : [value, '1'];
             return (
-                <div className="flex gap-2">
+                <div className="flex flex-col sm:flex-row gap-2">
                     <select
                         value={year}
                         onChange={(e) => onChange(`${e.target.value}-${quarter}`)}
@@ -286,20 +294,20 @@ export default function PeriodAnalysis() {
     }
 
     return (
-        <div className="space-y-6 animate-fade-in">
+        <div className="space-y-5 md:space-y-6 animate-fade-in">
             <header>
-                <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                <h2 className="text-xl md:text-2xl font-bold text-slate-800 flex items-center gap-2">
                     📈 매출 분석
                 </h2>
             </header>
 
             {/* Tabs */}
-            <div className="flex gap-2 border-b border-slate-200 overflow-x-auto pb-1">
+            <div className="flex gap-2 border-b border-slate-200 overflow-x-auto pb-1 scrollbar-hide">
                 {["trend", "compare"].map((tab) => (
                     <button
                         key={tab}
                         onClick={() => setActiveTab(tab)}
-                        className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors whitespace-nowrap ${activeTab === tab
+                        className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-t-lg transition-colors whitespace-nowrap ${activeTab === tab
                             ? "bg-white text-blue-600 border-b-2 border-blue-600"
                             : "text-slate-500 hover:text-slate-800"
                             }`}
@@ -311,16 +319,16 @@ export default function PeriodAnalysis() {
             </div>
 
             {activeTab === "trend" && (
-                <div className="space-y-8 animate-fade-in">
+                <div className="space-y-6 md:space-y-8 animate-fade-in">
                     {/* Controls & KPI Grid */}
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 md:gap-6 items-stretch">
                         {/* 1. 조회 기간 설정 */}
-                        <div className="lg:col-span-6 bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-center">
+                        <div className="lg:col-span-6 bg-white p-4 md:p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-center">
                             <h3 className="font-semibold text-slate-700 mb-4 flex items-center gap-2">
                                 <Calendar size={18} className="text-blue-500" />
                                 조회 기간 설정
                             </h3>
-                            <div className="flex gap-4 items-end mb-5">
+                            <div className="flex flex-col sm:flex-row gap-4 items-stretch sm:items-end mb-5">
                                 <div className="flex-1">
                                     <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1.5 ml-1">시작일</label>
                                     <input
@@ -340,7 +348,7 @@ export default function PeriodAnalysis() {
                                     />
                                 </div>
                             </div>
-                            <div className="flex gap-2.5">
+                            <div className="flex flex-wrap gap-2.5">
                                 <button onClick={() => { setStartDate("2025-11-17"); setEndDate("2025-11-24") }} className="px-4 py-1.5 bg-slate-100 text-[11px] font-bold text-slate-600 rounded-md hover:bg-slate-200 hover:text-blue-600 transition-all">최근 1주일</button>
                                 <button onClick={() => { setStartDate("2025-10-25"); setEndDate("2025-11-24") }} className="px-4 py-1.5 bg-slate-100 text-[11px] font-bold text-slate-600 rounded-md hover:bg-slate-200 hover:text-blue-600 transition-all">최근 1개월</button>
                                 <button onClick={() => { setStartDate("2025-08-25"); setEndDate("2025-11-24") }} className="px-4 py-1.5 bg-slate-100 text-[11px] font-bold text-slate-600 rounded-md hover:bg-slate-200 hover:text-blue-600 transition-all">최근 3개월</button>
@@ -348,14 +356,14 @@ export default function PeriodAnalysis() {
                         </div>
 
                         {/* 2. 총 매출 KPI */}
-                        <div className="lg:col-span-3 bg-gradient-to-br from-blue-600 to-indigo-700 p-6 rounded-xl border border-blue-100 shadow-lg text-white flex flex-col justify-center">
+                        <div className="lg:col-span-3 bg-gradient-to-br from-blue-600 to-indigo-700 p-4 md:p-6 rounded-xl border border-blue-100 shadow-lg text-white flex flex-col justify-center">
                             <div className="text-blue-100 font-bold text-[10px] uppercase tracking-wider mb-2.5 flex items-center gap-2 opacity-90">
                                 <TrendingUp size={16} />
                                 총 매출 (선택 기간)
                             </div>
                             <div className="flex flex-col">
                                 <div className="flex items-baseline gap-1.5">
-                                    <span className="text-3xl font-black truncate">{totalRevenue.toLocaleString()}</span>
+                                    <span className="text-2xl sm:text-3xl font-black truncate">{totalRevenue.toLocaleString()}</span>
                                     <span className="text-base font-bold text-blue-100/70">원</span>
                                 </div>
                                 <div className="text-[10px] text-blue-200 mt-2.5 font-medium bg-white/10 px-2 py-0.5 rounded-full w-fit">
@@ -365,7 +373,7 @@ export default function PeriodAnalysis() {
                         </div>
 
                         {/* 3. 비교 분석 KPI */}
-                        <div className={`lg:col-span-3 p-6 rounded-xl border shadow-lg flex flex-col justify-center transition-all ${comparisonMetrics.revenueDiff >= 0 ? 'bg-white border-rose-100' : 'bg-white border-blue-100'
+                        <div className={`lg:col-span-3 p-4 md:p-6 rounded-xl border shadow-lg flex flex-col justify-center transition-all ${comparisonMetrics.revenueDiff >= 0 ? 'bg-white border-rose-100' : 'bg-white border-blue-100'
                             }`}>
                             <div className="flex justify-between items-start mb-2.5">
                                 <div className="text-slate-500 font-bold text-[10px] uppercase tracking-wider flex items-center gap-2">
@@ -400,12 +408,12 @@ export default function PeriodAnalysis() {
                     </div>
 
                     {/* Weekly & Hourly Charts Grid */}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
                         {/* 요일별 매출 */}
-                        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm relative">
-                            <div className="flex justify-between items-center mb-4">
+                        <div className="bg-white p-4 md:p-6 rounded-xl border border-slate-200 shadow-sm relative">
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
                                 <h3 className="font-bold text-slate-800 flex items-center gap-2">📊 요일별 매출</h3>
-                                <div className="flex items-center gap-2 bg-slate-50 px-2 py-1 rounded-lg border border-slate-200">
+                                <div className="flex items-center gap-2 bg-slate-50 px-2 py-1 rounded-lg border border-slate-200 w-full sm:w-auto">
                                     <span className="text-[10px] font-bold text-slate-500">금요일 주말 포함</span>
                                     <button
                                         onClick={() => setIncludeFridayInWeekend(!includeFridayInWeekend)}
@@ -415,11 +423,11 @@ export default function PeriodAnalysis() {
                                     </button>
                                 </div>
                             </div>
-                            <div className="h-64">
+                            <div className="h-56 sm:h-64">
                                 <ResponsiveContainer width="100%" height="100%">
                                     <BarChart data={weeklyData}>
                                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                                        <XAxis dataKey="day" axisLine={false} tickLine={false} />
+                                        <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fontSize: isMobile ? 11 : 12 }} />
                                         <YAxis hide />
                                         <Tooltip formatter={(value) => (value as number)?.toLocaleString() + '원'} cursor={{ fill: '#f8fafc' }} />
                                         <Bar dataKey="revenue" radius={[4, 4, 0, 0]}>
@@ -433,7 +441,7 @@ export default function PeriodAnalysis() {
                                     </BarChart>
                                 </ResponsiveContainer>
                             </div>
-                            <div className="flex justify-center gap-4 mt-2 text-xs text-slate-500">
+                            <div className="flex flex-wrap justify-center sm:justify-start gap-4 mt-2 text-xs text-slate-500">
                                 <div className="flex items-center gap-1">
                                     <span className="w-2 h-2 rounded-full bg-blue-500"></span> 평일
                                 </div>
@@ -444,10 +452,10 @@ export default function PeriodAnalysis() {
                         </div>
 
                         {/* 시간대별 매출 추이 */}
-                        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+                        <div className="bg-white p-4 md:p-6 rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
                             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-6">
                                 <h3 className="font-bold text-slate-800 flex items-center gap-2">⏰ 시간대별 매출 추이</h3>
-                                <div className="flex items-center gap-2 bg-slate-50 p-1.5 rounded-lg border border-slate-200">
+                                <div className="flex items-center gap-2 bg-slate-50 p-1.5 rounded-lg border border-slate-200 w-full sm:w-auto justify-between sm:justify-start">
                                     <Clock size={14} className="text-slate-400 ml-1" />
                                     <div className="flex items-center gap-1">
                                         <select
@@ -473,9 +481,9 @@ export default function PeriodAnalysis() {
                                 </div>
                             </div>
 
-                            <div className="h-64 flex-1">
+                            <div className="h-56 sm:h-64 flex-1">
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <LineChart data={hourlyData} margin={{ top: 10, right: 30, left: 10, bottom: 0 }}>
+                                    <LineChart data={hourlyData} margin={{ top: 10, right: isMobile ? 10 : 30, left: 10, bottom: 0 }}>
                                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                                         <XAxis
                                             dataKey="hour"
@@ -542,8 +550,8 @@ export default function PeriodAnalysis() {
                         </h3>
                         <p className="text-sm text-slate-500">박스 크기 = 매출액</p>
 
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[500px]">
-                            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm overflow-hidden h-full flex flex-col">
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
+                            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm overflow-hidden h-[280px] sm:h-[340px] lg:h-[500px] flex flex-col">
                                 <ResponsiveContainer width="100%" height="100%">
                                     <Treemap
                                         data={itemSalesData}
@@ -560,21 +568,21 @@ export default function PeriodAnalysis() {
                                 </ResponsiveContainer>
                             </div>
 
-                            <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm overflow-hidden h-full flex flex-col">
+                            <div className="bg-white p-4 md:p-6 rounded-xl border border-slate-200 shadow-sm overflow-hidden h-[320px] sm:h-[400px] lg:h-[500px] flex flex-col">
                                 <h4 className="text-sm font-bold text-slate-700 mb-4">🏆 상품별 매출 순위</h4>
                                 <ResponsiveContainer width="100%" height="100%">
                                     <BarChart
                                         layout="vertical"
                                         data={itemSalesData.slice(0, 10)}
-                                        margin={{ top: 5, right: 30, left: 40, bottom: 5 }}
+                                        margin={{ top: 5, right: isMobile ? 10 : 30, left: isMobile ? 0 : 40, bottom: 5 }}
                                     >
                                         <CartesianGrid strokeDasharray="3 3" horizontal={false} vertical={true} stroke="#f1f5f9" />
                                         <XAxis type="number" hide />
                                         <YAxis
                                             type="category"
                                             dataKey="name"
-                                            width={150}
-                                            tick={{ fontSize: 11, fill: '#475569' }}
+                                            width={isMobile ? 90 : 150}
+                                            tick={{ fontSize: isMobile ? 10 : 11, fill: '#475569' }}
                                         />
                                         <Tooltip
                                             formatter={(value) => `${(value as number)?.toLocaleString()}원`}
@@ -591,10 +599,10 @@ export default function PeriodAnalysis() {
             )}
 
             {activeTab === "compare" && (
-                <div className="space-y-8 animate-fade-in">
+                <div className="space-y-6 md:space-y-8 animate-fade-in">
                     {/* Comparison Controls */}
-                    <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                        <div className="flex flex-col md:flex-row gap-6 items-end">
+                    <div className="bg-white p-4 md:p-6 rounded-xl border border-slate-200 shadow-sm">
+                        <div className="flex flex-col md:flex-row gap-4 md:gap-6 items-stretch md:items-end">
                             <div className="w-full md:w-64">
                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-2">비교 기준</label>
                                 <div className="flex bg-slate-100 p-1 rounded-lg">
@@ -619,7 +627,7 @@ export default function PeriodAnalysis() {
                                 </div>
                             </div>
 
-                            <div className="w-full md:flex-1 grid grid-cols-2 gap-4">
+                            <div className="w-full md:flex-1 grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-xs font-medium text-slate-500 mb-1">기준 기간 (과거/A)</label>
                                     {renderPeriodSelector(periodA, setPeriodA, false)}
@@ -644,35 +652,35 @@ export default function PeriodAnalysis() {
                     </div>
 
                     {/* KPI Cards */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between h-32">
-                            <div className="flex justify-between items-start">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+                        <div className="bg-white p-4 md:p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between min-h-[132px]">
+                            <div className="flex justify-between items-start gap-3">
                                 <span className="text-sm text-slate-500 font-medium">총 매출 (Revenue)</span>
                                 {renderGrowthBadge(summaryB.revenue, summaryA.revenue)}
                             </div>
-                            <div className="flex items-end gap-3">
+                            <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:gap-3">
                                 <span className="text-2xl font-bold text-slate-800">{summaryB.revenue.toLocaleString()}원</span>
                                 <span className="text-xs text-slate-400 mb-1">vs {summaryA.revenue.toLocaleString()}원</span>
                             </div>
                         </div>
 
-                        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between h-32">
-                            <div className="flex justify-between items-start">
+                        <div className="bg-white p-4 md:p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between min-h-[132px]">
+                            <div className="flex justify-between items-start gap-3">
                                 <span className="text-sm text-slate-500 font-medium">총 결제 건수 (Orders)</span>
                                 {renderGrowthBadge(summaryB.count, summaryA.count)}
                             </div>
-                            <div className="flex items-end gap-3">
+                            <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:gap-3">
                                 <span className="text-2xl font-bold text-slate-800">{summaryB.count.toLocaleString()}건</span>
                                 <span className="text-xs text-slate-400 mb-1">vs {summaryA.count.toLocaleString()}건</span>
                             </div>
                         </div>
 
-                        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between h-32">
-                            <div className="flex justify-between items-start">
+                        <div className="bg-white p-4 md:p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between min-h-[132px]">
+                            <div className="flex justify-between items-start gap-3">
                                 <span className="text-sm text-slate-500 font-medium">평균 주문금액 (Avg Ticket)</span>
                                 {renderGrowthBadge(summaryB.avgTicket, summaryA.avgTicket)}
                             </div>
-                            <div className="flex items-end gap-3">
+                            <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:gap-3">
                                 <span className="text-2xl font-bold text-slate-800">{summaryB.avgTicket.toLocaleString()}원</span>
                                 <span className="text-xs text-slate-400 mb-1">vs {summaryA.avgTicket.toLocaleString()}원</span>
                             </div>
@@ -680,15 +688,15 @@ export default function PeriodAnalysis() {
                     </div>
 
                     {/* Detailed Comparison Charts */}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[400px]">
-                        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
+                        <div className="bg-white p-4 md:p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col h-[320px] md:h-[400px]">
                             <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">📊 카테고리별 성과 비교</h3>
                             <div className="flex-1">
                                 <ResponsiveContainer width="100%" height="100%">
                                     <BarChart data={categoryComparison} layout="vertical" margin={{ left: 20 }}>
                                         <CartesianGrid strokeDasharray="3 3" horizontal={false} />
                                         <XAxis type="number" hide />
-                                        <YAxis type="category" dataKey="name" width={80} tick={{ fontSize: 12 }} />
+                                        <YAxis type="category" dataKey="name" width={isMobile ? 64 : 80} tick={{ fontSize: isMobile ? 10 : 12 }} />
                                         <Tooltip formatter={(value) => (value as number)?.toLocaleString() + '원'} />
                                         <Legend verticalAlign="top" height={36} />
                                         <Bar dataKey={periodA} name={`${periodA} (과거)`} fill="#cbd5e1" radius={[0, 4, 4, 0]} barSize={12} />
@@ -698,10 +706,10 @@ export default function PeriodAnalysis() {
                             </div>
                         </div>
 
-                        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col overflow-hidden">
+                        <div className="bg-white p-4 md:p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col overflow-hidden min-h-[320px] md:h-[400px]">
                             <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">🏆 인기 메뉴 랭킹 (판매량 기준)</h3>
                             <div className="flex-1 overflow-auto">
-                                <div className="grid grid-cols-2 gap-4 h-full">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 h-full">
                                     <div className="bg-slate-50 rounded-lg p-3">
                                         <div className="text-xs font-bold text-slate-500 mb-3 text-center border-b border-slate-200 pb-2">{periodA} Top 5</div>
                                         <div className="space-y-3">
