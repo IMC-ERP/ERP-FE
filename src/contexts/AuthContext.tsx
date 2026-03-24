@@ -55,6 +55,19 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
             }
         } catch (error: any) {
             console.error('[AUTH] Failed to check registration:', error);
+
+            // 401/403 에러 시 세션 만료 → 로그아웃하여 stale 세션 정리
+            const status = error?.response?.status;
+            if (status === 401 || status === 403) {
+                console.warn('[AUTH] Stale session detected, signing out...');
+                await supabase.auth.signOut();
+                setUser(null);
+                setSession(null);
+                setUserProfile(null);
+                setNeedsRegistration(false);
+                return;
+            }
+
             setNeedsRegistration(true);
             setUserProfile(null);
         }
@@ -97,17 +110,36 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
     // 인증 상태 감시
     useEffect(() => {
-        // 현재 세션 확인
-        supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
-            setSession(currentSession);
-            setUser(currentSession?.user ?? null);
+        let initialLoadDone = false;
 
-            if (currentSession?.user) {
+        // 현재 세션 확인 (캐시된 세션이 있으면 refresh하여 유효성 검증)
+        supabase.auth.getSession().then(async ({ data: { session: currentSession } }) => {
+            if (currentSession) {
+                // 캐시된 세션이 있으면 서버에 refresh하여 유효성 확인
+                const { data: { session: refreshed }, error } = await supabase.auth.refreshSession();
+                if (error || !refreshed) {
+                    // refresh 실패 → stale 세션 정리
+                    console.warn('[AUTH] Session refresh failed, clearing stale session');
+                    await supabase.auth.signOut();
+                    setSession(null);
+                    setUser(null);
+                    setLoading(false);
+                    initialLoadDone = true;
+                    return;
+                }
+                setSession(refreshed);
+                setUser(refreshed.user);
+                // 프로필은 비동기로 로드 (loading 블로킹 안 함)
                 loadUserProfile();
+            } else {
+                setSession(null);
+                setUser(null);
             }
             setLoading(false);
+            initialLoadDone = true;
         }).catch(() => {
             setLoading(false);
+            initialLoadDone = true;
         });
 
         // 상태 변화 리스너
@@ -117,13 +149,18 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
                 setUser(currentSession?.user ?? null);
 
                 if (currentSession?.user) {
-                    await loadUserProfile();
+                    // 프로필은 비동기로 로드 (loading 블로킹 안 함)
+                    loadUserProfile();
                 } else {
                     setUserProfile(null);
                     setNeedsRegistration(false);
                 }
 
-                setLoading(false);
+                // 초기 로드가 아직 안 끝났으면 여기서 풀어줌
+                if (!initialLoadDone) {
+                    setLoading(false);
+                    initialLoadDone = true;
+                }
             }
         );
 
