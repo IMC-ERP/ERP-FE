@@ -1,7 +1,7 @@
 /**
  * API Service
  * FastAPI 백엔드와 통신하는 axios 클라이언트
- * Firebase 인증 토큰 자동 첨부
+ * Supabase JWT 자동 첨부
  */
 
 import axios from 'axios';
@@ -45,6 +45,23 @@ api.interceptors.request.use(async (config) => {
 }, (error) => {
   return Promise.reject(error);
 });
+
+// 401 응답 시 토큰 갱신 후 재시도
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const originalRequest = error.config;
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
+      const { data: { session } } = await supabase.auth.refreshSession();
+      if (session?.access_token) {
+        originalRequest.headers.Authorization = `Bearer ${session.access_token}`;
+        return api(originalRequest);
+      }
+    }
+    return Promise.reject(error);
+  }
+);
 
 // ==================== Types ====================
 
