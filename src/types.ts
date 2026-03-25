@@ -45,10 +45,10 @@ export interface TopSellingItem {
 
 export interface StoreProfile {
     name: string;
-    ceoName: string;
-    foundedYear: string;
+    ownerName: string;
+    establishedYear: string;
     location: string;
-    contact: string;
+    contactNumber: string;
     logoUrl?: string; // Data URL or path
 }
 

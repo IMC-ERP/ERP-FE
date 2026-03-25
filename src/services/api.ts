@@ -14,6 +14,12 @@ const API_BASE_URL = import.meta.env.VITE_API_URL
     ? 'http://localhost:8000/api'
     : 'https://coffee-erp-backend-427178764915.asia-northeast3.run.app/api');
 
+let currentToken: string | null = null;
+
+export const setAuthToken = (token: string | null) => {
+  currentToken = token;
+};
+
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
@@ -22,24 +28,23 @@ const api = axios.create({
   timeout: 30000, // 30초 타임아웃 (Cloud Run Cold Start 대응)
 });
 
-// 지수 백오프 재시도 설정 (네트워크 오류 및 503 에러 대응)
-axiosRetry(api, {
-  retries: 3,
-  retryDelay: axiosRetry.exponentialDelay,
-  retryCondition: (error) => {
-    return axiosRetry.isNetworkOrIdempotentRequestError(error) ||
-      error.response?.status === 503;
-  },
-  onRetry: (_retryCount, _error) => {
-    // retry silently
-  }
-});
+// 지수 백오프 재시도 설정 제거 (디버깅 목적)
+// axiosRetry(api, {
+//  retries: 3,
+//  retryDelay: axiosRetry.exponentialDelay,
+//  retryCondition: (error) => {
+//    return axiosRetry.isNetworkOrIdempotentRequestError(error) ||
+//      error.response?.status === 503;
+//  },
+//  onRetry: (_retryCount, _error) => {
+//    // retry silently
+//  }
+// });
 
 // Supabase JWT 자동 첨부 인터셉터
-api.interceptors.request.use(async (config) => {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (session?.access_token) {
-    config.headers.Authorization = `Bearer ${session.access_token}`;
+api.interceptors.request.use((config) => {
+  if (currentToken) {
+    config.headers.Authorization = `Bearer ${currentToken}`;
   }
   return config;
 }, (error) => {
@@ -50,13 +55,18 @@ api.interceptors.request.use(async (config) => {
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
+    console.error('[Axios Response Error]', error.message, error.config?.url);
     const originalRequest = error.config;
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
-      const { data: { session } } = await supabase.auth.refreshSession();
-      if (session?.access_token) {
-        originalRequest.headers.Authorization = `Bearer ${session.access_token}`;
-        return api(originalRequest);
+      try {
+        const { data: { session } } = await supabase.auth.refreshSession();
+        if (session?.access_token) {
+          originalRequest.headers.Authorization = `Bearer ${session.access_token}`;
+          return api(originalRequest);
+        }
+      } catch (e) {
+        console.error('[Refresh Session Error]', e);
       }
     }
     return Promise.reject(error);
@@ -380,6 +390,7 @@ export interface UserRegistration {
   owner_name: string;
   phone?: string;
   address?: string;
+  established_year?: number;
 }
 
 export interface UserProfile {
@@ -390,6 +401,7 @@ export interface UserProfile {
   owner_name: string;
   phone?: string;
   address?: string;
+  role?: string;
   created_at: string;
   updated_at: string;
 }
@@ -413,7 +425,41 @@ export const userApi = {
   getProfile: () => api.get<UserProfile>('/users/profile'),
   updateProfile: (data: UserProfileUpdate) => api.put<UserProfile>('/users/profile', data),
   checkRegistration: () => api.get<RegistrationStatus>('/users/check-registration'),
+  getStoreProfile: () => api.get<StoreProfileData>('/users/store-profile'),
+  updateStoreProfile: (data: StoreProfileUpdateData) => api.put<StoreProfileData>('/users/store-profile', data),
+  getStoreMembers: () => api.get<StoreMemberData[]>('/users/store-members'),
+  deleteAccount: () => api.delete('/users/account'),
 };
+
+// ==================== Store Profile Types ====================
+
+export interface StoreProfileData {
+  id: string;
+  slug: string;
+  store_name: string;
+  status?: string;
+  owner_name?: string;
+  contact_number?: string;
+  address?: string;
+  established_year?: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface StoreProfileUpdateData {
+  store_name?: string;
+  owner_name?: string;
+  contact_number?: string;
+  address?: string;
+  established_year?: number;
+}
+
+export interface StoreMemberData {
+  name: string;
+  role: string;
+  phone?: string;
+  email?: string;
+}
 
 // ==================== Auth API ====================
 

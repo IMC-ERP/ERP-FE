@@ -1,6 +1,6 @@
 /**
  * RegisterPage - 사용자 회원가입 페이지
- * Firebase 인증 후 매장 정보 등록
+ * Supabase 인증 후 매장 정보 등록
  */
 
 import { useState, useEffect } from 'react';
@@ -16,7 +16,8 @@ export default function RegisterPage() {
         storeName: '',
         ownerName: '',
         phone: '',
-        address: ''
+        address: '',
+        establishedYear: ''
     });
 
     const [loading, setLoading] = useState(false);
@@ -62,7 +63,8 @@ export default function RegisterPage() {
                 store_name: formData.storeName,
                 owner_name: formData.ownerName,
                 phone: formData.phone,
-                address: formData.address
+                address: formData.address,
+                established_year: formData.establishedYear ? parseInt(formData.establishedYear) : undefined
             });
 
             // 등록 성공 - 프로필 새로고침 후 대시보드로 이동
@@ -144,6 +146,23 @@ export default function RegisterPage() {
                             value={formData.phone}
                             onChange={handleChange}
                             placeholder="예: 010-1234-5678"
+                            className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all"
+                        />
+                    </div>
+
+                    <div>
+                        <label htmlFor="establishedYear" className="block text-sm font-medium text-slate-700 mb-2">
+                            설립 연도
+                        </label>
+                        <input
+                            type="number"
+                            id="establishedYear"
+                            name="establishedYear"
+                            value={formData.establishedYear}
+                            onChange={handleChange}
+                            placeholder="예: 2024"
+                            min="1900"
+                            max="2099"
                             className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all"
                         />
                     </div>

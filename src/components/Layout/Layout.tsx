@@ -55,8 +55,8 @@ const NavItem = ({ to, icon: Icon, label, active, onClick }: NavItemProps) => (
 
 export default function Layout() {
   const location = useLocation();
-  const { storeProfile, appSettings, updateAppSettings } = useData();
-  const { user, logout } = useAuth();
+  const { appSettings, updateAppSettings } = useData();
+  const { user, userProfile, logout } = useAuth();
 
   const [isAIDrawerOpen, setIsAIDrawerOpen] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
@@ -140,12 +140,8 @@ export default function Layout() {
             <Menu size={22} />
           </button>
           <div className="mobile-header-title">
-            {storeProfile.logoUrl ? (
-              <img src={storeProfile.logoUrl} alt="Logo" className="mobile-header-logo" />
-            ) : (
-              <Coffee className="text-amber-600" size={18} />
-            )}
-            <span>{storeProfile.name}</span>
+            <Coffee className="text-amber-600" size={18} />
+            <span>{userProfile?.store_name || 'Coffee ERP'}</span>
           </div>
           <div className="mobile-header-actions">
             <button
@@ -187,15 +183,11 @@ export default function Layout() {
         ${isMobile && !isMobileSidebarOpen ? 'mobile-sidebar-closed' : ''}
       `}>
         <div className="p-6 border-b border-slate-100 flex items-center gap-3">
-          {storeProfile.logoUrl ? (
-            <img src={storeProfile.logoUrl} alt="Logo" className="w-10 h-10 rounded-full object-cover border border-slate-200" />
-          ) : (
-            <div className="bg-amber-100 p-2 rounded-full">
-              <Coffee className="text-amber-700" size={24} />
-            </div>
-          )}
+          <div className="bg-amber-100 p-2 rounded-full">
+            <Coffee className="text-amber-700" size={24} />
+          </div>
           <div className="flex-1">
-            <h1 className="text-base font-bold text-slate-800 tracking-tight leading-tight">{storeProfile.name}</h1>
+            <h1 className="text-base font-bold text-slate-800 tracking-tight leading-tight">{userProfile?.store_name || 'Coffee ERP'}</h1>
             <p className="text-[10px] text-slate-400">Coffee ERP v2.5.4</p>
           </div>
           {isMobile && (

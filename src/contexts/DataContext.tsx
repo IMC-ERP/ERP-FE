@@ -57,13 +57,13 @@ export const DataProvider = ({ children }: { children?: ReactNode }) => {
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    // Default Profile
+    // Default Profile (API에서 로드 전 기본값)
     const [storeProfile, setStoreProfile] = useState<StoreProfile>({
         name: "Coffee ERP",
-        ceoName: "홍길동",
-        foundedYear: "2023",
-        location: "서울시 강남구 테헤란로 123",
-        contact: "02-1234-5678"
+        ownerName: "",
+        establishedYear: "",
+        location: "",
+        contactNumber: ""
     });
 
     // Default Settings
