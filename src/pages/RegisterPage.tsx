@@ -67,9 +67,9 @@ export default function RegisterPage() {
                 established_year: formData.establishedYear ? parseInt(formData.establishedYear) : undefined
             });
 
-            // 등록 성공 - 프로필 새로고침 후 대시보드로 이동
+            // 등록 성공 - 프로필 새로고침 후 온보딩으로 이동
             await refreshProfile();
-            navigate('/dashboard');
+            navigate('/onboarding');
         } catch (err: any) {
             console.error('Registration failed:', err);
             setError(err.response?.data?.detail || '등록에 실패했습니다. 다시 시도해주세요.');

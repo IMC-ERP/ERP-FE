@@ -5,7 +5,6 @@
  */
 
 import axios from 'axios';
-import axiosRetry from 'axios-retry';
 import { supabase } from '../supabase';
 
 // 개발 환경에서는 localhost, 프로덕션에서는 Cloud Run 백엔드 사용

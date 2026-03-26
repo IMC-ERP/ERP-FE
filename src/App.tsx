@@ -19,6 +19,8 @@ import PeriodAnalysis from './pages/PeriodAnalysis';
 import TransactionManager from './pages/TransactionManager';
 import CostRecipeManager from './pages/CostRecipeManager';
 import SettingsPage from './pages/SettingsPage';
+import OnboardingLayout from './pages/onboarding/OnboardingLayout';
+import OnboardingGuard from './components/OnboardingGuard';
 import './index.css';
 
 const AIAssistant = lazy(() => import('./pages/AIAssistant'));
@@ -150,10 +152,21 @@ function App() {
             />
 
             <Route
+              path="/onboarding"
+              element={(
+                <ProtectedRoute>
+                  <OnboardingLayout />
+                </ProtectedRoute>
+              )}
+            />
+
+            <Route
               path="/"
               element={(
                 <ProtectedRoute>
-                  <Layout />
+                  <OnboardingGuard>
+                    <Layout />
+                  </OnboardingGuard>
                 </ProtectedRoute>
               )}
             >
