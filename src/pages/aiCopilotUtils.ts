@@ -150,18 +150,18 @@ const buildRecipeInsights = (recipes: RecipeCost[], recentMenuQtyMap: Map<string
 
 export const buildAnalyticsSnapshot = (sales: SaleItem[], inventory: InventoryItem[], recipes: RecipeCost[]): AnalyticsSnapshot => {
   const lowStockItems = inventory
-    .filter(item => item.safetyStock > 0 && item.currentStock < item.safetyStock)
+    .filter(item => item.safetyStock > 0 && item.quantity_on_hand < item.safetyStock)
     .map(item => ({
       ...item,
-      gap: item.safetyStock - item.currentStock,
-      coverage: item.safetyStock > 0 ? item.currentStock / item.safetyStock : 1
+      gap: item.safetyStock - item.quantity_on_hand,
+      coverage: item.safetyStock > 0 ? item.quantity_on_hand / item.safetyStock : 1
     }))
     .sort((a, b) => a.coverage - b.coverage);
 
   const watchlistCount = inventory.filter(item =>
     item.safetyStock > 0 &&
-    item.currentStock >= item.safetyStock &&
-    item.currentStock <= item.safetyStock * 1.2
+    item.quantity_on_hand >= item.safetyStock &&
+    item.quantity_on_hand <= item.safetyStock * 1.2
   ).length;
   const initialRecipeSnapshot = buildRecipeInsights(recipes, new Map<string, number>());
 
@@ -478,7 +478,7 @@ export const buildGuidanceCards = (snapshot: AnalyticsSnapshot): GuidanceCard[] 
       label: '오늘 바로',
       title: `${urgent.name_ko} 발주 확인`,
       summary: `안전재고보다 ${urgent.gap}${urgent.uom} 부족합니다.`,
-      detail: `현재 ${urgent.currentStock}${urgent.uom}, 안전 ${urgent.safetyStock}${urgent.uom}입니다. 같은 계열 품목까지 함께 묶어 발주 여부를 점검하세요.`,
+      detail: `현재 ${urgent.quantity_on_hand}${urgent.uom}, 안전 ${urgent.safetyStock}${urgent.uom}입니다. 같은 계열 품목까지 함께 묶어 발주 여부를 점검하세요.`,
       prompt: `${urgent.name_ko}를 포함한 저재고 품목 발주 우선순위를 정리해줘. 오늘 바로 끊길 수 있는 품목부터 알려줘.`
     });
   } else {
@@ -640,7 +640,7 @@ export const buildLocalFallbackResponse = (
   const checklistItems = buildChecklistItems(snapshot);
   const topLowStocks = snapshot.lowStockItems
     .slice(0, 3)
-    .map(item => `${item.name_ko}(${item.currentStock}${item.uom} / 안전 ${item.safetyStock}${item.uom})`)
+    .map(item => `${item.name_ko}(${item.quantity_on_hand}${item.uom} / 안전 ${item.safetyStock}${item.uom})`)
     .join(', ');
 
   const briefingLines = [

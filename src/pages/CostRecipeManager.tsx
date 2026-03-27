@@ -3,7 +3,7 @@
  * GCP-ERP 스타일 원가 및 레시피 관리 - Migrated from GCP-ERP-web-build-2.0-main
  */
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { ChevronDown, ChevronRight, Plus, Trash2, DollarSign, Calculator, Archive, AlertCircle, ArrowUp, ArrowDown, X, Save } from 'lucide-react';
 import { recipeCostApi, inventoryApi } from '../services/api';
 
@@ -16,7 +16,7 @@ interface RawMaterial {
     purchasePrice: number;
     purchaseUnitQty: number;
     unit: string;
-    currentStock: number;
+    quantity_on_hand: number;
 }
 
 interface RecipeIngredient {
@@ -56,6 +56,96 @@ const calculateRecipeCost = (ingredients: RecipeIngredient[], materials: RawMate
 };
 
 // --- Sub Components ---
+
+// Searchable Material Select (Combobox)
+const SearchableMaterialSelect = ({
+    value,
+    onChange,
+    materials
+}: {
+    value: string;
+    onChange: (val: string) => void;
+    materials: RawMaterial[];
+}) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
+    const wrapperRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
+                setIsOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    const selectedMaterial = materials.find(m => m.id === value);
+
+    const handleOpen = () => {
+        setSearchTerm('');
+        setIsOpen(true);
+    };
+
+    const filteredMaterials = useMemo(() => {
+        if (!searchTerm) return materials;
+        return materials.filter(m =>
+            m.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (m.category && m.category.toLowerCase().includes(searchTerm.toLowerCase()))
+        );
+    }, [materials, searchTerm]);
+
+    return (
+        <div className="relative w-full" ref={wrapperRef}>
+            <div
+                onClick={handleOpen}
+                className="w-full p-1.5 border border-slate-300 rounded text-sm bg-white cursor-pointer flex justify-between items-center"
+            >
+                <span className="truncate">
+                    {selectedMaterial ? `${selectedMaterial.name} (${selectedMaterial.category})` : '재료 선택'}
+                </span>
+                <ChevronDown size={14} className="text-slate-400" />
+            </div>
+
+            {isOpen && (
+                <div className="absolute z-[100] w-[280px] mt-1 bg-white border border-slate-200 rounded-lg shadow-xl max-h-60 flex flex-col overflow-hidden">
+                    <div className="p-2 border-b border-slate-100 shrink-0">
+                        <input
+                            type="text"
+                            autoFocus
+                            placeholder="이름 또는 카테고리로 재료 검색..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="w-full p-2 text-sm bg-slate-50 border border-slate-200 rounded focus:outline-none focus:border-indigo-400"
+                        />
+                    </div>
+                    <div className="overflow-y-auto flex-1 p-1">
+                        {filteredMaterials.length === 0 ? (
+                            <div className="p-3 text-center text-xs text-slate-500">
+                                일치하는 재료가 없습니다.
+                            </div>
+                        ) : (
+                            filteredMaterials.map(m => (
+                                <div
+                                    key={m.id}
+                                    onClick={() => {
+                                        onChange(m.id);
+                                        setIsOpen(false);
+                                    }}
+                                    className={`px-3 py-2 text-sm cursor-pointer rounded-md hover:bg-slate-50 transition-colors flex justify-between items-center ${value === m.id ? 'bg-indigo-50 text-indigo-700 font-bold' : 'text-slate-700'}`}
+                                >
+                                    <span className="truncate mr-2 font-medium">{m.name}</span>
+                                    <span className="text-xs text-slate-400 whitespace-nowrap">{m.category}</span>
+                                </div>
+                            ))
+                        )}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
 
 // Modal Component for Adding Material
 const AddMaterialModal = ({
@@ -98,7 +188,7 @@ const AddMaterialModal = ({
             purchasePrice: Number(price) || 0,
             purchaseUnitQty: Number(qty) || 1,
             unit,
-            currentStock: Number(stock) || 0
+            quantity_on_hand: Number(stock) || 0
         });
 
         setNewCategoryName('');
@@ -295,8 +385,8 @@ const AddRecipeModal = ({
     const totalCost = ingredients.reduce((sum, ing) => {
         const mat = materials.find(m => m.id === ing.materialId);
         if (!mat) return sum;
-        const unitPrice = getUnitPrice(mat);
-        return sum + (unitPrice * ing.qty);
+        const unit_cost = getUnitPrice(mat);
+        return sum + (unit_cost * ing.qty);
     }, 0);
 
     const handleSave = () => {
@@ -418,73 +508,69 @@ const AddRecipeModal = ({
                         <label className="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide">레시피 구성</label>
                         <div className="bg-slate-50 rounded-lg border border-slate-200 overflow-hidden">
                             <div className="responsive-table-shell">
-                            <table className="w-full min-w-[720px] text-sm text-left">
-                                <thead className="bg-slate-100 text-slate-600 font-semibold">
-                                    <tr>
-                                        <th className="px-4 py-2">원재료 선택</th>
-                                        <th className="px-4 py-2 text-right">사용 용량</th>
-                                        <th className="px-4 py-2 text-right">단위</th>
-                                        <th className="px-4 py-2 text-right">단위당 원가</th>
-                                        <th className="px-4 py-2 text-right">재료비</th>
-                                        <th className="px-4 py-2 text-center">삭제</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100 bg-white">
-                                    {ingredients.map(ing => {
-                                        const mat = materials.find(m => m.id === ing.materialId);
-                                        const unitPrice = mat ? getUnitPrice(mat) : 0;
-                                        const cost = unitPrice * ing.qty;
-
-                                        return (
-                                            <tr key={ing.id} className="hover:bg-slate-50">
-                                                <td className="px-4 py-2">
-                                                    <select
-                                                        value={ing.materialId}
-                                                        onChange={(e) => handleUpdateIngredient(ing.id, 'materialId', e.target.value)}
-                                                        className="w-full p-1 border border-slate-300 rounded text-sm"
-                                                    >
-                                                        {materials.map(m => (
-                                                            <option key={m.id} value={m.id}>{m.name} ({m.category})</option>
-                                                        ))}
-                                                    </select>
-                                                </td>
-                                                <td className="px-4 py-2 text-right">
-                                                    <input
-                                                        type="number"
-                                                        value={ing.qty}
-                                                        onChange={(e) => handleUpdateIngredient(ing.id, 'qty', parseFloat(e.target.value) || 0)}
-                                                        className="w-24 p-1 border border-slate-300 rounded text-right text-sm inline-block"
-                                                    />
-                                                </td>
-                                                <td className="px-4 py-2 text-right text-slate-500">{mat?.unit}</td>
-                                                <td className="px-4 py-2 text-right text-slate-400 font-mono">{unitPrice.toFixed(1)}원</td>
-                                                <td className="px-4 py-2 text-right font-bold text-slate-700 font-mono">{Math.round(cost).toLocaleString()}원</td>
-                                                <td className="px-4 py-2 text-center">
-                                                    <button
-                                                        onClick={() => handleRemoveIngredient(ing.id)}
-                                                        className="text-slate-400 hover:text-red-500"
-                                                        aria-label={`${mat?.name ?? '재료'} 재료 행 삭제`}
-                                                    >
-                                                        <Trash2 size={16} />
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-                                    {ingredients.length === 0 && (
+                                <table className="w-full min-w-[720px] text-sm text-left">
+                                    <thead className="bg-slate-100 text-slate-600 font-semibold">
                                         <tr>
-                                            <td colSpan={6} className="p-4 text-center text-slate-400">등록된 재료가 없습니다. 재료를 추가해주세요.</td>
+                                            <th className="px-4 py-2">원재료 선택</th>
+                                            <th className="px-4 py-2 text-right">사용 용량</th>
+                                            <th className="px-4 py-2 text-right">단위</th>
+                                            <th className="px-4 py-2 text-right">단위당 원가</th>
+                                            <th className="px-4 py-2 text-right">재료비</th>
+                                            <th className="px-4 py-2 text-center">삭제</th>
                                         </tr>
-                                    )}
-                                </tbody>
-                                <tfoot className="bg-slate-50 font-bold border-t border-slate-200 text-slate-800">
-                                    <tr>
-                                        <td colSpan={4} className="px-4 py-3 text-right">총 원가 합계</td>
-                                        <td className="px-4 py-3 text-right text-blue-600">{Math.round(totalCost).toLocaleString()}원</td>
-                                        <td></td>
-                                    </tr>
-                                </tfoot>
-                            </table>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100 bg-white">
+                                        {ingredients.map(ing => {
+                                            const mat = materials.find(m => m.id === ing.materialId);
+                                            const unit_cost = mat ? getUnitPrice(mat) : 0;
+                                            const cost = unit_cost * ing.qty;
+
+                                            return (
+                                                <tr key={ing.id} className="hover:bg-slate-50">
+                                                    <td className="px-4 py-2">
+                                                        <SearchableMaterialSelect
+                                                            value={ing.materialId}
+                                                            onChange={(val) => handleUpdateIngredient(ing.id, 'materialId', val)}
+                                                            materials={materials}
+                                                        />
+                                                    </td>
+                                                    <td className="px-4 py-2 text-right">
+                                                        <input
+                                                            type="number"
+                                                            value={ing.qty}
+                                                            onChange={(e) => handleUpdateIngredient(ing.id, 'qty', parseFloat(e.target.value) || 0)}
+                                                            className="w-24 p-1 border border-slate-300 rounded text-right text-sm inline-block"
+                                                        />
+                                                    </td>
+                                                    <td className="px-4 py-2 text-right text-slate-500">{mat?.unit}</td>
+                                                    <td className="px-4 py-2 text-right text-slate-400 font-mono">{unit_cost.toFixed(1)}원</td>
+                                                    <td className="px-4 py-2 text-right font-bold text-slate-700 font-mono">{Math.round(cost).toLocaleString()}원</td>
+                                                    <td className="px-4 py-2 text-center">
+                                                        <button
+                                                            onClick={() => handleRemoveIngredient(ing.id)}
+                                                            className="text-slate-400 hover:text-red-500"
+                                                            aria-label={`${mat?.name ?? '재료'} 재료 행 삭제`}
+                                                        >
+                                                            <Trash2 size={16} />
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                        {ingredients.length === 0 && (
+                                            <tr>
+                                                <td colSpan={6} className="p-4 text-center text-slate-400">등록된 재료가 없습니다. 재료를 추가해주세요.</td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                    <tfoot className="bg-slate-50 font-bold border-t border-slate-200 text-slate-800">
+                                        <tr>
+                                            <td colSpan={4} className="px-4 py-3 text-right">총 원가 합계</td>
+                                            <td className="px-4 py-3 text-right text-blue-600">{Math.round(totalCost).toLocaleString()}원</td>
+                                            <td></td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
                             </div>
                         </div>
                         <p className="responsive-table-hint sm:hidden mt-2">표는 좌우로 밀어서 확인할 수 있습니다.</p>
@@ -609,73 +695,69 @@ const RecipeRow = ({
                     {/* Ingredients Table */}
                     <div className="bg-white rounded-lg border border-slate-200 overflow-hidden mb-4">
                         <div className="responsive-table-shell">
-                        <table className="w-full min-w-[720px] text-sm text-left">
-                            <thead className="bg-slate-100 text-slate-600 font-semibold">
-                                <tr>
-                                    <th className="px-4 py-2">원재료 선택</th>
-                                    <th className="px-4 py-2 text-right">사용 용량</th>
-                                    <th className="px-4 py-2 text-right">단위</th>
-                                    <th className="px-4 py-2 text-right">단위당 원가</th>
-                                    <th className="px-4 py-2 text-right">재료비</th>
-                                    <th className="px-4 py-2 text-center">삭제</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100">
-                                {recipe.ingredients.map(ing => {
-                                    const mat = materials.find(m => m.id === ing.materialId);
-                                    const unitPrice = mat ? getUnitPrice(mat) : 0;
-                                    const cost = unitPrice * ing.qty;
-
-                                    return (
-                                        <tr key={ing.id} className="hover:bg-slate-50">
-                                            <td className="px-4 py-2">
-                                                <select
-                                                    value={ing.materialId}
-                                                    onChange={(e) => onUpdateIngredient(recipe.id, ing.id, 'materialId', e.target.value)}
-                                                    className="w-full p-1 border border-slate-300 rounded text-sm"
-                                                >
-                                                    {materials.map(m => (
-                                                        <option key={m.id} value={m.id}>{m.name} ({m.category})</option>
-                                                    ))}
-                                                </select>
-                                            </td>
-                                            <td className="px-4 py-2 text-right">
-                                                <input
-                                                    type="number"
-                                                    value={ing.qty}
-                                                    onChange={(e) => onUpdateIngredient(recipe.id, ing.id, 'qty', parseFloat(e.target.value) || 0)}
-                                                    className="w-24 p-1 border border-slate-300 rounded text-right text-sm inline-block"
-                                                />
-                                            </td>
-                                            <td className="px-4 py-2 text-right text-slate-500">{mat?.unit}</td>
-                                            <td className="px-4 py-2 text-right text-slate-400 font-mono">{unitPrice.toFixed(1)}원</td>
-                                            <td className="px-4 py-2 text-right font-bold text-slate-700 font-mono">{Math.round(cost).toLocaleString()}원</td>
-                                            <td className="px-4 py-2 text-center">
-                                                <button
-                                                    onClick={() => onRemoveIngredient(recipe.id, ing.id)}
-                                                    className="text-slate-400 hover:text-red-500"
-                                                    aria-label={`${recipe.name}의 ${mat?.name ?? '재료'} 삭제`}
-                                                >
-                                                    <Trash2 size={16} />
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                                {recipe.ingredients.length === 0 && (
+                            <table className="w-full min-w-[720px] text-sm text-left">
+                                <thead className="bg-slate-100 text-slate-600 font-semibold">
                                     <tr>
-                                        <td colSpan={6} className="p-4 text-center text-slate-400">등록된 재료가 없습니다. 재료를 추가해주세요.</td>
+                                        <th className="px-4 py-2">원재료 선택</th>
+                                        <th className="px-4 py-2 text-right">사용 용량</th>
+                                        <th className="px-4 py-2 text-right">단위</th>
+                                        <th className="px-4 py-2 text-right">단위당 원가</th>
+                                        <th className="px-4 py-2 text-right">재료비</th>
+                                        <th className="px-4 py-2 text-center">삭제</th>
                                     </tr>
-                                )}
-                            </tbody>
-                            <tfoot className="bg-slate-50 font-bold border-t border-slate-200 text-slate-800">
-                                <tr>
-                                    <td colSpan={4} className="px-4 py-3 text-right">총 원가 합계</td>
-                                    <td className="px-4 py-3 text-right text-blue-600">{Math.round(totalCost).toLocaleString()}원</td>
-                                    <td></td>
-                                </tr>
-                            </tfoot>
-                        </table>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {recipe.ingredients.map(ing => {
+                                        const mat = materials.find(m => m.id === ing.materialId);
+                                        const unit_cost = mat ? getUnitPrice(mat) : 0;
+                                        const cost = unit_cost * ing.qty;
+
+                                        return (
+                                            <tr key={ing.id} className="hover:bg-slate-50">
+                                                <td className="px-4 py-2">
+                                                    <SearchableMaterialSelect
+                                                        value={ing.materialId}
+                                                        onChange={(val) => onUpdateIngredient(recipe.id, ing.id, 'materialId', val)}
+                                                        materials={materials}
+                                                    />
+                                                </td>
+                                                <td className="px-4 py-2 text-right">
+                                                    <input
+                                                        type="number"
+                                                        value={ing.qty}
+                                                        onChange={(e) => onUpdateIngredient(recipe.id, ing.id, 'qty', parseFloat(e.target.value) || 0)}
+                                                        className="w-24 p-1 border border-slate-300 rounded text-right text-sm inline-block"
+                                                    />
+                                                </td>
+                                                <td className="px-4 py-2 text-right text-slate-500">{mat?.unit}</td>
+                                                <td className="px-4 py-2 text-right text-slate-400 font-mono">{unit_cost.toFixed(1)}원</td>
+                                                <td className="px-4 py-2 text-right font-bold text-slate-700 font-mono">{Math.round(cost).toLocaleString()}원</td>
+                                                <td className="px-4 py-2 text-center">
+                                                    <button
+                                                        onClick={() => onRemoveIngredient(recipe.id, ing.id)}
+                                                        className="text-slate-400 hover:text-red-500"
+                                                        aria-label={`${recipe.name}의 ${mat?.name ?? '재료'} 삭제`}
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                    {recipe.ingredients.length === 0 && (
+                                        <tr>
+                                            <td colSpan={6} className="p-4 text-center text-slate-400">등록된 재료가 없습니다. 재료를 추가해주세요.</td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                                <tfoot className="bg-slate-50 font-bold border-t border-slate-200 text-slate-800">
+                                    <tr>
+                                        <td colSpan={4} className="px-4 py-3 text-right">총 원가 합계</td>
+                                        <td className="px-4 py-3 text-right text-blue-600">{Math.round(totalCost).toLocaleString()}원</td>
+                                        <td></td>
+                                    </tr>
+                                </tfoot>
+                            </table>
                         </div>
                     </div>
                     <p className="responsive-table-hint sm:hidden mb-4">표는 좌우로 밀어서 확인할 수 있습니다.</p>
@@ -726,85 +808,85 @@ const MaterialTable = ({ materials, onUpdate, onDelete, onSave }: MaterialTableP
                         <span className="text-xs text-slate-400">{items.length}개 품목</span>
                     </div>
                     <div className="responsive-table-shell">
-                    <table className="w-full min-w-[780px] text-sm text-left">
-                        <thead className="bg-white text-slate-500 font-semibold border-b border-slate-100">
-                            <tr>
-                                <th className="px-6 py-3">원재료명</th>
-                                <th className="px-6 py-3 text-right">구매가(원)</th>
-                                <th className="px-6 py-3 text-right">구매 용량</th>
-                                <th className="px-6 py-3 text-center">단위</th>
-                                <th className="px-6 py-3 text-right bg-blue-50/50">단위당 가격</th>
-                                <th className="px-6 py-3 text-right">현재 재고</th>
-                                <th className="px-6 py-3 text-center">관리</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                            {items.map(mat => (
-                                <tr key={mat.id} className="hover:bg-slate-50">
-                                    <td className="px-6 py-3">
-                                        <input
-                                            type="text"
-                                            value={mat.name}
-                                            onChange={(e) => onUpdate(mat.id, 'name', e.target.value)}
-                                            className="w-full bg-transparent border-none focus:ring-0 p-0 font-medium text-slate-800"
-                                        />
-                                    </td>
-                                    <td className="px-6 py-3 text-right">
-                                        <input
-                                            type="number"
-                                            value={mat.purchasePrice}
-                                            onChange={(e) => onUpdate(mat.id, 'purchasePrice', parseInt(e.target.value) || 0)}
-                                            className="w-24 bg-slate-50 border border-slate-200 rounded p-1 text-right focus:border-blue-500 focus:outline-none"
-                                        />
-                                    </td>
-                                    <td className="px-6 py-3 text-right">
-                                        <input
-                                            type="number"
-                                            value={mat.purchaseUnitQty}
-                                            onChange={(e) => onUpdate(mat.id, 'purchaseUnitQty', parseInt(e.target.value) || 0)}
-                                            className="w-20 bg-slate-50 border border-slate-200 rounded p-1 text-right focus:border-blue-500 focus:outline-none"
-                                        />
-                                    </td>
-                                    <td className="px-6 py-3 text-center">
-                                        <select
-                                            value={mat.unit}
-                                            onChange={(e) => onUpdate(mat.id, 'unit', e.target.value)}
-                                            className="bg-transparent text-slate-500 text-xs"
-                                        >
-                                            <option value="g">g</option>
-                                            <option value="ml">ml</option>
-                                            <option value="ea">ea</option>
-                                        </select>
-                                    </td>
-                                    <td className="px-6 py-3 text-right font-mono text-blue-600 bg-blue-50/30 font-bold">
-                                        {getUnitPrice(mat).toFixed(1)}원/{mat.unit}
-                                    </td>
-                                    <td className="px-6 py-3 text-right text-slate-600">
-                                        {mat.currentStock.toLocaleString()}
-                                    </td>
-                                    <td className="px-6 py-3 text-center">
-                                        <div className="flex gap-2 justify-center">
-                                            <button
-                                                onClick={() => onSave(mat)}
-                                                className="text-slate-300 hover:text-indigo-600 transition-colors"
-                                                title="저장"
-                                                aria-label={`${mat.name} 원재료 저장`}
-                                            >
-                                                <Save size={16} />
-                                            </button>
-                                            <button
-                                                onClick={() => onDelete(mat.id)}
-                                                className="text-slate-300 hover:text-red-500 transition-colors"
-                                                aria-label={`${mat.name} 원재료 삭제`}
-                                            >
-                                                <Trash2 size={16} />
-                                            </button>
-                                        </div>
-                                    </td>
+                        <table className="w-full min-w-[780px] text-sm text-left">
+                            <thead className="bg-white text-slate-500 font-semibold border-b border-slate-100">
+                                <tr>
+                                    <th className="px-6 py-3">원재료명</th>
+                                    <th className="px-6 py-3 text-right">구매가(원)</th>
+                                    <th className="px-6 py-3 text-right">구매 용량</th>
+                                    <th className="px-6 py-3 text-center">단위</th>
+                                    <th className="px-6 py-3 text-right bg-blue-50/50">단위당 가격</th>
+                                    <th className="px-6 py-3 text-right">현재 재고</th>
+                                    <th className="px-6 py-3 text-center">관리</th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                                {items.map(mat => (
+                                    <tr key={mat.id} className="hover:bg-slate-50">
+                                        <td className="px-6 py-3">
+                                            <input
+                                                type="text"
+                                                value={mat.name}
+                                                onChange={(e) => onUpdate(mat.id, 'name', e.target.value)}
+                                                className="w-full bg-transparent border-none focus:ring-0 p-0 font-medium text-slate-800"
+                                            />
+                                        </td>
+                                        <td className="px-6 py-3 text-right">
+                                            <input
+                                                type="number"
+                                                value={mat.purchasePrice}
+                                                onChange={(e) => onUpdate(mat.id, 'purchasePrice', parseInt(e.target.value) || 0)}
+                                                className="w-24 bg-slate-50 border border-slate-200 rounded p-1 text-right focus:border-blue-500 focus:outline-none"
+                                            />
+                                        </td>
+                                        <td className="px-6 py-3 text-right">
+                                            <input
+                                                type="number"
+                                                value={mat.purchaseUnitQty}
+                                                onChange={(e) => onUpdate(mat.id, 'purchaseUnitQty', parseInt(e.target.value) || 0)}
+                                                className="w-20 bg-slate-50 border border-slate-200 rounded p-1 text-right focus:border-blue-500 focus:outline-none"
+                                            />
+                                        </td>
+                                        <td className="px-6 py-3 text-center">
+                                            <select
+                                                value={mat.unit}
+                                                onChange={(e) => onUpdate(mat.id, 'unit', e.target.value)}
+                                                className="bg-transparent text-slate-500 text-xs"
+                                            >
+                                                <option value="g">g</option>
+                                                <option value="ml">ml</option>
+                                                <option value="ea">ea</option>
+                                            </select>
+                                        </td>
+                                        <td className="px-6 py-3 text-right font-mono text-blue-600 bg-blue-50/30 font-bold">
+                                            {getUnitPrice(mat).toFixed(1)}원/{mat.unit}
+                                        </td>
+                                        <td className="px-6 py-3 text-right text-slate-600">
+                                            {mat.quantity_on_hand.toLocaleString()}
+                                        </td>
+                                        <td className="px-6 py-3 text-center">
+                                            <div className="flex gap-2 justify-center">
+                                                <button
+                                                    onClick={() => onSave(mat)}
+                                                    className="text-slate-300 hover:text-indigo-600 transition-colors"
+                                                    title="저장"
+                                                    aria-label={`${mat.name} 원재료 저장`}
+                                                >
+                                                    <Save size={16} />
+                                                </button>
+                                                <button
+                                                    onClick={() => onDelete(mat.id)}
+                                                    className="text-slate-300 hover:text-red-500 transition-colors"
+                                                    aria-label={`${mat.name} 원재료 삭제`}
+                                                >
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             ))}
@@ -835,30 +917,32 @@ export default function CostRecipeManager() {
             const loadedMaterials: RawMaterial[] = inventoryRes.data.map(item => ({
                 id: item.id,
                 category: item.category,
-                name: item.id, // Using id as name for now based on schema
+                name: item.name,
                 purchasePrice: item.unit_cost * (item.quantity_on_hand > 0 ? 1 : 1), // Approximate
                 purchaseUnitQty: 1, // Default to 1 unit
                 unit: item.uom || 'ea',
-                currentStock: item.quantity_on_hand
+                quantity_on_hand: item.quantity_on_hand
             }));
             setMaterials(loadedMaterials);
 
             // Transform RecipeCost to MenuRecipe
             const loadedRecipes: MenuRecipe[] = recipesRes.data.map(r => ({
-                id: r.menu_name,
+                id: r.name,
                 category: r.category || 'Uncategorized',
-                name: r.menu_name,
-                salePrice: r.selling_price,
+                name: r.name,
+                salePrice: r.price,
                 ingredients: r.ingredients.map((ing, idx) => ({
-                    id: `${r.menu_name}-${idx}`,
-                    materialId: ing.name,
-                    qty: ing.usage
+                    id: `${r.name}-${idx}`,
+                    materialId: ing.ingredientId || ing.name,
+                    qty: ing.quantity
                 }))
             }));
             setRecipes(loadedRecipes);
 
         } catch (error) {
-            console.error("Failed to fetch data", error);
+            console.error("Failed to fetch data:", error);
+            setMaterials([]);
+            setRecipes([]);
         }
     };
 
@@ -938,7 +1022,7 @@ export default function CostRecipeManager() {
         try {
             await inventoryApi.update(material.id, {
                 category: material.category,
-                quantity_on_hand: material.currentStock,
+                quantity_on_hand: material.quantity_on_hand,
                 uom: material.unit,
                 unit_cost: material.purchasePrice / (material.purchaseUnitQty || 1),
                 safety_stock: 0,
@@ -953,16 +1037,18 @@ export default function CostRecipeManager() {
     };
 
     const handleDeleteMaterial = async (id: string) => {
-        if (window.confirm("이 원재료를 삭제하시겠습니까? (사용 중인 레시피에 영향을 줄 수 있습니다.)")) {
-            try {
-                // API 호출 지원 여부에 따라 주석 해제 (inventoryApi에 delete가 있다고 가정하거나 추가 필요)
-                // await inventoryApi.delete(id); 
-                setMaterials(prev => prev.filter(m => m.id !== id));
-            } catch (error) {
-                console.error("Failed to delete material", error);
-                alert("삭제 실패");
+        setTimeout(async () => {
+            if (window.confirm("이 원재료를 삭제하시겠습니까? (사용 중인 레시피에 영향을 줄 수 있습니다.)")) {
+                try {
+                    // API 호출 지원 여부에 따라 주석 해제 (inventoryApi에 delete가 있다고 가정하거나 추가 필요)
+                    // await inventoryApi.delete(id); 
+                    setMaterials(prev => prev.filter(m => m.id !== id));
+                } catch (error) {
+                    console.error("Failed to delete material", error);
+                    alert("삭제 실패");
+                }
             }
-        }
+        }, 10);
     };
 
     const handleOpenAddMaterialModal = () => {
@@ -977,13 +1063,18 @@ export default function CostRecipeManager() {
 
             await inventoryApi.create({
                 id: newItemId,
+                name: newItemId,
+                type: 'RAW',
                 category: data.category,
-                quantity_on_hand: data.currentStock,
+                quantity_on_hand: data.quantity_on_hand,
                 uom: data.unit,
                 unit_cost: data.purchasePrice / (data.purchaseUnitQty || 1), // 단가 계산
                 safety_stock: 0,
                 max_stock_level: 0,
-                needs_reorder: false
+                needs_reorder: false,
+                updated_at: new Date().toISOString(),
+                prep_yield: 0,
+                prep_recipe: []
             });
 
             const newMat: RawMaterial = {
@@ -1000,15 +1091,17 @@ export default function CostRecipeManager() {
 
     // --- Handlers: Recipes ---
     const handleDeleteRecipe = async (id: string) => {
-        if (window.confirm("이 메뉴 레시피를 삭제하시겠습니까?")) {
-            try {
-                await recipeCostApi.delete(id);
-                setRecipes(prev => prev.filter(r => r.id !== id));
-            } catch (error) {
-                console.error("Failed to delete recipe", error);
-                alert("삭제 실패");
+        setTimeout(async () => {
+            if (window.confirm("이 메뉴 레시피를 삭제하시겠습니까?")) {
+                try {
+                    await recipeCostApi.delete(id);
+                    setRecipes(prev => prev.filter(r => r.id !== id));
+                } catch (error) {
+                    console.error("Failed to delete recipe", error);
+                    alert("삭제 실패");
+                }
             }
-        }
+        }, 10);
     };
 
     const handleAddRecipe = () => {
@@ -1019,16 +1112,19 @@ export default function CostRecipeManager() {
         try {
             // Transform to API format
             const apiData = {
-                menu_name: data.name,
+                name: data.name,
+                menuId: data.name,
                 category: data.category,
-                selling_price: data.salePrice,
+                price: data.salePrice,
                 ingredients: data.ingredients.map(ing => {
                     const mat = materials.find(m => m.id === ing.materialId);
                     return {
-                        name: ing.materialId,
-                        cost_per_unit: mat ? getUnitPrice(mat) : 0,
-                        usage: ing.qty,
-                        cost: mat ? getUnitPrice(mat) * ing.qty : 0
+                        name: mat?.name || ing.materialId,
+                        ingredientId: ing.materialId,
+                        unit_cost: mat ? getUnitPrice(mat) : 0,
+                        quantity: ing.qty,
+                        total_ingredient_cost: mat ? getUnitPrice(mat) * ing.qty : 0,
+                        uom: mat?.unit || 'g'
                     };
                 })
             };
@@ -1052,16 +1148,19 @@ export default function CostRecipeManager() {
         try {
             // API payload 변환
             const payload = {
-                menu_name: recipe.name,
-                category: "Uncategorized", // 기본 카테고리 (UI에 카테고리 선택이 없어서)
-                selling_price: recipe.salePrice,
+                name: recipe.name,
+                menuId: recipe.name,
+                category: recipe.category || "Uncategorized", // 기본 카테고리 (UI에 카테고리 선택이 없어서)
+                price: recipe.salePrice,
                 ingredients: recipe.ingredients.map(ing => {
                     const mat = materials.find(m => m.id === ing.materialId);
                     return {
-                        name: ing.materialId, // materialId를 name으로 사용 (백엔드 스키마 확인 필요)
-                        cost_per_unit: mat ? getUnitPrice(mat) : 0,
-                        usage: ing.qty,
-                        cost: (mat ? getUnitPrice(mat) : 0) * ing.qty
+                        name: mat?.name || ing.materialId, // materialId를 name으로 사용 (백엔드 스키마 확인 필요)
+                        ingredientId: ing.materialId,
+                        unit_cost: mat ? getUnitPrice(mat) : 0,
+                        quantity: ing.qty,
+                        total_ingredient_cost: (mat ? getUnitPrice(mat) : 0) * ing.qty,
+                        uom: mat?.unit || 'g'
                     };
                 })
             };

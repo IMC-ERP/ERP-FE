@@ -1,6 +1,6 @@
 /**
  * RegisterPage - 사용자 회원가입 페이지
- * Supabase 인증 후 매장 정보 등록
+ * Firebase 인증 후 매장 정보 등록
  */
 
 import { useState, useEffect } from 'react';
@@ -61,15 +61,15 @@ export default function RegisterPage() {
             await userApi.register({
                 email: user.email,
                 store_name: formData.storeName,
-                owner_name: formData.ownerName,
+                name: formData.ownerName,
                 phone: formData.phone,
                 address: formData.address,
-                established_year: formData.establishedYear ? parseInt(formData.establishedYear) : undefined
+                established_year: formData.establishedYear ? parseInt(formData.establishedYear) : undefined,
             });
 
-            // 등록 성공 - 프로필 새로고침 후 온보딩으로 이동
+            // 등록 성공 - 프로필 새로고침 후 대시보드로 이동
             await refreshProfile();
-            navigate('/onboarding');
+            navigate('/dashboard');
         } catch (err: any) {
             console.error('Registration failed:', err);
             setError(err.response?.data?.detail || '등록에 실패했습니다. 다시 시도해주세요.');
@@ -151,23 +151,6 @@ export default function RegisterPage() {
                     </div>
 
                     <div>
-                        <label htmlFor="establishedYear" className="block text-sm font-medium text-slate-700 mb-2">
-                            설립 연도
-                        </label>
-                        <input
-                            type="number"
-                            id="establishedYear"
-                            name="establishedYear"
-                            value={formData.establishedYear}
-                            onChange={handleChange}
-                            placeholder="예: 2024"
-                            min="1900"
-                            max="2099"
-                            className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all"
-                        />
-                    </div>
-
-                    <div>
                         <label htmlFor="address" className="block text-sm font-medium text-slate-700 mb-2">
                             매장 주소
                         </label>
@@ -179,6 +162,23 @@ export default function RegisterPage() {
                             placeholder="예: 서울시 강남구 테헤란로 123"
                             rows={3}
                             className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all resize-none"
+                        />
+                    </div>
+
+                    <div>
+                        <label htmlFor="establishedYear" className="block text-sm font-medium text-slate-700 mb-2">
+                            설립 연도
+                        </label>
+                        <input
+                            type="number"
+                            id="establishedYear"
+                            name="establishedYear"
+                            value={formData.establishedYear}
+                            onChange={handleChange}
+                            placeholder="예: 2024"
+                            min="1900"
+                            max="2100"
+                            className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all"
                         />
                     </div>
 
