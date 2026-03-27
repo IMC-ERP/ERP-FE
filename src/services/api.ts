@@ -437,6 +437,8 @@ export const userApi = {
     api.get<{ code: string; used_by: string | null; created_at: string; status: string }[]>('/users/invitations'),
   expireInvitation: (code: string) =>
     api.put<{ success: boolean; code: string }>(`/users/invitations/${code}/expire`),
+  forceRemoveMember: (email: string) =>
+    api.delete<{ success: boolean; email: string }>(`/users/members/${encodeURIComponent(email)}`),
 };
 
 // ==================== Store Profile Types ====================

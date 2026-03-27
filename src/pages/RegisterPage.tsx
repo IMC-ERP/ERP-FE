@@ -78,11 +78,31 @@ export default function RegisterPage() {
         }
     };
 
+    // 일반 필드 핸들러
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         setFormData(prev => ({
             ...prev,
             [e.target.name]: e.target.value
         }));
+    };
+
+    // 매장명/대표자명: 특수문자 입력 차단 (한글, 영문, 숫자, 공백만 허용)
+    const handleNameChange = (field: 'storeName' | 'ownerName') =>
+        (e: React.ChangeEvent<HTMLInputElement>) => {
+            const value = e.target.value.replace(/[^가-힣a-zA-Z0-9\s]/g, '');
+            setFormData(prev => ({ ...prev, [field]: value }));
+        };
+
+    // 연락처: 숫자만 입력받고 XXX-XXXX-XXXX 자동 포맷
+    const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const digits = e.target.value.replace(/\D/g, '').slice(0, 11);
+        let formatted = digits;
+        if (digits.length > 7) {
+            formatted = `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
+        } else if (digits.length > 3) {
+            formatted = `${digits.slice(0, 3)}-${digits.slice(3)}`;
+        }
+        setFormData(prev => ({ ...prev, phone: formatted }));
     };
 
     return (
@@ -112,7 +132,7 @@ export default function RegisterPage() {
                             id="storeName"
                             name="storeName"
                             value={formData.storeName}
-                            onChange={handleChange}
+                            onChange={handleNameChange('storeName')}
                             placeholder="예: 카페 커피엔드"
                             required
                             className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all"
@@ -128,7 +148,7 @@ export default function RegisterPage() {
                             id="ownerName"
                             name="ownerName"
                             value={formData.ownerName}
-                            onChange={handleChange}
+                            onChange={handleNameChange('ownerName')}
                             placeholder="예: 홍길동"
                             required
                             className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all"
@@ -140,12 +160,14 @@ export default function RegisterPage() {
                             연락처
                         </label>
                         <input
-                            type="tel"
+                            type="text"
                             id="phone"
                             name="phone"
                             value={formData.phone}
-                            onChange={handleChange}
+                            onChange={handlePhoneChange}
                             placeholder="예: 010-1234-5678"
+                            maxLength={13}
+                            inputMode="numeric"
                             className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all"
                         />
                     </div>
@@ -160,9 +182,9 @@ export default function RegisterPage() {
                             name="establishedYear"
                             value={formData.establishedYear}
                             onChange={handleChange}
-                            placeholder="예: 2024"
+                            placeholder={`예: ${new Date().getFullYear()}`}
                             min="1900"
-                            max="2099"
+                            max={new Date().getFullYear()}
                             className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all"
                         />
                     </div>

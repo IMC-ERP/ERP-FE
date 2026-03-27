@@ -10,7 +10,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { userApi, type StoreMemberData } from '../services/api';
 import {
     Store, User, MapPin, Phone, Calendar, Users, UserPlus, Shield, Mail,
-    Monitor, Moon, Sun, Type, Bell, Save, Check, Loader2, AlertCircle, Trash2, X,
+    Monitor, Moon, Sun, Type, Save, Check, Loader2, AlertCircle, Trash2, X,
     Copy, Edit3, ChevronDown, ChevronUp, ClipboardList
 } from 'lucide-react';
 
@@ -21,7 +21,7 @@ interface InvitationRecord {
     status: string;
 }
 
-type SettingsTab = 'profile' | 'account' | 'display' | 'notification';
+type SettingsTab = 'profile' | 'account' | 'display';
 
 const roleLabel = (role: string) => {
     switch (role) {
@@ -34,7 +34,7 @@ const roleLabel = (role: string) => {
 
 export default function SettingsPage() {
     const { appSettings, updateAppSettings } = useData();
-    const { userProfile, logout } = useAuth();
+    const { userProfile, logout, refreshProfile } = useAuth();
 
     const [activeTab, setActiveTab] = useState<SettingsTab>('profile');
 
@@ -59,7 +59,6 @@ export default function SettingsPage() {
 
     // ========== 초대 코드 상태 ==========
     const [inviteCode, setInviteCode] = useState('');
-    const [inviteUrl, setInviteUrl] = useState('');
     const [inviteLoading, setInviteLoading] = useState(false);
     const [inviteModalOpen, setInviteModalOpen] = useState(false);
     const [inviteToast, setInviteToast] = useState('');
@@ -75,10 +74,47 @@ export default function SettingsPage() {
     const [isDeleting, setIsDeleting] = useState(false);
     const [deleteError, setDeleteError] = useState('');
 
+    // ========== 계정 정보 편집 상태 ==========
+    const [accountEditMode, setAccountEditMode] = useState(false);
+    const [accountForm, setAccountForm] = useState({ owner_name: '', phone: '' });
+    const [accountOriginal, setAccountOriginal] = useState({ owner_name: '', phone: '' });
+    const [accountSaving, setAccountSaving] = useState(false);
+
+    const accountHasChanges = accountForm.owner_name !== accountOriginal.owner_name || accountForm.phone !== accountOriginal.phone;
+
+    const handleAccountEdit = () => {
+        if (!userProfile) return;
+        const original = { owner_name: userProfile.owner_name || '', phone: userProfile.phone || '' };
+        setAccountOriginal(original);
+        setAccountForm({ ...original });
+        setAccountEditMode(true);
+    };
+
+    const handleAccountCancel = () => {
+        setAccountEditMode(false);
+        setAccountForm({ ...accountOriginal });
+    };
+
+    const handleAccountSave = async () => {
+        setAccountSaving(true);
+        try {
+            await userApi.updateProfile({ owner_name: accountForm.owner_name, phone: accountForm.phone });
+            await refreshProfile();
+            setAccountEditMode(false);
+        } catch (err: any) {
+            console.error('프로필 업데이트 실패:', err);
+        } finally {
+            setAccountSaving(false);
+        }
+    };
+
     // ========== 초대 관리 상태 ==========
     const [invitations, setInvitations] = useState<InvitationRecord[]>([]);
     const [invitationsLoading, setInvitationsLoading] = useState(true);
     const [invitationsError, setInvitationsError] = useState('');
+
+    // ========== 구성원 강제 탈퇴 상태 ==========
+    const [removingMemberEmail, setRemovingMemberEmail] = useState<string | null>(null);
 
     // ========== 카드 접기/펼치기 상태 ==========
     const [membersExpanded, setMembersExpanded] = useState(true);
@@ -195,7 +231,6 @@ export default function SettingsPage() {
         try {
             const res = await userApi.createInviteCode();
             setInviteCode(res.data.code);
-            setInviteUrl(`${window.location.origin}/invite`);
             setInviteModalOpen(true);
             await loadInvitationsList();
         } catch (err: any) {
@@ -282,6 +317,25 @@ export default function SettingsPage() {
         }
     };
 
+    // ========== 구성원 강제 탈퇴 핸들러 ==========
+    const handleForceRemoveMember = async (email: string, name: string) => {
+        if (!window.confirm(`정말 "${name}" 구성원을 강제 탈퇴시키겠습니까?\n이 작업은 되돌릴 수 없습니다.`)) return;
+        setRemovingMemberEmail(email);
+        try {
+            await userApi.forceRemoveMember(email);
+            // 구성원 목록 새로고침
+            const res = await userApi.getStoreMembers();
+            setMembers(res.data);
+            setInviteToast('구성원이 강제 탈퇴되었습니다.');
+            setTimeout(() => setInviteToast(''), 2000);
+        } catch (err: any) {
+            setInviteToast(err.response?.data?.detail || '구성원 강제 탈퇴에 실패했습니다.');
+            setTimeout(() => setInviteToast(''), 3000);
+        } finally {
+            setRemovingMemberEmail(null);
+        }
+    };
+
     // ========== 계정 탈퇴 핸들러 ==========
     const handleDeleteAccount = async () => {
         setIsDeleting(true);
@@ -333,7 +387,6 @@ export default function SettingsPage() {
                         <TabButton tab="profile" icon={Store} label="매장 프로필" />
                         <TabButton tab="account" icon={User} label="계정 관리" />
                         <TabButton tab="display" icon={Monitor} label="디스플레이" />
-                        <TabButton tab="notification" icon={Bell} label="알림 설정" />
                     </nav>
                 </div>
 
@@ -497,6 +550,10 @@ export default function SettingsPage() {
                                                             <th className="text-left px-4 py-3 font-semibold text-slate-600">이름</th>
                                                             <th className="text-left px-4 py-3 font-semibold text-slate-600">직급</th>
                                                             <th className="text-left px-4 py-3 font-semibold text-slate-600">전화번호</th>
+                                                            {/* owner만 관리 컬럼 표시 */}
+                                                            {userProfile?.role === 'owner' && (
+                                                                <th className="text-center px-4 py-3 font-semibold text-slate-600 w-16">관리</th>
+                                                            )}
                                                         </tr>
                                                     </thead>
                                                     <tbody className="divide-y divide-slate-100">
@@ -529,6 +586,23 @@ export default function SettingsPage() {
                                                                     )}
                                                                 </td>
                                                                 <td className="px-4 py-3 text-slate-600">{member.phone || '-'}</td>
+                                                                {/* owner만 관리 셀 표시 - 본인 행에는 빈 셀 */}
+                                                                {userProfile?.role === 'owner' && (
+                                                                    <td className="px-4 py-3 text-center">
+                                                                        {member.email !== userProfile?.email && member.role !== 'owner' ? (
+                                                                            <button
+                                                                                onClick={() => handleForceRemoveMember(member.email!, member.name)}
+                                                                                disabled={removingMemberEmail === member.email}
+                                                                                className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                                                                                title="구성원 강제 탈퇴"
+                                                                            >
+                                                                                {removingMemberEmail === member.email
+                                                                                    ? <Loader2 size={16} className="animate-spin" />
+                                                                                    : <Trash2 size={16} />}
+                                                                            </button>
+                                                                        ) : null}
+                                                                    </td>
+                                                                )}
                                                             </tr>
                                                         ))}
                                                     </tbody>
@@ -645,47 +719,157 @@ export default function SettingsPage() {
 
                     {/* ===================== 계정 관리 탭 ===================== */}
                     {activeTab === 'account' && (
-                        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 sm:p-6 md:p-8 animate-fade-in">
-                            <h3 className="text-lg font-bold text-slate-800 border-b border-slate-100 pb-3 mb-6">내 계정 정보</h3>
+                        <div className="space-y-6 animate-fade-in">
+                            {/* 계정 정보 카드 */}
+                            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 sm:p-6 md:p-8">
+                                <h3 className="text-lg font-bold text-slate-800 border-b border-slate-100 pb-3 mb-6">내 계정 정보</h3>
 
-                            {!userProfile ? (
-                                <div className="flex flex-col items-center justify-center py-12 text-slate-400 gap-3">
-                                    <AlertCircle size={32} className="text-slate-300" />
-                                    <p className="text-sm">계정 정보를 불러올 수 없습니다.</p>
-                                    <p className="text-xs text-slate-400">백엔드 서버 연결을 확인해주세요.</p>
-                                </div>
-                            ) : (
-                                <div className="space-y-4">
-                                    {[
-                                        { icon: Mail, label: '이메일', value: userProfile.email },
-                                        { icon: User, label: '이름', value: userProfile.owner_name },
-                                        { icon: Shield, label: '역할', value: roleLabel(userProfile.role || 'owner') },
-                                        { icon: Phone, label: '연락처', value: userProfile.phone || '-' },
-                                        { icon: Store, label: '소속 매장', value: userProfile.store_name },
-                                        {
-                                            icon: Calendar, label: '가입일',
-                                            value: userProfile.created_at
-                                                ? new Date(userProfile.created_at).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })
-                                                : '-'
-                                        },
-                                    ].map((item, idx) => (
-                                        <div key={idx} className="flex items-center gap-4 p-4 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors">
-                                            <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center flex-shrink-0">
-                                                <item.icon size={18} className="text-blue-600" />
+                                {!userProfile ? (
+                                    <div className="flex flex-col items-center justify-center py-12 text-slate-400 gap-3">
+                                        <AlertCircle size={32} className="text-slate-300" />
+                                        <p className="text-sm">계정 정보를 불러올 수 없습니다.</p>
+                                        <p className="text-xs text-slate-400">백엔드 서버 연결을 확인해주세요.</p>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <div className="space-y-4">
+                                            {/* 이메일 (읽기 전용) */}
+                                            <div className="flex items-center gap-4 p-4 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors">
+                                                <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center flex-shrink-0">
+                                                    <Mail size={18} className="text-blue-600" />
+                                                </div>
+                                                <div className="flex-1">
+                                                    <div className="text-xs text-slate-400 font-medium">이메일</div>
+                                                    <div className="text-sm font-semibold text-slate-800">{userProfile.email}</div>
+                                                </div>
                                             </div>
-                                            <div>
-                                                <div className="text-xs text-slate-400 font-medium">{item.label}</div>
-                                                <div className="text-sm font-semibold text-slate-800">{item.value}</div>
+
+                                            {/* 이름 (편집 가능) */}
+                                            <div className="flex items-center gap-4 p-4 border border-slate-200 rounded-xl transition-colors">
+                                                <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center flex-shrink-0">
+                                                    <User size={18} className="text-blue-600" />
+                                                </div>
+                                                <div className="flex-1">
+                                                    <div className="text-xs text-slate-400 font-medium">이름</div>
+                                                    {accountEditMode ? (
+                                                        <input
+                                                            type="text"
+                                                            value={accountForm.owner_name}
+                                                            onChange={(e) => setAccountForm(prev => ({ ...prev, owner_name: e.target.value }))}
+                                                            className="w-full text-sm font-semibold text-slate-800 border border-slate-300 rounded-lg px-3 py-1.5 mt-1 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-shadow"
+                                                        />
+                                                    ) : (
+                                                        <div className="text-sm font-semibold text-slate-800">{userProfile.owner_name}</div>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            {/* 역할 (읽기 전용) */}
+                                            <div className="flex items-center gap-4 p-4 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors">
+                                                <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center flex-shrink-0">
+                                                    <Shield size={18} className="text-blue-600" />
+                                                </div>
+                                                <div className="flex-1">
+                                                    <div className="text-xs text-slate-400 font-medium">역할</div>
+                                                    <div className="text-sm font-semibold text-slate-800">{roleLabel(userProfile.role || 'owner')}</div>
+                                                </div>
+                                            </div>
+
+                                            {/* 연락처 (편집 가능) */}
+                                            <div className="flex items-center gap-4 p-4 border border-slate-200 rounded-xl transition-colors">
+                                                <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center flex-shrink-0">
+                                                    <Phone size={18} className="text-blue-600" />
+                                                </div>
+                                                <div className="flex-1">
+                                                    <div className="text-xs text-slate-400 font-medium">연락처</div>
+                                                    {accountEditMode ? (
+                                                        <input
+                                                            type="text"
+                                                            value={accountForm.phone}
+                                                            onChange={(e) => setAccountForm(prev => ({ ...prev, phone: e.target.value }))}
+                                                            placeholder="연락처를 입력하세요"
+                                                            className="w-full text-sm font-semibold text-slate-800 border border-slate-300 rounded-lg px-3 py-1.5 mt-1 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-shadow"
+                                                        />
+                                                    ) : (
+                                                        <div className="text-sm font-semibold text-slate-800">{userProfile.phone || '-'}</div>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            {/* 소속 매장 (읽기 전용) */}
+                                            <div className="flex items-center gap-4 p-4 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors">
+                                                <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center flex-shrink-0">
+                                                    <Store size={18} className="text-blue-600" />
+                                                </div>
+                                                <div className="flex-1">
+                                                    <div className="text-xs text-slate-400 font-medium">소속 매장</div>
+                                                    <div className="text-sm font-semibold text-slate-800">{userProfile.store_name}</div>
+                                                </div>
+                                            </div>
+
+                                            {/* 가입일 (읽기 전용) */}
+                                            <div className="flex items-center gap-4 p-4 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors">
+                                                <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center flex-shrink-0">
+                                                    <Calendar size={18} className="text-blue-600" />
+                                                </div>
+                                                <div className="flex-1">
+                                                    <div className="text-xs text-slate-400 font-medium">가입일</div>
+                                                    <div className="text-sm font-semibold text-slate-800">
+                                                        {userProfile.created_at
+                                                            ? new Date(userProfile.created_at).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })
+                                                            : '-'}
+                                                    </div>
+                                                </div>
                                             </div>
                                         </div>
-                                    ))}
-                                </div>
-                            )}
 
-                            {/* 계정 탈퇴 섹션 */}
+                                        {/* 동적 버튼: 수정하기 / 취소하기 / 수정 사항 저장하기 */}
+                                        <div className="flex justify-end mt-6">
+                                            {!accountEditMode ? (
+                                                <button
+                                                    onClick={handleAccountEdit}
+                                                    className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white text-sm font-bold rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+                                                >
+                                                    <Edit3 size={16} /> 수정하기
+                                                </button>
+                                            ) : accountHasChanges ? (
+                                                <div className="flex gap-3">
+                                                    <button
+                                                        onClick={handleAccountCancel}
+                                                        disabled={accountSaving}
+                                                        className="px-5 py-2.5 text-sm font-semibold text-slate-600 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-50 transition-colors"
+                                                    >
+                                                        취소하기
+                                                    </button>
+                                                    <button
+                                                        onClick={handleAccountSave}
+                                                        disabled={accountSaving}
+                                                        className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white text-sm font-bold rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors shadow-sm"
+                                                    >
+                                                        {accountSaving ? (
+                                                            <><Loader2 size={16} className="animate-spin" /> 저장 중...</>
+                                                        ) : (
+                                                            <><Save size={16} /> 수정 사항 저장하기</>
+                                                        )}
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <button
+                                                    onClick={handleAccountCancel}
+                                                    className="flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-slate-600 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
+                                                >
+                                                    <X size={16} /> 취소하기
+                                                </button>
+                                            )}
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+
+                            {/* 계정 탈퇴 섹션 (카드 외부, 별도 섹션) */}
                             {userProfile && (
-                                <div className="mt-8 pt-6 border-t border-slate-200">
-                                    <h4 className="text-sm font-bold text-red-600 mb-2">위험 구역</h4>
+                                <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 sm:p-6 md:p-8">
+                                    <h4 className="text-sm font-bold text-slate-700 mb-2">계정 탈퇴</h4>
                                     <p className="text-sm text-slate-500 mb-4">계정을 탈퇴하면 모든 권한이 상실되며, 되돌릴 수 없습니다.</p>
                                     <button
                                         onClick={() => {
@@ -770,39 +954,7 @@ export default function SettingsPage() {
                         </div>
                     )}
 
-                    {/* ===================== 알림 설정 탭 ===================== */}
-                    {activeTab === 'notification' && (
-                        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 sm:p-6 md:p-8 space-y-6 animate-fade-in">
-                            <h3 className="text-lg font-bold text-slate-800 border-b border-slate-100 pb-3 mb-6">알림 설정</h3>
 
-                            <div className="space-y-4">
-                                {[
-                                    { id: 'lowStock', label: '재고 부족 경고', desc: '안전 재고 이하로 떨어질 때 알림을 받습니다.' },
-                                    { id: 'dailyReport', label: '일일 매출 리포트', desc: '매일 마감 시 매출 요약을 알림으로 받습니다.' },
-                                    { id: 'marketing', label: '마케팅/이벤트 정보', desc: '새로운 기능이나 이벤트 소식을 받습니다.' }
-                                ].map(item => (
-                                    <div key={item.id} className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-4 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors">
-                                        <div>
-                                            <div className="font-bold text-slate-800 text-sm">{item.label}</div>
-                                            <div className="text-xs text-slate-500 mt-0.5">{item.desc}</div>
-                                        </div>
-                                        <button
-                                            onClick={() => updateAppSettings({
-                                                notifications: {
-                                                    ...appSettings.notifications,
-                                                    [item.id]: !appSettings.notifications[item.id as keyof typeof appSettings.notifications]
-                                                }
-                                            })}
-                                            className={`w-12 h-6 rounded-full transition-colors relative ${appSettings.notifications[item.id as keyof typeof appSettings.notifications] ? 'bg-blue-600' : 'bg-slate-300'}`}
-                                            aria-label={`${item.label} ${appSettings.notifications[item.id as keyof typeof appSettings.notifications] ? '끄기' : '켜기'}`}
-                                        >
-                                            <div className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow-sm transition-transform ${appSettings.notifications[item.id as keyof typeof appSettings.notifications] ? 'left-7' : 'left-1'}`} />
-                                        </button>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
                 </div>
             </div>
 
