@@ -10,8 +10,16 @@ import { useAuth } from '../contexts/AuthContext';
 import { userApi, type StoreMemberData } from '../services/api';
 import {
     Store, User, MapPin, Phone, Calendar, Users, UserPlus, Shield, Mail,
-    Monitor, Moon, Sun, Type, Bell, Save, Check, Loader2, AlertCircle, Trash2, X
+    Monitor, Moon, Sun, Type, Bell, Save, Check, Loader2, AlertCircle, Trash2, X,
+    Copy, Edit3, ChevronDown, ChevronUp, ClipboardList
 } from 'lucide-react';
+
+interface InvitationRecord {
+    code: string;
+    used_by: string | null;
+    created_at: string;
+    status: string;
+}
 
 type SettingsTab = 'profile' | 'account' | 'display' | 'notification';
 
@@ -49,11 +57,32 @@ export default function SettingsPage() {
     const [membersLoading, setMembersLoading] = useState(true);
     const [membersError, setMembersError] = useState('');
 
+    // ========== 초대 코드 상태 ==========
+    const [inviteCode, setInviteCode] = useState('');
+    const [inviteUrl, setInviteUrl] = useState('');
+    const [inviteLoading, setInviteLoading] = useState(false);
+    const [inviteModalOpen, setInviteModalOpen] = useState(false);
+    const [inviteToast, setInviteToast] = useState('');
+
+    // ========== 구성원 편집 모드 상태 ==========
+    const [editMode, setEditMode] = useState(false);
+    const [editedRoles, setEditedRoles] = useState<Record<string, string>>({});
+    const [roleSaving, setRoleSaving] = useState(false);
+
     // ========== 계정 탈퇴 상태 ==========
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [deleteInputSlug, setDeleteInputSlug] = useState('');
     const [isDeleting, setIsDeleting] = useState(false);
     const [deleteError, setDeleteError] = useState('');
+
+    // ========== 초대 관리 상태 ==========
+    const [invitations, setInvitations] = useState<InvitationRecord[]>([]);
+    const [invitationsLoading, setInvitationsLoading] = useState(true);
+    const [invitationsError, setInvitationsError] = useState('');
+
+    // ========== 카드 접기/펼치기 상태 ==========
+    const [membersExpanded, setMembersExpanded] = useState(true);
+    const [invitationsExpanded, setInvitationsExpanded] = useState(true);
 
     // ========== 매장 프로필 로드 ==========
     useEffect(() => {
@@ -102,9 +131,27 @@ export default function SettingsPage() {
             }
         };
 
+        const loadInvitations = async () => {
+            if (userProfile?.role !== 'owner' || !userProfile?.store_id) {
+                setInvitationsLoading(false);
+                return;
+            }
+            try {
+                setInvitationsLoading(true);
+                setInvitationsError('');
+                const res = await userApi.getInvitations();
+                setInvitations(res.data || []);
+            } catch (err: any) {
+                setInvitationsError('초대 코드 목록을 불러올 수 없습니다.');
+            } finally {
+                setInvitationsLoading(false);
+            }
+        };
+
         loadStoreProfile();
         loadMembers();
-    }, []);
+        loadInvitations();
+    }, [userProfile?.role, userProfile?.store_id]);
 
     // ========== 매장 프로필 저장 ==========
     const handleStoreFormChange = (field: string, value: string) => {
@@ -132,8 +179,107 @@ export default function SettingsPage() {
         }
     };
 
-    const handleInviteCode = () => {
-        alert('초대 코드 발급 기능은 현재 준비 중입니다.');
+    const loadInvitationsList = async () => {
+        if (userProfile?.role !== 'owner' || !userProfile?.store_id) return;
+        try {
+            const res = await userApi.getInvitations();
+            setInvitations(res.data || []);
+        } catch {
+            // silent refresh failure
+        }
+    };
+
+    const handleInviteCode = async () => {
+        if (!userProfile?.store_id) return;
+        setInviteLoading(true);
+        try {
+            const res = await userApi.createInviteCode();
+            setInviteCode(res.data.code);
+            setInviteUrl(`${window.location.origin}/invite`);
+            setInviteModalOpen(true);
+            await loadInvitationsList();
+        } catch (err: any) {
+            setInviteToast(err.response?.data?.detail || '초대 코드 발급에 실패했습니다.');
+            setTimeout(() => setInviteToast(''), 3000);
+        } finally {
+            setInviteLoading(false);
+        }
+    };
+
+    const handleExpireInvitation = async (code: string) => {
+        if (!window.confirm('이 초대 코드를 강제로 만료시키겠습니까?')) return;
+        try {
+            await userApi.expireInvitation(code);
+            setInvitations(prev => prev.map(inv =>
+                inv.code === code ? { ...inv, status: 'expired' } : inv
+            ));
+            setInviteToast('초대 코드가 만료되었습니다.');
+            setTimeout(() => setInviteToast(''), 2000);
+        } catch (err: any) {
+            setInviteToast(err.response?.data?.detail || '만료 처리에 실패했습니다.');
+            setTimeout(() => setInviteToast(''), 3000);
+        }
+    };
+
+    const getInviteMessage = () => {
+        const ownerName = storeForm.owner_name || userProfile?.owner_name || '대표';
+        const storeName = storeForm.store_name || userProfile?.store_name || '매장';
+        const url = `${window.location.origin}/invite`;
+        return `${ownerName}님이 당신을 ${storeName} 구성원으로 초대합니다. ${url}로 이동하여 [${inviteCode}]를 입력해주세요!`;
+    };
+
+    const handleCopyCode = async () => {
+        try {
+            await navigator.clipboard.writeText(getInviteMessage());
+            setInviteToast('초대 메시지가 복사되었습니다!');
+            setTimeout(() => setInviteToast(''), 2000);
+        } catch {
+            setInviteToast('복사에 실패했습니다. 메시지를 직접 복사해주세요.');
+            setTimeout(() => setInviteToast(''), 3000);
+        }
+    };
+
+    const handleEditModeToggle = () => {
+        if (editMode) {
+            // 취소: 편집 상태 초기화
+            setEditedRoles({});
+            setEditMode(false);
+        } else {
+            // 편집 모드 시작: 현재 역할을 초기값으로
+            const initial: Record<string, string> = {};
+            members.forEach(m => {
+                if (m.email && m.role !== 'owner') {
+                    initial[m.email] = m.role;
+                }
+            });
+            setEditedRoles(initial);
+            setEditMode(true);
+        }
+    };
+
+    const handleSaveRoles = async () => {
+        if (!userProfile?.store_id) return;
+        setRoleSaving(true);
+        try {
+            const promises = members
+                .filter(m => m.email && m.role !== 'owner' && editedRoles[m.email!] && editedRoles[m.email!] !== m.role)
+                .map(m => userApi.updateMemberRole(m.email!, editedRoles[m.email!]));
+
+            await Promise.all(promises);
+
+            // 구성원 목록 새로고침
+            const res = await userApi.getStoreMembers();
+            setMembers(res.data);
+            setEditMode(false);
+            setEditedRoles({});
+            setInviteToast('직급이 변경되었습니다!');
+            setTimeout(() => setInviteToast(''), 2000);
+        } catch (err: any) {
+            setInviteToast(err.message || '직급 변경에 실패했습니다.');
+            setTimeout(() => setInviteToast(''), 3000);
+        } finally {
+            setRoleSaving(false);
+        }
     };
 
     // ========== 계정 탈퇴 핸들러 ==========
@@ -279,67 +425,221 @@ export default function SettingsPage() {
                                 ) : null}
                             </div>
 
-                            {/* 카드 2: 구성원 정보 (별도 카드) */}
+                            {/* 카드 2: 구성원 정보 (owner만 표시) */}
+                            {userProfile?.role === 'owner' && (
                             <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 sm:p-6 md:p-8">
-                                <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-6">
+                                <div className={`flex items-center justify-between ${membersExpanded ? 'border-b border-slate-100 pb-3 mb-6' : ''}`}>
                                     <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
                                         <Users size={20} /> 구성원 정보
                                     </h3>
-                                    <button
-                                        onClick={handleInviteCode}
-                                        className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-700 font-semibold text-sm rounded-lg hover:bg-emerald-100 transition-colors border border-emerald-200"
-                                    >
-                                        <UserPlus size={16} /> 초대 코드 발급
-                                    </button>
+                                    <div className="flex items-center gap-2">
+                                        {membersExpanded && (
+                                            <>
+                                                {editMode ? (
+                                                    <>
+                                                        <button
+                                                            onClick={handleEditModeToggle}
+                                                            disabled={roleSaving}
+                                                            className="flex items-center gap-1.5 px-3 py-2 text-sm font-semibold text-slate-600 bg-slate-50 border border-slate-200 rounded-lg hover:bg-slate-100 transition-colors"
+                                                        >
+                                                            <X size={14} /> 취소
+                                                        </button>
+                                                        <button
+                                                            onClick={handleSaveRoles}
+                                                            disabled={roleSaving}
+                                                            className="flex items-center gap-1.5 px-3 py-2 text-sm font-bold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                                                        >
+                                                            {roleSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                                                            변경사항 저장하기
+                                                        </button>
+                                                    </>
+                                                ) : (
+                                                    <button
+                                                        onClick={handleEditModeToggle}
+                                                        className="flex items-center gap-1.5 px-3 py-2 text-sm font-semibold text-slate-600 bg-slate-50 border border-slate-200 rounded-lg hover:bg-slate-100 transition-colors"
+                                                    >
+                                                        <Edit3 size={14} /> 정보 수정하기
+                                                    </button>
+                                                )}
+                                            </>
+                                        )}
+                                        <button
+                                            onClick={() => setMembersExpanded(prev => !prev)}
+                                            className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                                            aria-label={membersExpanded ? '접기' : '펼치기'}
+                                        >
+                                            {membersExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                                        </button>
+                                    </div>
                                 </div>
 
-                                {membersError && (
-                                    <div className="p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-red-600 text-sm">
-                                        <AlertCircle size={16} className="flex-shrink-0" /> {membersError}
-                                    </div>
-                                )}
+                                {membersExpanded && (
+                                    <>
+                                        {membersError && (
+                                            <div className="p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-red-600 text-sm">
+                                                <AlertCircle size={16} className="flex-shrink-0" /> {membersError}
+                                            </div>
+                                        )}
 
-                                {membersLoading ? (
-                                    <div className="flex items-center justify-center py-8 text-slate-400">
-                                        <Loader2 className="animate-spin mr-2" size={20} /> 구성원 목록 로딩 중...
-                                    </div>
-                                ) : !membersError && members.length === 0 ? (
-                                    <div className="text-center py-8 text-slate-400 text-sm">
-                                        등록된 구성원이 없습니다.
-                                    </div>
-                                ) : !membersError ? (
-                                    <div className="overflow-hidden rounded-lg border border-slate-200">
-                                        <table className="w-full text-sm">
-                                            <thead className="bg-slate-50">
-                                                <tr>
-                                                    <th className="text-left px-4 py-3 font-semibold text-slate-600">이름</th>
-                                                    <th className="text-left px-4 py-3 font-semibold text-slate-600">직급</th>
-                                                    <th className="text-left px-4 py-3 font-semibold text-slate-600">전화번호</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-slate-100">
-                                                {members.map((member, idx) => (
-                                                    <tr key={idx} className="hover:bg-slate-50 transition-colors">
-                                                        <td className="px-4 py-3 font-medium text-slate-800">{member.name || '-'}</td>
-                                                        <td className="px-4 py-3">
-                                                            <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold ${
-                                                                member.role === 'owner'
-                                                                    ? 'bg-amber-100 text-amber-700'
-                                                                    : member.role === 'manager'
-                                                                    ? 'bg-blue-100 text-blue-700'
-                                                                    : 'bg-slate-100 text-slate-600'
-                                                            }`}>
-                                                                <Shield size={12} /> {roleLabel(member.role)}
-                                                            </span>
-                                                        </td>
-                                                        <td className="px-4 py-3 text-slate-600">{member.phone || '-'}</td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                ) : null}
+                                        {membersLoading ? (
+                                            <div className="flex items-center justify-center py-8 text-slate-400">
+                                                <Loader2 className="animate-spin mr-2" size={20} /> 구성원 목록 로딩 중...
+                                            </div>
+                                        ) : !membersError && members.length === 0 ? (
+                                            <div className="text-center py-8 text-slate-400 text-sm">
+                                                등록된 구성원이 없습니다.
+                                            </div>
+                                        ) : !membersError ? (
+                                            <div className="overflow-hidden rounded-lg border border-slate-200">
+                                                <table className="w-full text-sm">
+                                                    <thead className="bg-slate-50">
+                                                        <tr>
+                                                            <th className="text-left px-4 py-3 font-semibold text-slate-600">이름</th>
+                                                            <th className="text-left px-4 py-3 font-semibold text-slate-600">직급</th>
+                                                            <th className="text-left px-4 py-3 font-semibold text-slate-600">전화번호</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-slate-100">
+                                                        {members.map((member, idx) => (
+                                                            <tr key={idx} className="hover:bg-slate-50 transition-colors">
+                                                                <td className="px-4 py-3 font-medium text-slate-800">{member.name || '-'}</td>
+                                                                <td className="px-4 py-3">
+                                                                    {editMode && member.role !== 'owner' && member.email ? (
+                                                                        <div className="relative inline-block">
+                                                                            <select
+                                                                                value={editedRoles[member.email] || member.role}
+                                                                                onChange={(e) => setEditedRoles(prev => ({ ...prev, [member.email!]: e.target.value }))}
+                                                                                className="appearance-none pl-3 pr-8 py-1.5 border border-blue-300 rounded-lg text-sm font-semibold bg-blue-50 text-blue-700 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                                                                            >
+                                                                                <option value="staff">직원</option>
+                                                                                <option value="manager">매니저</option>
+                                                                            </select>
+                                                                            <ChevronDown size={14} className="absolute right-2 top-1/2 -translate-y-1/2 text-blue-500 pointer-events-none" />
+                                                                        </div>
+                                                                    ) : (
+                                                                        <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold ${
+                                                                            member.role === 'owner'
+                                                                                ? 'bg-amber-100 text-amber-700'
+                                                                                : member.role === 'manager'
+                                                                                ? 'bg-blue-100 text-blue-700'
+                                                                                : 'bg-slate-100 text-slate-600'
+                                                                        }`}>
+                                                                            <Shield size={12} /> {roleLabel(member.role)}
+                                                                        </span>
+                                                                    )}
+                                                                </td>
+                                                                <td className="px-4 py-3 text-slate-600">{member.phone || '-'}</td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        ) : null}
+                                    </>
+                                )}
                             </div>
+                            )}
+
+                            {/* 카드 3: 구성원 초대 관리 (owner만 표시) */}
+                            {userProfile?.role === 'owner' && (
+                            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 sm:p-6 md:p-8">
+                                <div className={`flex items-center justify-between ${invitationsExpanded ? 'border-b border-slate-100 pb-3 mb-6' : ''}`}>
+                                    <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                                        <ClipboardList size={20} /> 구성원 초대 관리
+                                    </h3>
+                                    <div className="flex items-center gap-2">
+                                        {invitationsExpanded && (
+                                            <button
+                                                onClick={handleInviteCode}
+                                                disabled={inviteLoading}
+                                                className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-700 font-semibold text-sm rounded-lg hover:bg-emerald-100 transition-colors border border-emerald-200 disabled:opacity-50"
+                                            >
+                                                {inviteLoading ? <Loader2 size={16} className="animate-spin" /> : <UserPlus size={16} />}
+                                                초대 코드 발급
+                                            </button>
+                                        )}
+                                        <button
+                                            onClick={() => setInvitationsExpanded(prev => !prev)}
+                                            className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                                            aria-label={invitationsExpanded ? '접기' : '펼치기'}
+                                        >
+                                            {invitationsExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {invitationsExpanded && (
+                                    <>
+                                        {invitationsError && (
+                                            <div className="p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-red-600 text-sm">
+                                                <AlertCircle size={16} className="flex-shrink-0" /> {invitationsError}
+                                            </div>
+                                        )}
+
+                                        {invitationsLoading ? (
+                                            <div className="flex items-center justify-center py-8 text-slate-400">
+                                                <Loader2 className="animate-spin mr-2" size={20} /> 초대 코드 목록 로딩 중...
+                                            </div>
+                                        ) : !invitationsError && invitations.length === 0 ? (
+                                            <div className="text-center py-8 text-slate-400 text-sm">
+                                                발급된 초대 코드가 없습니다.
+                                            </div>
+                                        ) : !invitationsError ? (
+                                            <div className="overflow-hidden rounded-lg border border-slate-200">
+                                                <table className="w-full text-sm">
+                                                    <thead className="bg-slate-50">
+                                                        <tr>
+                                                            <th className="text-left px-4 py-3 font-semibold text-slate-600">코드</th>
+                                                            <th className="text-left px-4 py-3 font-semibold text-slate-600">초대된 사람</th>
+                                                            <th className="text-left px-4 py-3 font-semibold text-slate-600">코드 생성 시각</th>
+                                                            <th className="text-left px-4 py-3 font-semibold text-slate-600">코드 만료 여부</th>
+                                                            <th className="text-center px-4 py-3 font-semibold text-slate-600">관리</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-slate-100">
+                                                        {invitations.map((inv, idx) => (
+                                                            <tr key={idx} className="hover:bg-slate-50 transition-colors">
+                                                                <td className="px-4 py-3 font-mono font-medium text-slate-800 tracking-wider">{inv.code}</td>
+                                                                <td className="px-4 py-3 text-slate-600">{inv.used_by || '미사용'}</td>
+                                                                <td className="px-4 py-3 text-slate-600">
+                                                                    {(() => {
+                                                                        const d = new Date(inv.created_at);
+                                                                        const pad = (n: number) => String(n).padStart(2, '0');
+                                                                        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+                                                                    })()}
+                                                                </td>
+                                                                <td className="px-4 py-3">
+                                                                    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${
+                                                                        inv.status === 'active'
+                                                                            ? 'bg-emerald-100 text-emerald-700'
+                                                                            : 'bg-slate-100 text-slate-500'
+                                                                    }`}>
+                                                                        {inv.status === 'active' ? '사용 가능' : '만료'}
+                                                                    </span>
+                                                                </td>
+                                                                <td className="px-4 py-3 text-center">
+                                                                    {inv.status === 'active' ? (
+                                                                        <button
+                                                                            onClick={() => handleExpireInvitation(inv.code)}
+                                                                            className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                                                            title="강제 만료"
+                                                                        >
+                                                                            <Trash2 size={16} />
+                                                                        </button>
+                                                                    ) : (
+                                                                        <span className="text-slate-300">-</span>
+                                                                    )}
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        ) : null}
+                                    </>
+                                )}
+                            </div>
+                            )}
                         </div>
                     )}
 
@@ -505,6 +805,49 @@ export default function SettingsPage() {
                     )}
                 </div>
             </div>
+
+            {/* 토스트 메시지 */}
+            {inviteToast && (
+                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-3 bg-slate-800 text-white text-sm font-medium rounded-xl shadow-lg animate-fade-in">
+                    {inviteToast}
+                </div>
+            )}
+
+            {/* 초대 코드 모달 */}
+            {inviteModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
+                    <div className="bg-white rounded-2xl w-full max-w-sm shadow-xl overflow-hidden">
+                        <div className="p-6 text-center space-y-4">
+                            <div className="w-14 h-14 bg-emerald-100 rounded-full flex items-center justify-center mx-auto">
+                                <UserPlus size={28} className="text-emerald-600" />
+                            </div>
+                            <h3 className="text-lg font-bold text-slate-800">초대 코드가 발급되었습니다</h3>
+                            <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
+                                <p className="text-xs text-slate-500 mb-2">초대 코드 (12시간 유효)</p>
+                                <p className="text-3xl font-mono font-bold text-slate-800 tracking-[0.3em]">{inviteCode}</p>
+                            </div>
+                            <div className="bg-blue-50 rounded-xl p-4 border border-blue-200 text-left">
+                                <p className="text-xs text-blue-500 mb-2 font-semibold">복사될 초대 메시지</p>
+                                <p className="text-sm text-slate-700 leading-relaxed">{getInviteMessage()}</p>
+                            </div>
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={handleCopyCode}
+                                    className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition-colors"
+                                >
+                                    <Copy size={16} /> 메시지 복사
+                                </button>
+                                <button
+                                    onClick={() => setInviteModalOpen(false)}
+                                    className="flex-1 py-2.5 bg-slate-100 text-slate-600 font-semibold rounded-lg hover:bg-slate-200 transition-colors"
+                                >
+                                    닫기
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* 계정 탈퇴 모달 */}
             {isDeleteModalOpen && userProfile && (

@@ -21,6 +21,7 @@ import CostRecipeManager from './pages/CostRecipeManager';
 import SettingsPage from './pages/SettingsPage';
 import OnboardingLayout from './pages/onboarding/OnboardingLayout';
 import OnboardingGuard from './components/OnboardingGuard';
+import InvitePage from './pages/InvitePage';
 import './index.css';
 
 const AIAssistant = lazy(() => import('./pages/AIAssistant'));
@@ -150,6 +151,8 @@ function App() {
                 </ProtectedRoute>
               )}
             />
+
+            <Route path="/invite" element={<InvitePage />} />
 
             <Route
               path="/onboarding"

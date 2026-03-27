@@ -25,9 +25,15 @@ export default function OnboardingGuard({ children }: { children: React.ReactNod
                 return;
             }
 
+            // staff/manager는 온보딩 스킵 (온보딩은 owner 전용)
+            if (userProfile.role && userProfile.role !== 'owner') {
+                setIsChecking(false);
+                return;
+            }
+
             // 1차 체크: CompleteSetupStep에서 로컬스토리지에 저장한 '완료 플래그' 확인
             const isOnboardingComplete = localStorage.getItem(`onboarding_complete_${userProfile.uid}`) === 'true';
-            
+
             if (isOnboardingComplete) {
                 // 이미 완료한 유저는 통과
                 setIsChecking(false);

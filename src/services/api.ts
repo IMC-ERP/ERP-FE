@@ -428,6 +428,15 @@ export const userApi = {
   updateStoreProfile: (data: StoreProfileUpdateData) => api.put<StoreProfileData>('/users/store-profile', data),
   getStoreMembers: () => api.get<StoreMemberData[]>('/users/store-members'),
   deleteAccount: () => api.delete('/users/account'),
+  createInviteCode: () => api.post<{ code: string }>('/users/invite-code'),
+  redeemInviteCode: (code: string) => api.post<{ store_id: string }>('/users/redeem-invite', { code }),
+  updateMemberRole: (email: string, role: string) => api.put<{ success: boolean }>('/users/member-role', { email, role }),
+  registerMember: (data: { owner_name: string; phone?: string }) =>
+    api.post<{ uid: string; email: string; owner_name: string; phone?: string; role: string; profile_id: string }>('/users/register-member', data),
+  getInvitations: () =>
+    api.get<{ code: string; used_by: string | null; created_at: string; status: string }[]>('/users/invitations'),
+  expireInvitation: (code: string) =>
+    api.put<{ success: boolean; code: string }>(`/users/invitations/${code}/expire`),
 };
 
 // ==================== Store Profile Types ====================

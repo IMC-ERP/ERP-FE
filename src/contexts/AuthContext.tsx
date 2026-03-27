@@ -15,7 +15,7 @@ interface AuthContextType {
     userProfile: UserProfile | null;
     loading: boolean;
     needsRegistration: boolean;
-    signInWithGoogle: () => Promise<void>;
+    signInWithGoogle: (redirectPath?: string) => Promise<void>;
     logout: () => Promise<void>;
     refreshProfile: () => Promise<void>;
 }
@@ -81,12 +81,15 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     };
 
     // Google 로그인
-    const signInWithGoogle = async () => {
+    const signInWithGoogle = async (redirectPath?: string) => {
         try {
+            const redirectTo = redirectPath
+                ? `${window.location.origin}${redirectPath}`
+                : window.location.origin;
             const { error } = await supabase.auth.signInWithOAuth({
                 provider: 'google',
                 options: {
-                    redirectTo: window.location.origin,
+                    redirectTo,
                 },
             });
             if (error) throw error;

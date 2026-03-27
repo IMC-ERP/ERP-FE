@@ -74,12 +74,12 @@ export default function OnboardingLayout() {
         <div className="p-6 sm:p-8 bg-slate-50/50 border-b border-slate-200">
           <div className="flex justify-between text-sm font-semibold text-blue-600 mb-2 uppercase tracking-wide">
             <span>Onboarding Progress</span>
-            <span>{Math.round(((currentStep - 1) / 3) * 100)}% Complete</span>
+            <span>{Math.round((currentStep / 3) * 100)}% Complete</span>
           </div>
           <div className="w-full bg-slate-200 rounded-full h-2 mb-2">
             <div 
               className="bg-blue-600 h-2 rounded-full transition-all duration-300 ease-in-out" 
-              style={{ width: `${((currentStep - 1) / 3) * 100}%` }}
+              style={{ width: `${(currentStep / 3) * 100}%` }}
             ></div>
           </div>
           <div className="text-xs text-slate-400 font-medium">
