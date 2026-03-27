@@ -86,9 +86,11 @@ export default function InventorySetupStep({ onNext }: InventorySetupStepProps) 
           if (!row || row.length === 0) continue; // 빈 줄 건너뛰기
           
           const typeVal = row[0]?.toString().trim(); // A열: 품목구분
-          const category = row[1]; // B열: 카테고리
-          const name = row[2]; // C열: 품목명
-          const uom = row[3]; // D열: 관리단위
+          const category = row[1]?.toString().trim() || 'Uncategorized'; // B열: 카테고리
+          const name = row[2]?.toString().trim() || ''; // C열: 품목명
+          let uom = row[3]?.toString().trim() || 'ea'; // D열: 관리단위
+          uom = uom.toLowerCase();
+          if (uom === 'l') uom = 'L'; // L은 보통 대문자로 표기
           const quantityOnHand = Number(row[4]); // E열: 현재재고량
           const purchasePrice = Number(row[5]); // F열: 1개가격
           const purchaseVolume = Number(row[6]); // G열: 총용량
@@ -102,6 +104,12 @@ export default function InventorySetupStep({ onNext }: InventorySetupStepProps) 
           if (isNaN(quantityOnHand) || isNaN(purchasePrice) || isNaN(purchaseVolume) || isNaN(safetyStock) || isNaN(maxStock)) {
             throw new Error(`[${i+2}행] 수량 및 가격 관련 항목은 숫자여야 합니다.`);
           }
+          
+          const validUoms = ['g', 'kg', 'ml', 'L', 'ea'];
+          if (!validUoms.includes(uom)) {
+            throw new Error(`[${i+2}행] 관리단위는 'g', 'kg', 'ml', 'L', 'ea' 중 하나여야 합니다. 입력값: ${row[3]}`);
+          }
+
           if (safetyStock >= maxStock) {
             throw new Error(`[${i+2}행] 안전 재고량은 최대 재고량보다 작아야 합니다.`);
           }
