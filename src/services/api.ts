@@ -1,12 +1,12 @@
 /**
  * API Service
  * FastAPI 백엔드와 통신하는 axios 클라이언트
- * Firebase 인증 토큰 자동 첨부
+ * Supabase JWT 자동 첨부
  */
 
 import axios from 'axios';
 import axiosRetry from 'axios-retry';
-import { auth } from '../firebase';
+import { supabase } from '../supabase';
 
 // 개발 환경에서는 localhost, 프로덕션에서는 Cloud Run 백엔드 사용
 const API_BASE_URL = import.meta.env.VITE_API_URL
@@ -30,29 +30,38 @@ axiosRetry(api, {
     return axiosRetry.isNetworkOrIdempotentRequestError(error) ||
       error.response?.status === 503;
   },
-  onRetry: (retryCount, error) => {
-    console.log(`[API] Retry attempt ${retryCount} for ${error.config?.url}`);
+  onRetry: (_retryCount, _error) => {
+    // retry silently
   }
 });
 
-// Firebase ID Token 자동 첨부 인터셉터
+// Supabase JWT 자동 첨부 인터셉터
 api.interceptors.request.use(async (config) => {
-  // Firebase Auth 초기화 대기 (새로고침 시 race condition 방지)
-  await auth.authStateReady();
-
-  const user = auth.currentUser;
-  if (user) {
-    try {
-      const token = await user.getIdToken();
-      config.headers.Authorization = `Bearer ${token}`;
-    } catch (error) {
-      console.error('Failed to get Firebase token:', error);
-    }
+  const { data: { session } } = await supabase.auth.getSession();
+  if (session?.access_token) {
+    config.headers.Authorization = `Bearer ${session.access_token}`;
   }
   return config;
 }, (error) => {
   return Promise.reject(error);
 });
+
+// 401 응답 시 토큰 갱신 후 재시도
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const originalRequest = error.config;
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
+      const { data: { session } } = await supabase.auth.refreshSession();
+      if (session?.access_token) {
+        originalRequest.headers.Authorization = `Bearer ${session.access_token}`;
+        return api(originalRequest);
+      }
+    }
+    return Promise.reject(error);
+  }
+);
 
 // ==================== Types ====================
 
@@ -126,13 +135,7 @@ export const ocrApi = {
     });
   },
 
-  // 다중 영수증 이미지 OCR (Not implemented in backend yet, but updating type for consistency if needed, or leave as is)
-  // Backend doesn't have /ocr/receipt/multiple. Frontend loops calls to single?
-  // Frontend code: Promise.all(files.map(file => ocrApi.analyzeMultipleReceipts(file)))
-  // Actually Inventory.tsx uses analyzeMultipleReceipts for EACH file if multiple files.
-  // Wait, the Inventory.tsx code says: `files.map(file => ocrApi.analyzeMultipleReceipts(file))`.
-  // It iterates and calls the API for each file.
-  // So I should point THIS also to `/ocr/receipt` and use the same response type.
+  // 다중 영수증: 파일별로 단일 OCR 엔드포인트 호출
   analyzeMultipleReceipts: (file: File) => {
     const formData = new FormData();
     formData.append('file', file);
@@ -317,6 +320,8 @@ export interface DailySalesMenuItem {
   menu: string;
   quantity: number;
   sales_amount?: number;
+  matched?: boolean;
+  original_name?: string | null;
 }
 
 export interface DailySales {

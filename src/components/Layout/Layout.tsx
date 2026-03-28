@@ -230,9 +230,9 @@ export default function Layout() {
         {user && (
           <div className="p-4 border-t border-slate-200 bg-slate-50">
             <div className="flex items-center gap-3 mb-3">
-              {user.photoURL ? (
+              {user.user_metadata?.avatar_url ? (
                 <img
-                  src={user.photoURL}
+                  src={user.user_metadata.avatar_url}
                   alt="Profile"
                   className="w-8 h-8 rounded-full border border-slate-200"
                 />
@@ -243,7 +243,7 @@ export default function Layout() {
               )}
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-slate-700 truncate">
-                  {user.displayName || '사용자'}
+                  {user.user_metadata?.full_name || '사용자'}
                 </p>
                 <p className="text-xs text-slate-400 truncate">
                   {user.email}
