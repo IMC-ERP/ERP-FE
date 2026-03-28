@@ -3,27 +3,49 @@
  * 재고 관리 페이지 (전면 재설계)
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { RefreshCw, ChevronDown, ChevronUp, Plus, X, Trash2, Camera, ImageIcon } from 'lucide-react';
-import { inventoryApi, stockIntakeApi, ocrApi, type InventoryItem, type StockIntake, type OCRReceiptData, type StockIntakeRecord } from '../services/api';
+import {
+  intermediateApi,
+  inventoryApi,
+  stockIntakeApi,
+  ocrApi,
+  type IntermediateProductionLog,
+  type IntermediateRecipe,
+  type InventoryItem,
+  type InventoryUpdatePayload,
+  type StockIntake,
+  type OCRReceiptData,
+  type StockIntakeRecord,
+} from '../services/api';
+import { supabase } from '../supabase';
+import { useAuth } from '../contexts/AuthContext';
+import {
+  createDetailFormData,
+  createIntermediateRecipeDetailForm,
+  toDetailValues,
+  type AddItemFormData,
+  type IntakeItem,
+  type IntermediateRecipeFormState,
+  type IntermediateRecipeFormValues,
+  type ItemDetailFormData,
+  type ItemDetailValues,
+  type TabType,
+} from './inventory/types';
+import {
+  calculateIntakeTotalAmount,
+  createEmptyIntakeItem,
+  createInitialFormData,
+  createInitialIntermediateRecipeForm,
+  createIntermediateIngredientDraft,
+  createLocalRowId,
+  parseNumericInput,
+} from './inventory/utils';
 import './Inventory.css';
 
-type TabType = 'overview' | 'pricing' | 'receiving' | 'forecast' | 'history';
-
-// Define IntakeItem interface based on the instruction's provided structure
-interface IntakeItem {
-  id: number;
-  category: string;
-  name: string;
-  volume: number;
-  quantity: number;
-  price_per_unit: number;
-  total_amount: number;
-  uom: string; // 단위 (g, ml, kg, L 등)
-}
-
 export default function Inventory() {
+  const { userProfile } = useAuth();
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabType>('overview');
@@ -32,29 +54,23 @@ export default function Inventory() {
   // 품목 추가 모달 관련 상태
   const [showAddModal, setShowAddModal] = useState(false);
   const [isNewCategory, setIsNewCategory] = useState(false);
-  const [formData, setFormData] = useState({
-    id: '',
-    category: '',
-    quantity_on_hand: 0,
-    uom: 'g' as 'g' | 'kg' | 'ml' | 'L' | 'ea',
-    safety_stock: 0,
-    max_stock_level: 0,
-    unit_cost: 0,
-  });
+  const [formData, setFormData] = useState<AddItemFormData>(createInitialFormData());
   const [submitMessage, setSubmitMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
+  const [selectedItemHistory, setSelectedItemHistory] = useState<StockIntakeRecord[]>([]);
+  const [loadingSelectedItem, setLoadingSelectedItem] = useState(false);
+  const [selectedItemError, setSelectedItemError] = useState<string | null>(null);
+  const [isItemEditMode, setIsItemEditMode] = useState(false);
+  const [itemDetailForm, setItemDetailForm] = useState<ItemDetailFormData | null>(null);
+  const [originalItemDetailForm, setOriginalItemDetailForm] = useState<ItemDetailFormData | null>(null);
+  const [itemDetailMessage, setItemDetailMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [isSavingItemDetail, setIsSavingItemDetail] = useState(false);
+  const selectedItemRequestRef = useRef<string | null>(null);
+  const realtimeRefreshTimerRef = useRef<number | null>(null);
 
   // 수기 입고 상태 (모달 대신 탭 내용 전환 방식)
   const [isManualInputMode, setIsManualInputMode] = useState(false);
-  const [intakeItems, setIntakeItems] = useState<IntakeItem[]>([{
-    id: Date.now(),
-    category: '',
-    name: '',
-    volume: 0,
-    quantity: 0,
-    price_per_unit: 0,
-    total_amount: 0,
-    uom: 'g', // 기본 단위
-  }]);
+  const [intakeItems, setIntakeItems] = useState<IntakeItem[]>([createEmptyIntakeItem()]);
   const [intakeMessage, setIntakeMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   // 이미지 업로드 및 OCR 관련 상태
@@ -77,6 +93,24 @@ export default function Inventory() {
   const [intakeHistory, setIntakeHistory] = useState<StockIntakeRecord[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [historyMessage, setHistoryMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [intermediateRecipes, setIntermediateRecipes] = useState<IntermediateRecipe[]>([]);
+  const [productionLogs, setProductionLogs] = useState<IntermediateProductionLog[]>([]);
+  const [loadingIntermediate, setLoadingIntermediate] = useState(false);
+  const [intermediateMessage, setIntermediateMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [intermediateView, setIntermediateView] = useState<'recipe' | 'production'>('recipe');
+  const [intermediateRecipeForm, setIntermediateRecipeForm] = useState<IntermediateRecipeFormState>(createInitialIntermediateRecipeForm());
+  const [selectedProductionRecipeId, setSelectedProductionRecipeId] = useState<number | ''>('');
+  const [selectedIntermediateRecipe, setSelectedIntermediateRecipe] = useState<IntermediateRecipe | null>(null);
+  const [intermediateRecipeDetailForm, setIntermediateRecipeDetailForm] = useState<IntermediateRecipeFormState | null>(null);
+  const [originalIntermediateRecipeDetailForm, setOriginalIntermediateRecipeDetailForm] = useState<IntermediateRecipeFormState | null>(null);
+  const [isIntermediateRecipeEditMode, setIsIntermediateRecipeEditMode] = useState(false);
+  const [isSavingIntermediateRecipeDetail, setIsSavingIntermediateRecipeDetail] = useState(false);
+  const [intermediateRecipeDetailMessage, setIntermediateRecipeDetailMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [productionBatchCount, setProductionBatchCount] = useState<number | ''>('');
+  const [productionNote, setProductionNote] = useState('');
+  const [savingIntermediateRecipe, setSavingIntermediateRecipe] = useState(false);
+  const [producingIntermediate, setProducingIntermediate] = useState(false);
+  const [deletingProductionLogId, setDeletingProductionLogId] = useState<number | null>(null);
 
   // 자동완성 드롭다운 상태
   const [activeSearchIndex, setActiveSearchIndex] = useState<number | null>(null);
@@ -105,21 +139,77 @@ export default function Inventory() {
     return () => window.removeEventListener('scroll', handleScroll, true);
   }, [activeSearchIndex]);
 
-  const fetchInventory = async () => {
+  const fetchInventory = async ({ silent = false }: { silent?: boolean } = {}) => {
     try {
-      setLoading(true);
+      if (!silent) {
+        setLoading(true);
+      }
       const res = await inventoryApi.getAll();
       setInventory(res.data);
     } catch (err) {
       console.error('Failed to fetch inventory:', err);
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   };
 
   useEffect(() => {
     fetchInventory();
   }, []);
+
+  const fetchIntermediateData = async ({ silent = false }: { silent?: boolean } = {}) => {
+    try {
+      if (!silent) {
+        setLoadingIntermediate(true);
+      }
+      const [recipesRes, logsRes] = await Promise.all([
+        intermediateApi.getRecipes(),
+        intermediateApi.getProductionLogs(20),
+      ]);
+      setIntermediateRecipes(recipesRes.data);
+      setProductionLogs(logsRes.data);
+    } catch (err) {
+      console.error('Failed to fetch intermediate data:', err);
+      setIntermediateMessage({ type: 'error', text: '중간재 데이터를 불러오지 못했습니다.' });
+    } finally {
+      if (!silent) {
+        setLoadingIntermediate(false);
+      }
+    }
+  };
+
+  useEffect(() => {
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') {
+        return;
+      }
+
+      if (selectedItem) {
+        handleCloseItemDetail();
+        return;
+      }
+
+      if (selectedIntermediateRecipe) {
+        setSelectedIntermediateRecipe(null);
+        return;
+      }
+
+      if (showAddModal) {
+        handleCloseModal();
+      }
+    };
+
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [selectedItem, selectedIntermediateRecipe, showAddModal]);
+
+  useEffect(() => {
+    if (activeTab === 'intermediate') {
+      fetchIntermediateData();
+    }
+  }, [activeTab]);
 
   const toggleCategory = (category: string) => {
     const newExpanded = new Set(expandedCategories);
@@ -133,35 +223,32 @@ export default function Inventory() {
 
   const handleAddItem = () => {
     setShowAddModal(true);
-    setFormData({
-      id: '',
-      category: '',
-      quantity_on_hand: 0,
-      uom: 'g',
-      safety_stock: 0,
-      max_stock_level: 0,
-      unit_cost: 0,
-    });
-    setIsNewCategory(false);
+    setFormData(createInitialFormData());
+    setIsNewCategory(existingCategories.length === 0);
     setSubmitMessage(null);
   };
 
   const handleCloseModal = () => {
     setShowAddModal(false);
-    setFormData({
-      id: '',
-      category: '',
-      quantity_on_hand: 0,
-      uom: 'g',
-      safety_stock: 0,
-      max_stock_level: 0,
-      unit_cost: 0,
-    });
+    setFormData(createInitialFormData());
     setIsNewCategory(false);
     setSubmitMessage(null);
   };
 
-  const handleInputChange = (field: string, value: string | number) => {
+  const handleCloseItemDetail = () => {
+    selectedItemRequestRef.current = null;
+    setSelectedItem(null);
+    setSelectedItemHistory([]);
+    setSelectedItemError(null);
+    setLoadingSelectedItem(false);
+    setIsItemEditMode(false);
+    setItemDetailForm(null);
+    setOriginalItemDetailForm(null);
+    setItemDetailMessage(null);
+    setIsSavingItemDetail(false);
+  };
+
+  const handleInputChange = <K extends keyof AddItemFormData>(field: K, value: AddItemFormData[K]) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
@@ -169,9 +256,28 @@ export default function Inventory() {
     e.preventDefault();
     setSubmitMessage(null);
 
+    const itemName = formData.id.trim();
+    const category = formData.category.trim();
+
+    if (!itemName) {
+      setSubmitMessage({ type: 'error', text: '품목 이름을 입력해주세요.' });
+      return;
+    }
+
+    if (!category) {
+      setSubmitMessage({ type: 'error', text: '카테고리를 입력해주세요.' });
+      return;
+    }
+
     try {
       const newItem: Omit<InventoryItem, 'id'> & { id: string } = {
-        ...formData,
+        id: itemName,
+        category,
+        quantity_on_hand: formData.quantity_on_hand,
+        uom: formData.uom,
+        safety_stock: Number(formData.safety_stock),
+        max_stock_level: Number(formData.max_stock_level),
+        unit_cost: formData.unit_cost,
         needs_reorder: false,
       };
 
@@ -189,20 +295,460 @@ export default function Inventory() {
     }
   };
 
+  const normalizeItemKey = (value: string) => value.trim().toLowerCase();
+
+  const handleOpenItemDetail = async (item: InventoryItem) => {
+    selectedItemRequestRef.current = item.id;
+    setSelectedItem(item);
+    const initialDetailForm = createDetailFormData(item);
+    setItemDetailForm(initialDetailForm);
+    setOriginalItemDetailForm(initialDetailForm);
+    setSelectedItemHistory([]);
+    setSelectedItemError(null);
+    setItemDetailMessage(null);
+    setLoadingSelectedItem(true);
+    setIsItemEditMode(false);
+
+    const [itemResult, historyResult] = await Promise.allSettled([
+      inventoryApi.getById(item.id),
+      stockIntakeApi.getAll(100),
+    ]);
+
+    if (selectedItemRequestRef.current !== item.id) {
+      return;
+    }
+
+    const errors: string[] = [];
+
+    if (itemResult.status === 'fulfilled') {
+      setSelectedItem(itemResult.value.data);
+      const latestDetailForm = createDetailFormData(itemResult.value.data);
+      setItemDetailForm(latestDetailForm);
+      setOriginalItemDetailForm(latestDetailForm);
+    } else {
+      console.error('재고 상세 조회 실패:', itemResult.reason);
+      errors.push('재고 상세');
+    }
+
+    if (historyResult.status === 'fulfilled') {
+      const normalizedItemId = normalizeItemKey(item.id);
+      const filteredHistory = historyResult.value.data
+        .filter((record) => normalizeItemKey(record.name || '') === normalizedItemId)
+        .sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+      setSelectedItemHistory(filteredHistory);
+    } else {
+      console.error('재고 이력 조회 실패:', historyResult.reason);
+      errors.push('입고 이력');
+    }
+
+    setSelectedItemError(
+      errors.length > 0
+        ? `${errors.join(', ')} 정보를 완전히 불러오지 못했습니다.`
+        : null
+    );
+    setLoadingSelectedItem(false);
+  };
+
+  const handleDetailFieldChange = <K extends keyof ItemDetailFormData>(field: K, value: ItemDetailFormData[K]) => {
+    setItemDetailMessage(null);
+    setItemDetailForm((prev) => (prev ? { ...prev, [field]: value } : prev));
+  };
+
+  const findInventoryItem = (value: string) => inventory.find((item) => item.id === value);
+
+  const handleIntermediateOutputChange = (value: string) => {
+    const matched = findInventoryItem(value);
+    setIntermediateRecipeForm((prev) => ({
+      ...prev,
+      output_item_search: value,
+      output_item_id: matched?.id ?? '',
+    }));
+    setIntermediateMessage(null);
+  };
+
+  const handleIntermediateIngredientChange = (rowId: number, value: string) => {
+    const matched = findInventoryItem(value);
+    setIntermediateRecipeForm((prev) => ({
+      ...prev,
+      ingredients: prev.ingredients.map((ingredient) => ingredient.row_id === rowId
+        ? {
+          ...ingredient,
+          ingredient_search: value,
+          ingredient_id: matched?.id ?? '',
+          ingredient_uom: matched?.uom ?? '',
+        }
+        : ingredient),
+    }));
+    setIntermediateMessage(null);
+  };
+
+  const handleIntermediateIngredientUsageChange = (rowId: number, value: number | '') => {
+    setIntermediateRecipeForm((prev) => ({
+      ...prev,
+      ingredients: prev.ingredients.map((ingredient) => ingredient.row_id === rowId
+        ? { ...ingredient, usage_amount: value }
+        : ingredient),
+    }));
+    setIntermediateMessage(null);
+  };
+
+  const handleAddIntermediateIngredient = () => {
+    setIntermediateRecipeForm((prev) => ({
+      ...prev,
+      ingredients: [...prev.ingredients, createIntermediateIngredientDraft()],
+    }));
+  };
+
+  const handleRemoveIntermediateIngredient = (rowId: number) => {
+    setIntermediateRecipeForm((prev) => ({
+      ...prev,
+      ingredients: prev.ingredients.filter((ingredient) => ingredient.row_id !== rowId),
+    }));
+  };
+
+  const handleIntermediateRecipeDetailOutputChange = (value: string) => {
+    const matched = findInventoryItem(value);
+    setIntermediateRecipeDetailMessage(null);
+    setIntermediateRecipeDetailForm((prev) => (prev ? {
+      ...prev,
+      output_item_search: value,
+      output_item_id: matched?.id ?? '',
+    } : prev));
+  };
+
+  const handleIntermediateRecipeDetailIngredientChange = (rowId: number, value: string) => {
+    const matched = findInventoryItem(value);
+    setIntermediateRecipeDetailMessage(null);
+    setIntermediateRecipeDetailForm((prev) => (prev ? {
+      ...prev,
+      ingredients: prev.ingredients.map((ingredient) => ingredient.row_id === rowId
+        ? {
+          ...ingredient,
+          ingredient_search: value,
+          ingredient_id: matched?.id ?? '',
+          ingredient_uom: matched?.uom ?? '',
+        }
+        : ingredient),
+    } : prev));
+  };
+
+  const handleIntermediateRecipeDetailIngredientUsageChange = (rowId: number, value: number | '') => {
+    setIntermediateRecipeDetailMessage(null);
+    setIntermediateRecipeDetailForm((prev) => (prev ? {
+      ...prev,
+      ingredients: prev.ingredients.map((ingredient) => ingredient.row_id === rowId
+        ? { ...ingredient, usage_amount: value }
+        : ingredient),
+    } : prev));
+  };
+
+  const handleAddIntermediateRecipeDetailIngredient = () => {
+    setIntermediateRecipeDetailMessage(null);
+    setIntermediateRecipeDetailForm((prev) => (prev ? {
+      ...prev,
+      ingredients: [...prev.ingredients, createIntermediateIngredientDraft()],
+    } : prev));
+  };
+
+  const handleRemoveIntermediateRecipeDetailIngredient = (rowId: number) => {
+    setIntermediateRecipeDetailMessage(null);
+    setIntermediateRecipeDetailForm((prev) => (prev ? {
+      ...prev,
+      ingredients: prev.ingredients.filter((ingredient) => ingredient.row_id !== rowId),
+    } : prev));
+  };
+
+  const handleSaveIntermediateRecipe = async () => {
+    if (!intermediateRecipeForm.output_item_id) {
+      setIntermediateMessage({ type: 'error', text: '생산할 중간재를 inventory에서 선택해주세요.' });
+      return;
+    }
+
+    const normalizedIngredients = intermediateRecipeForm.ingredients
+      .filter((ingredient) => ingredient.ingredient_id || ingredient.ingredient_search || ingredient.usage_amount !== '')
+      .map((ingredient) => ({
+        ingredient_id: ingredient.ingredient_id,
+        usage_amount: Number(ingredient.usage_amount || 0),
+      }));
+
+    if (Number(intermediateRecipeForm.output_quantity || 0) <= 0) {
+      setIntermediateMessage({ type: 'error', text: '1배치 생산 수량을 입력해주세요.' });
+      return;
+    }
+
+    if (normalizedIngredients.length === 0) {
+      setIntermediateMessage({ type: 'error', text: '최소 1개 이상의 원재료를 추가해주세요.' });
+      return;
+    }
+
+    if (normalizedIngredients.some((ingredient) => !ingredient.ingredient_id)) {
+      setIntermediateMessage({ type: 'error', text: '원재료는 inventory 검색 결과에서 정확히 선택해주세요.' });
+      return;
+    }
+
+    if (normalizedIngredients.some((ingredient) => ingredient.usage_amount <= 0)) {
+      setIntermediateMessage({ type: 'error', text: '원재료 투입량은 0보다 커야 합니다.' });
+      return;
+    }
+
+    setSavingIntermediateRecipe(true);
+    setIntermediateMessage(null);
+
+    try {
+      await intermediateApi.createRecipe({
+        output_item_id: intermediateRecipeForm.output_item_id,
+        output_quantity: Number(intermediateRecipeForm.output_quantity),
+        note: intermediateRecipeForm.note.trim(),
+        ingredients: normalizedIngredients,
+      });
+      setIntermediateRecipeForm(createInitialIntermediateRecipeForm());
+      await fetchIntermediateData();
+      setIntermediateMessage({ type: 'success', text: '중간재 레시피가 생성되었습니다.' });
+    } catch (err: any) {
+      const errorMsg = err.response?.data?.detail || '중간재 레시피 생성에 실패했습니다.';
+      setIntermediateMessage({ type: 'error', text: errorMsg });
+    } finally {
+      setSavingIntermediateRecipe(false);
+    }
+  };
+
+  const handleProduceIntermediate = async () => {
+    if (!selectedProductionRecipeId) {
+      setIntermediateMessage({ type: 'error', text: '생산할 중간재 레시피를 선택해주세요.' });
+      return;
+    }
+
+    if (Number(productionBatchCount || 0) <= 0) {
+      setIntermediateMessage({ type: 'error', text: '생산 배치 수를 입력해주세요.' });
+      return;
+    }
+
+    setProducingIntermediate(true);
+    setIntermediateMessage(null);
+
+    try {
+      await intermediateApi.createProduction({
+        recipe_id: Number(selectedProductionRecipeId),
+        batch_count: Number(productionBatchCount),
+        note: productionNote.trim(),
+      });
+      setProductionBatchCount('');
+      setProductionNote('');
+      await Promise.all([fetchInventory(), fetchIntermediateData()]);
+      setIntermediateMessage({ type: 'success', text: '중간재 생산이 완료되어 재고가 즉시 반영되었습니다.' });
+    } catch (err: any) {
+      const errorMsg = err.response?.data?.detail || '중간재 생산 등록에 실패했습니다.';
+      setIntermediateMessage({ type: 'error', text: errorMsg });
+    } finally {
+      setProducingIntermediate(false);
+    }
+  };
+
+  const handleDeleteProductionLog = async (logId: number) => {
+    if (!window.confirm('이 생산 로그를 삭제하시겠습니까?\n\n✓ 차감된 원재료 재고가 복구됩니다\n✓ 증가한 중간재 재고가 차감됩니다\n\n계속하시겠습니까?')) {
+      return;
+    }
+
+    try {
+      setDeletingProductionLogId(logId);
+      setIntermediateMessage(null);
+      await intermediateApi.deleteProduction(logId);
+      await Promise.all([fetchInventory(), fetchIntermediateData()]);
+      setIntermediateMessage({ type: 'success', text: '생산 로그가 삭제되고 재고가 복구되었습니다.' });
+    } catch (err: any) {
+      const errorMsg = err.response?.data?.detail || '생산 로그 삭제에 실패했습니다.';
+      setIntermediateMessage({ type: 'error', text: errorMsg });
+    } finally {
+      setDeletingProductionLogId(null);
+    }
+  };
+
+  const handleOpenIntermediateRecipe = (recipe: IntermediateRecipe) => {
+    setSelectedIntermediateRecipe(recipe);
+    const initialDetailForm = createIntermediateRecipeDetailForm(
+      recipe,
+      createIntermediateIngredientDraft,
+      createLocalRowId,
+    );
+    setIntermediateRecipeDetailForm(initialDetailForm);
+    setOriginalIntermediateRecipeDetailForm(initialDetailForm);
+    setIsIntermediateRecipeEditMode(false);
+    setIntermediateRecipeDetailMessage(null);
+    setIntermediateMessage(null);
+  };
+
+  const handleCloseIntermediateRecipe = () => {
+    setSelectedIntermediateRecipe(null);
+    setIntermediateRecipeDetailForm(null);
+    setOriginalIntermediateRecipeDetailForm(null);
+    setIsIntermediateRecipeEditMode(false);
+    setIsSavingIntermediateRecipeDetail(false);
+    setIntermediateRecipeDetailMessage(null);
+  };
+
+  const handleOpenProductionFromRecipe = (recipe: IntermediateRecipe) => {
+    setSelectedProductionRecipeId(recipe.id);
+    setIntermediateView('production');
+    setSelectedIntermediateRecipe(null);
+    setIntermediateMessage(null);
+  };
+
+  const normalizeIntermediateRecipeForm = (form: IntermediateRecipeFormState): IntermediateRecipeFormValues => ({
+    output_item_id: form.output_item_id.trim(),
+    output_quantity: Number(form.output_quantity || 0),
+    note: form.note.trim(),
+    ingredients: form.ingredients
+      .filter((ingredient) => ingredient.ingredient_id || ingredient.ingredient_search || ingredient.usage_amount !== '')
+      .map((ingredient) => ({
+        ingredient_id: ingredient.ingredient_id.trim(),
+        usage_amount: Number(ingredient.usage_amount || 0),
+      })),
+  });
+
+  const areIntermediateRecipeFormsEqual = (left: IntermediateRecipeFormValues, right: IntermediateRecipeFormValues) => (
+    left.output_item_id === right.output_item_id
+    && left.output_quantity === right.output_quantity
+    && left.note === right.note
+    && JSON.stringify(left.ingredients) === JSON.stringify(right.ingredients)
+  );
+
+  const handleSaveIntermediateRecipeDetail = async () => {
+    if (!selectedIntermediateRecipe || !intermediateRecipeDetailForm) {
+      return;
+    }
+
+    const normalizedForm = normalizeIntermediateRecipeForm(intermediateRecipeDetailForm);
+
+    if (!normalizedForm.output_item_id) {
+      setIntermediateRecipeDetailMessage({ type: 'error', text: '생산할 중간재를 inventory에서 선택해주세요.' });
+      return;
+    }
+
+    if (normalizedForm.output_quantity <= 0) {
+      setIntermediateRecipeDetailMessage({ type: 'error', text: '1배치 생산 수량을 입력해주세요.' });
+      return;
+    }
+
+    if (normalizedForm.ingredients.length === 0) {
+      setIntermediateRecipeDetailMessage({ type: 'error', text: '최소 1개 이상의 원재료를 추가해주세요.' });
+      return;
+    }
+
+    if (normalizedForm.ingredients.some((ingredient) => !ingredient.ingredient_id)) {
+      setIntermediateRecipeDetailMessage({ type: 'error', text: '원재료는 inventory 검색 결과에서 정확히 선택해주세요.' });
+      return;
+    }
+
+    if (normalizedForm.ingredients.some((ingredient) => ingredient.usage_amount <= 0)) {
+      setIntermediateRecipeDetailMessage({ type: 'error', text: '원재료 투입량은 0보다 커야 합니다.' });
+      return;
+    }
+
+    try {
+      setIsSavingIntermediateRecipeDetail(true);
+      setIntermediateRecipeDetailMessage(null);
+      const response = await intermediateApi.updateRecipe(selectedIntermediateRecipe.id, normalizedForm);
+      const updatedRecipe = response.data;
+      const refreshedDetailForm = createIntermediateRecipeDetailForm(
+        updatedRecipe,
+        createIntermediateIngredientDraft,
+        createLocalRowId,
+      );
+
+      setSelectedIntermediateRecipe(updatedRecipe);
+      setIntermediateRecipeDetailForm(refreshedDetailForm);
+      setOriginalIntermediateRecipeDetailForm(refreshedDetailForm);
+      setIsIntermediateRecipeEditMode(false);
+      setIntermediateRecipeDetailMessage({ type: 'success', text: '중간재 레시피가 수정되었습니다.' });
+      await fetchIntermediateData();
+    } catch (err: any) {
+      const errorMsg = err.response?.data?.detail || '중간재 레시피 수정에 실패했습니다.';
+      setIntermediateRecipeDetailMessage({ type: 'error', text: errorMsg });
+    } finally {
+      setIsSavingIntermediateRecipeDetail(false);
+    }
+  };
+
+  const normalizeDetailForm = (form: ItemDetailFormData): ItemDetailValues => ({
+    id: form.id.trim(),
+    category: form.category.trim(),
+    quantity_on_hand: Number(form.quantity_on_hand || 0),
+    uom: form.uom.trim(),
+    safety_stock: Number(form.safety_stock || 0),
+    max_stock_level: Number(form.max_stock_level || 0),
+    unit_cost: Number(form.unit_cost || 0),
+  });
+
+  const areDetailFormsEqual = (left: ItemDetailValues, right: ItemDetailValues) => (
+    left.id === right.id
+    && left.category === right.category
+    && left.quantity_on_hand === right.quantity_on_hand
+    && left.uom === right.uom
+    && left.safety_stock === right.safety_stock
+    && left.max_stock_level === right.max_stock_level
+    && left.unit_cost === right.unit_cost
+  );
+
+  const handleSaveItemDetail = async () => {
+    if (!selectedItem || !itemDetailForm || !originalItemDetailForm) {
+      return;
+    }
+
+    const normalizedForm = normalizeDetailForm(itemDetailForm);
+
+    if (!normalizedForm.id) {
+      setItemDetailMessage({ type: 'error', text: '품목 이름을 입력해주세요.' });
+      return;
+    }
+
+    if (!normalizedForm.category) {
+      setItemDetailMessage({ type: 'error', text: '카테고리를 입력해주세요.' });
+      return;
+    }
+
+    setIsSavingItemDetail(true);
+    setItemDetailMessage(null);
+
+    try {
+      const payload: InventoryUpdatePayload = {
+        id: normalizedForm.id,
+        category: normalizedForm.category,
+        quantity_on_hand: normalizedForm.quantity_on_hand,
+        uom: normalizedForm.uom,
+        safety_stock: normalizedForm.safety_stock,
+        max_stock_level: normalizedForm.max_stock_level,
+        unit_cost: normalizedForm.unit_cost,
+      };
+
+      await inventoryApi.update(selectedItem.id, payload);
+
+      const [inventoryRes, itemRes] = await Promise.all([
+        inventoryApi.getAll(),
+        inventoryApi.getById(normalizedForm.id),
+      ]);
+
+      const latestItem = itemRes.data;
+      const latestDetailForm = createDetailFormData(latestItem);
+
+      setInventory(inventoryRes.data);
+      setSelectedItem(latestItem);
+      setItemDetailForm(latestDetailForm);
+      setOriginalItemDetailForm(latestDetailForm);
+      setIsItemEditMode(false);
+      setItemDetailMessage({ type: 'success', text: '수정사항이 저장되었습니다.' });
+    } catch (err: any) {
+      const errorMsg = err.response?.data?.detail || '수정사항 저장에 실패했습니다.';
+      setItemDetailMessage({ type: 'error', text: errorMsg });
+    } finally {
+      setIsSavingItemDetail(false);
+    }
+  };
+
   // ==================== 수기 입고 핸들러 ====================
 
   const handleOpenManualIntake = () => {
     setIsManualInputMode(true);
-    setIntakeItems([{
-      id: Date.now(),
-      category: '',
-      name: '',
-      volume: 0,
-      quantity: 0,
-      price_per_unit: 0,
-      total_amount: 0,
-      uom: 'g', // 기본 단위
-    }]);
+    setIntakeItems([createEmptyIntakeItem()]);
     setIntakeMessage(null);
     setUploadedImages([]);
     setImagePreviewUrls([]);
@@ -362,16 +908,7 @@ export default function Inventory() {
 
 
   const handleAddIntakeItem = () => {
-    setIntakeItems(prev => [...prev, {
-      id: Date.now(),
-      category: '',
-      name: '',
-      volume: 0,
-      quantity: 0,
-      price_per_unit: 0,
-      total_amount: 0,
-      uom: 'g', // 기본 단위
-    }]);
+    setIntakeItems(prev => [...prev, createEmptyIntakeItem()]);
   };
 
   const handleRemoveIntakeItem = (id: number) => {
@@ -385,7 +922,7 @@ export default function Inventory() {
 
         // 품목 총 결제 금액 자동 계산
         if (field === 'quantity' || field === 'price_per_unit') {
-          updated.total_amount = updated.quantity * updated.price_per_unit;
+          updated.total_amount = calculateIntakeTotalAmount(updated.quantity, updated.price_per_unit);
         }
 
         // 카테고리가 변경되면 품목 이름 초기화
@@ -454,29 +991,43 @@ export default function Inventory() {
         })
       );
 
-      const failures = results.filter(r => r.status === 'rejected') as PromiseRejectedResult[];
-      const successes = results.filter(r => r.status === 'fulfilled');
+      const successfulItems: IntakeItem[] = [];
+      const failedItems: IntakeItem[] = [];
+      const failureMessages: string[] = [];
 
-      if (failures.length === 0) {
-        setIntakeMessage({ type: 'success', text: `${successes.length}개 품목의 재고가 성공적으로 반영되었습니다!` });
+      results.forEach((result, index) => {
+        if (result.status === 'fulfilled') {
+          successfulItems.push(intakeItems[index]);
+          return;
+        }
 
-        // 재고 목록 새로고침
+        failedItems.push(intakeItems[index]);
+        const detail = (result.reason as any)?.response?.data?.detail;
+        if (detail) {
+          failureMessages.push(String(detail));
+        }
+      });
+
+      if (successfulItems.length > 0) {
+        await Promise.all([
+          fetchInventory({ silent: true }),
+          fetchIntakeHistory({ silent: true }),
+        ]);
+      }
+
+      if (failedItems.length === 0) {
+        setIntakeMessage({ type: 'success', text: `${successfulItems.length}개 품목의 재고가 성공적으로 반영되었습니다!` });
         setTimeout(() => {
-          fetchInventory();
           handleCloseManualIntake();
-        }, 2000);
-      } else if (successes.length > 0) {
-        const firstError = (failures[0].reason as any)?.response?.data?.detail || '일부 품목 처리 실패';
+        }, 1200);
+      } else if (successfulItems.length > 0) {
+        setIntakeItems(failedItems);
         setIntakeMessage({
           type: 'error',
-          text: `${successes.length}개 성공, ${failures.length}개 실패. 오류: ${firstError}`
+          text: `${successfulItems.length}개 성공, ${failedItems.length}개 실패. ${failureMessages[0] || '실패한 품목만 남겨두었습니다. 수정 후 다시 제출해주세요.'}`
         });
-
-        // 부분 성공이므로 재고 새로고침
-        fetchInventory();
       } else {
-        const firstError = (failures[0].reason as any)?.response?.data?.detail || '재고 입고에 실패했습니다.';
-        setIntakeMessage({ type: 'error', text: firstError });
+        setIntakeMessage({ type: 'error', text: failureMessages[0] || '재고 입고에 실패했습니다.' });
       }
     } catch (err: any) {
       setIntakeMessage({ type: 'error', text: '서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.' });
@@ -485,7 +1036,12 @@ export default function Inventory() {
   const existingCategories = Array.from(new Set(inventory.map(item => item.category)));
 
   const getStockPercentage = (current: number, max: number) => {
-    return Math.round((current / max) * 100);
+    if (max <= 0) {
+      return 0;
+    }
+
+    const percentage = Math.round((current / max) * 100);
+    return Number.isFinite(percentage) ? percentage : 0;
   };
 
   const getStockStatus = (percentage: number) => {
@@ -508,8 +1064,47 @@ export default function Inventory() {
     return colors[category] || '#7F8C8D';
   };
 
+  const formatCurrency = (value: number) => `${Math.round(value).toLocaleString()}원`;
+
+  const formatQuantity = (value: number, uom: string) => `${value.toLocaleString()}${uom}`;
+
+  const formatTimestamp = (timestamp: string) => {
+    if (!timestamp) {
+      return '-';
+    }
+
+    const date = new Date(timestamp);
+    if (Number.isNaN(date.getTime())) {
+      return timestamp.replace('T', ' ');
+    }
+
+    return date.toLocaleString('ko-KR', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  const selectedIntermediateOutputItem = intermediateRecipeForm.output_item_id
+    ? findInventoryItem(intermediateRecipeForm.output_item_id)
+    : null;
+  const selectedProductionRecipe = selectedProductionRecipeId
+    ? intermediateRecipes.find((recipe) => recipe.id === selectedProductionRecipeId) ?? null
+    : null;
+  const recentProductionLogs = productionLogs.slice(0, 5);
+
+  const isReorderNeeded = (item: Pick<InventoryItem, 'quantity_on_hand' | 'safety_stock' | 'needs_reorder'>) => {
+    if (item.safety_stock > 0) {
+      return item.quantity_on_hand < item.safety_stock;
+    }
+
+    return item.needs_reorder;
+  };
+
   // 발주 필요 아이템
-  const needsReorderItems = inventory.filter(item => item.needs_reorder);
+  const needsReorderItems = inventory.filter(isReorderNeeded);
 
   // 카테고리별 그룹핑 (모든 아이템 포함)
   const groupedByCategory = inventory.reduce((acc, item) => {
@@ -567,7 +1162,13 @@ export default function Inventory() {
     const categoryColor = getCategoryColor(item.category);
 
     return (
-      <div key={item.id} className={`inventory-card-new ${status}`}>
+      <button
+        key={item.id}
+        type="button"
+        className={`inventory-card-new ${status}`}
+        onClick={() => void handleOpenItemDetail(item)}
+        aria-label={`${item.id} 상세 보기`}
+      >
         <div className="card-top">
           <span className="category-badge" style={{ backgroundColor: categoryColor }}>
             {item.category}
@@ -584,7 +1185,7 @@ export default function Inventory() {
             ></div>
           </div>
         </div>
-      </div>
+      </button>
     );
   };
 
@@ -635,7 +1236,7 @@ export default function Inventory() {
                   </div>
                   <div className="category-badge-group">
                     <span className="category-items-badge">
-                      부족 {items.filter(i => i.needs_reorder).length}
+                      부족 {items.filter(isReorderNeeded).length}
                     </span>
                     {isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
                   </div>
@@ -810,6 +1411,340 @@ export default function Inventory() {
           </table>
         </div>
       </section>
+    </div>
+  );
+
+  const renderIntermediateTab = () => (
+    <div className="space-y-4 md:space-y-6">
+      <section className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h3 className="text-lg font-bold text-slate-800">중간재 관리</h3>
+            <p className="text-sm text-slate-500 mt-1">복잡한 요약은 빼고, 레시피 등록과 생산 처리만 바로 하도록 단순화했습니다.</p>
+          </div>
+          <button className="btn btn-secondary" onClick={() => void fetchIntermediateData()} disabled={loadingIntermediate}>
+            <RefreshCw size={16} className={loadingIntermediate ? 'animate-spin' : ''} />
+            새로고침
+          </button>
+        </div>
+
+        <div className="mt-4 flex flex-wrap gap-2">
+          <button
+            type="button"
+            className={`btn ${intermediateView === 'recipe' ? 'btn-primary' : 'btn-secondary'}`}
+            onClick={() => setIntermediateView('recipe')}
+          >
+            레시피 설계
+          </button>
+          <button
+            type="button"
+            className={`btn ${intermediateView === 'production' ? 'btn-primary' : 'btn-secondary'}`}
+            onClick={() => setIntermediateView('production')}
+          >
+            생산 등록
+          </button>
+        </div>
+      </section>
+
+      {intermediateMessage && (
+        <div className={`intake-message ${intermediateMessage.type}`}>
+          {intermediateMessage.text}
+        </div>
+      )}
+
+      {loadingIntermediate ? (
+        <section className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+          <div className="detail-empty-state">
+            <div className="loading-spinner"></div>
+            <p className="mt-3">중간재 데이터를 불러오는 중입니다.</p>
+          </div>
+        </section>
+      ) : intermediateView === 'recipe' ? (
+        <>
+          <section className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+            <div className="mb-5">
+              <h3 className="text-lg font-bold text-slate-800">레시피 설계</h3>
+              <p className="text-sm text-slate-500 mt-1">중간재와 원재료를 검색해서 간단히 연결하세요.</p>
+            </div>
+
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-[1.4fr_0.6fr] gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-slate-600 mb-2">중간재 검색</label>
+                  <input
+                    list="inventory-item-search-list"
+                    className="detail-form-input"
+                    placeholder="생산할 중간재를 검색"
+                    value={intermediateRecipeForm.output_item_search}
+                    onChange={(e) => handleIntermediateOutputChange(e.target.value)}
+                  />
+                  <p className="mt-2 text-xs text-slate-500">
+                    {selectedIntermediateOutputItem
+                      ? `선택됨: ${selectedIntermediateOutputItem.id} · ${selectedIntermediateOutputItem.uom}`
+                      : '검색 후 목록에서 정확한 품목을 선택하세요.'}
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-600 mb-2">1배치 생산량</label>
+                  <input
+                    className="detail-form-input"
+                    type="number"
+                    min="0"
+                    placeholder="예: 1000"
+                    value={intermediateRecipeForm.output_quantity}
+                    onChange={(e) => setIntermediateRecipeForm((prev) => ({
+                      ...prev,
+                      output_quantity: e.target.value === '' ? '' : Number(e.target.value),
+                    }))}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-slate-600 mb-2">메모</label>
+                <input
+                  className="detail-form-input"
+                  type="text"
+                  placeholder="선택 사항"
+                  value={intermediateRecipeForm.note}
+                  onChange={(e) => setIntermediateRecipeForm((prev) => ({ ...prev, note: e.target.value }))}
+                />
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div className="flex items-center justify-between gap-3 mb-3">
+                  <div>
+                    <h4 className="text-base font-bold text-slate-800">원재료</h4>
+                    <p className="text-xs text-slate-500 mt-1">필요한 재료만 추가하세요.</p>
+                  </div>
+                  <button type="button" className="btn btn-secondary" onClick={handleAddIntermediateIngredient}>
+                    <Plus size={16} />
+                    재료 추가
+                  </button>
+                </div>
+
+                <div className="space-y-3">
+                  {intermediateRecipeForm.ingredients.map((ingredient, index) => (
+                    <div key={ingredient.row_id} className="grid grid-cols-1 md:grid-cols-[1.2fr_0.7fr_auto] gap-3 rounded-xl border border-slate-200 bg-white p-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-500 mb-2">재료 {index + 1}</label>
+                        <input
+                          list="inventory-item-search-list"
+                          className="detail-form-input"
+                          placeholder="원재료 검색"
+                          value={ingredient.ingredient_search}
+                          onChange={(e) => handleIntermediateIngredientChange(ingredient.row_id, e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-500 mb-2">투입량</label>
+                        <input
+                          className="detail-form-input"
+                          type="number"
+                          min="0"
+                          placeholder={ingredient.ingredient_uom || '수량'}
+                          value={ingredient.usage_amount}
+                          onChange={(e) => handleIntermediateIngredientUsageChange(
+                            ingredient.row_id,
+                            e.target.value === '' ? '' : Number(e.target.value),
+                          )}
+                        />
+                        <p className="mt-2 text-xs text-slate-500">{ingredient.ingredient_uom || '-'}</p>
+                      </div>
+                      <div className="flex items-end">
+                        {intermediateRecipeForm.ingredients.length > 1 && (
+                          <button
+                            type="button"
+                            className="btn-remove-row"
+                            onClick={() => handleRemoveIntermediateIngredient(ingredient.row_id)}
+                            aria-label="재료 삭제"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex justify-center pt-2">
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  disabled={savingIntermediateRecipe}
+                  onClick={() => void handleSaveIntermediateRecipe()}
+                >
+                  {savingIntermediateRecipe ? '레시피 저장 중...' : '레시피 저장'}
+                </button>
+              </div>
+            </div>
+          </section>
+
+          <section className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+            <div className="flex items-center justify-between gap-3 mb-4">
+              <h3 className="text-base font-bold text-slate-800">저장된 레시피</h3>
+              <span className="text-xs font-semibold text-slate-500">{intermediateRecipes.length}개</span>
+            </div>
+            {intermediateRecipes.length === 0 ? (
+              <p className="text-sm text-slate-400">아직 저장된 레시피가 없습니다.</p>
+            ) : (
+              <div className="space-y-2">
+                {intermediateRecipes.map((recipe) => (
+                  <button
+                    key={recipe.id}
+                    type="button"
+                    className="w-full flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-left transition hover:border-indigo-200 hover:bg-indigo-50/60"
+                    onClick={() => handleOpenIntermediateRecipe(recipe)}
+                  >
+                    <div>
+                      <p className="text-sm font-semibold text-slate-800">{recipe.output_item_name}</p>
+                      <p className="text-xs text-slate-500">
+                        1배치 {recipe.output_quantity.toLocaleString()}{recipe.output_uom} · 재료 {recipe.ingredients.length}개
+                      </p>
+                    </div>
+                    <span className="text-xs font-semibold text-slate-400">{formatTimestamp(recipe.updated_at)}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </section>
+        </>
+      ) : (
+        <>
+          <section className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+            <div className="mb-5">
+              <h3 className="text-lg font-bold text-slate-800">생산 등록</h3>
+              <p className="text-sm text-slate-500 mt-1">레시피를 선택하고 배치 수만 입력하면 됩니다. 재고가 부족하면 저장되지 않습니다.</p>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-slate-600 mb-2">레시피 선택</label>
+                <select
+                  className="detail-form-input"
+                  value={selectedProductionRecipeId}
+                  onChange={(e) => setSelectedProductionRecipeId(e.target.value === '' ? '' : Number(e.target.value))}
+                >
+                  <option value="">생산할 레시피를 선택하세요</option>
+                  {intermediateRecipes.map((recipe) => (
+                    <option key={recipe.id} value={recipe.id}>
+                      {recipe.output_item_name} ({recipe.output_quantity}{recipe.output_uom}/배치)
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-[0.7fr_1.3fr] gap-3">
+                <div>
+                  <label className="block text-sm font-semibold text-slate-600 mb-2">배치 수</label>
+                  <input
+                    className="detail-form-input"
+                    type="number"
+                    min="0"
+                    placeholder="예: 2"
+                    value={productionBatchCount}
+                    onChange={(e) => setProductionBatchCount(e.target.value === '' ? '' : Number(e.target.value))}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-600 mb-2">메모</label>
+                  <input
+                    className="detail-form-input"
+                    type="text"
+                    placeholder="선택 사항"
+                    value={productionNote}
+                    onChange={(e) => setProductionNote(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <h4 className="text-sm font-bold text-slate-800 mb-3">필요 재료</h4>
+                {!selectedProductionRecipe ? (
+                  <p className="text-sm text-slate-500">레시피를 선택하면 필요한 원재료가 여기 표시됩니다.</p>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+                      <p className="text-sm font-semibold text-slate-800">{selectedProductionRecipe.output_item_name}</p>
+                      <p className="text-xs text-slate-500 mt-1">
+                        예상 생산량 {(selectedProductionRecipe.output_quantity * Number(productionBatchCount || 0)).toLocaleString()}{selectedProductionRecipe.output_uom}
+                      </p>
+                    </div>
+                    {selectedProductionRecipe.ingredients.map((ingredient) => (
+                      <div key={`${selectedProductionRecipe.id}-${ingredient.ingredient_id}`} className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3">
+                        <span className="text-sm text-slate-700">{ingredient.ingredient_name}</span>
+                        <span className="text-xs font-semibold text-slate-500">
+                          {(ingredient.usage_amount * Number(productionBatchCount || 0)).toLocaleString()}{ingredient.ingredient_uom}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex justify-center pt-2">
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  disabled={producingIntermediate}
+                  onClick={() => void handleProduceIntermediate()}
+                >
+                  {producingIntermediate ? '생산 처리 중...' : '생산 등록'}
+                </button>
+              </div>
+            </div>
+          </section>
+
+          <section className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+            <div className="flex items-center justify-between gap-3 mb-4">
+              <h3 className="text-base font-bold text-slate-800">최근 생산 이력</h3>
+              <span className="text-xs font-semibold text-slate-500">{productionLogs.length}건</span>
+            </div>
+            {recentProductionLogs.length === 0 ? (
+              <p className="text-sm text-slate-400">생산 이력이 없습니다.</p>
+            ) : (
+              <div className="space-y-2">
+                {recentProductionLogs.map((log) => (
+                  <div key={log.id} className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-slate-800">{log.output_item_name}</p>
+                        <p className="text-xs text-slate-500">
+                          {log.batch_count.toLocaleString()}배치 · {log.output_amount.toLocaleString()}{log.output_uom}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs font-semibold text-slate-400">{formatTimestamp(log.created_at)}</span>
+                        <button
+                          type="button"
+                          className="p-2 rounded-lg border border-rose-200 text-rose-500 hover:bg-rose-50 disabled:opacity-50"
+                          onClick={() => void handleDeleteProductionLog(log.id)}
+                          disabled={deletingProductionLogId === log.id}
+                          title="생산 로그 삭제"
+                          aria-label="생산 로그 삭제"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        </>
+      )}
+
+      <datalist id="inventory-item-search-list">
+        {inventory.map((item) => (
+          <option
+            key={`inventory-search-${item.id}`}
+            value={item.id}
+            label={`${item.category} · ${item.uom}`}
+          />
+        ))}
+      </datalist>
     </div>
   );
 
@@ -1060,9 +1995,10 @@ export default function Inventory() {
                         <input
                           type="number"
                           value={item.volume || ''}
-                          onChange={(e) => handleIntakeItemChange(item.id, 'volume', Number(e.target.value))}
+                          onChange={(e) => handleIntakeItemChange(item.id, 'volume', parseNumericInput(e.target.value))}
                           placeholder="2300"
                           min="0"
+                          step="any"
                           className="table-input"
                         />
                       </td>
@@ -1085,9 +2021,10 @@ export default function Inventory() {
                         <input
                           type="number"
                           value={item.quantity || ''}
-                          onChange={(e) => handleIntakeItemChange(item.id, 'quantity', Number(e.target.value))}
+                          onChange={(e) => handleIntakeItemChange(item.id, 'quantity', parseNumericInput(e.target.value))}
                           placeholder="1"
                           min="0"
+                          step="any"
                           className="table-input"
                         />
                       </td>
@@ -1095,9 +2032,10 @@ export default function Inventory() {
                         <input
                           type="number"
                           value={item.price_per_unit || ''}
-                          onChange={(e) => handleIntakeItemChange(item.id, 'price_per_unit', Number(e.target.value))}
+                          onChange={(e) => handleIntakeItemChange(item.id, 'price_per_unit', parseNumericInput(e.target.value))}
                           placeholder="1280"
                           min="0"
+                          step="any"
                           className="table-input"
                         />
                       </td>
@@ -1186,52 +2124,137 @@ export default function Inventory() {
 
   // ==================== 입고 기록 탭 ====================
 
-  const fetchIntakeHistory = async () => {
+  const fetchIntakeHistory = async ({ silent = false }: { silent?: boolean } = {}) => {
     try {
-      setLoadingHistory(true);
-      setHistoryMessage(null);
+      if (!silent) {
+        setLoadingHistory(true);
+        setHistoryMessage(null);
+      }
       const res = await stockIntakeApi.getAll(100);
       setIntakeHistory(res.data);
     } catch (err: any) {
       console.error('입고 기록 조회 실패:', err);
       setHistoryMessage({ type: 'error', text: '입고 기록을 불러오지 못했습니다.' });
     } finally {
-      setLoadingHistory(false);
+      if (!silent) {
+        setLoadingHistory(false);
+      }
     }
   };
 
-  const handleDeleteIntakeRecord = async (timestamp: string) => {
-    if (!window.confirm('이 입고 기록을 삭제하시겠습니까?\n\n✓ 재고 수량이 차감됩니다\n✓ 평균 단가가 역산됩니다\n\n계속하시겠습니까?')) {
+  const scheduleRealtimeRefresh = () => {
+    if (realtimeRefreshTimerRef.current !== null) {
+      return;
+    }
+
+    realtimeRefreshTimerRef.current = window.setTimeout(() => {
+      realtimeRefreshTimerRef.current = null;
+      void fetchInventory({ silent: true });
+      if (activeTab === 'history') {
+        void fetchIntakeHistory({ silent: true });
+      }
+      if (activeTab === 'intermediate') {
+        void fetchIntermediateData({ silent: true });
+      }
+    }, 180);
+  };
+
+  const handleDeleteIntakeRecord = async (record: StockIntakeRecord) => {
+    if (!window.confirm('이 입고 기록을 삭제하시겠습니까?\n\n✓ 입고 수량만큼 현재고가 복구됩니다\n✓ 최근 입고 기준이면 평균 단가도 함께 복구됩니다\n\n계속하시겠습니까?')) {
       return;
     }
 
     try {
-      await stockIntakeApi.delete(timestamp);
+      await stockIntakeApi.delete(record.id);
       setHistoryMessage({ type: 'success', text: '입고 기록이 삭제되었습니다.' });
-      fetchIntakeHistory(); // 목록 새로고침
+      await Promise.all([fetchInventory({ silent: true }), fetchIntakeHistory({ silent: true })]);
     } catch (err: any) {
       const errorMsg = err.response?.data?.detail || '입고 기록 삭제에 실패했습니다.';
       setHistoryMessage({ type: 'error', text: errorMsg });
     }
   };
 
+  useEffect(() => {
+    const refreshVisibleData = () => {
+      void fetchInventory({ silent: true });
+      if (activeTab === 'history') {
+        void fetchIntakeHistory({ silent: true });
+      }
+      if (activeTab === 'intermediate') {
+        void fetchIntermediateData({ silent: true });
+      }
+    };
+
+    const handleWindowFocus = () => refreshVisibleData();
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        refreshVisibleData();
+      }
+    };
+
+    window.addEventListener('focus', handleWindowFocus);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    const intervalId = window.setInterval(() => {
+      if (!document.hidden) {
+        refreshVisibleData();
+      }
+    }, 5000);
+
+    return () => {
+      window.removeEventListener('focus', handleWindowFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.clearInterval(intervalId);
+    };
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (!userProfile?.store_id) {
+      return;
+    }
+
+    const storeFilter = `store_id=eq.${userProfile.store_id}`;
+    const channel = supabase
+      .channel(`inventory-live-${userProfile.store_id}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'inventory_items',
+        filter: storeFilter,
+      }, scheduleRealtimeRefresh)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'stock_intakes',
+        filter: storeFilter,
+      }, scheduleRealtimeRefresh)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'intermediate_recipes',
+        filter: storeFilter,
+      }, scheduleRealtimeRefresh)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'intermediate_production_logs',
+        filter: storeFilter,
+      }, scheduleRealtimeRefresh)
+      .subscribe();
+
+    return () => {
+      if (realtimeRefreshTimerRef.current !== null) {
+        window.clearTimeout(realtimeRefreshTimerRef.current);
+        realtimeRefreshTimerRef.current = null;
+      }
+      void supabase.removeChannel(channel);
+    };
+  }, [activeTab, userProfile?.store_id]);
+
   // 탭 변경 시 입고 기록 로드
   useEffect(() => {
     if (activeTab === 'history') {
-      const loadHistory = async () => {
-        try {
-          setLoadingHistory(true);
-          setHistoryMessage(null);
-          const res = await stockIntakeApi.getAll(100);
-          setIntakeHistory(res.data);
-        } catch (err: any) {
-          console.error('입고 기록 조회 실패:', err);
-          setHistoryMessage({ type: 'error', text: '입고 기록을 불러오지 못했습니다.' });
-        } finally {
-          setLoadingHistory(false);
-        }
-      };
-      loadHistory();
+      void fetchIntakeHistory();
     }
   }, [activeTab]);
 
@@ -1244,10 +2267,10 @@ export default function Inventory() {
             <span className="intake-icon">📋</span>
             <div>
               <h2>재고 입고 기록</h2>
-              <p className="intake-header-copy">최근 100개의 입고 기록을 표시합니다. 삭제 시 재고는 되돌려지지 않습니다.</p>
+              <p className="intake-header-copy">최근 100개의 입고 기록을 표시합니다. 삭제 시 현재고는 즉시 복구되며, 더 최근 입고가 있으면 안전을 위해 삭제가 차단됩니다.</p>
             </div>
           </div>
-          <button className="btn btn-secondary" onClick={fetchIntakeHistory} disabled={loadingHistory}>
+          <button className="btn btn-secondary" onClick={() => void fetchIntakeHistory()} disabled={loadingHistory}>
             <RefreshCw size={18} className={loadingHistory ? 'animate-spin' : ''} />
             새로고침
           </button>
@@ -1294,7 +2317,7 @@ export default function Inventory() {
                   </tr>
                 ) : (
                   intakeHistory.map((record) => (
-                    <tr key={record.timestamp}>
+                    <tr key={record.id}>
                       <td>{record.timestamp?.replace('T', ' ') || '-'}</td>
                       <td>{record.category || '-'}</td>
                       <td className="font-bold">{record.name || '-'}</td>
@@ -1308,7 +2331,7 @@ export default function Inventory() {
                       <td className="text-center">
                         <button
                           className="btn-remove-row"
-                          onClick={() => handleDeleteIntakeRecord(record.timestamp)}
+                          onClick={() => handleDeleteIntakeRecord(record)}
                           title="입고 기록 삭제 (재고 수량 및 단가 원상복구)"
                           aria-label="기록 삭제"
                         >
@@ -1326,6 +2349,66 @@ export default function Inventory() {
     );
   };
 
+  const normalizedDetailForm = itemDetailForm ? normalizeDetailForm(itemDetailForm) : null;
+  const normalizedOriginalDetailForm = originalItemDetailForm ? normalizeDetailForm(originalItemDetailForm) : null;
+  const detailItem = normalizedDetailForm ?? (selectedItem ? toDetailValues(selectedItem) : null);
+  const isItemDirty = Boolean(
+    isItemEditMode
+    && normalizedDetailForm
+    && normalizedOriginalDetailForm
+    && !areDetailFormsEqual(normalizedDetailForm, normalizedOriginalDetailForm)
+  );
+  const selectedItemPercentage = detailItem
+    ? getStockPercentage(detailItem.quantity_on_hand, detailItem.max_stock_level)
+    : 0;
+  const selectedItemStatus = getStockStatus(selectedItemPercentage);
+  const selectedItemCoverage = detailItem && detailItem.safety_stock > 0
+    ? detailItem.quantity_on_hand / detailItem.safety_stock
+    : null;
+  const selectedItemStockValue = detailItem
+    ? detailItem.quantity_on_hand * detailItem.unit_cost
+    : 0;
+  const selectedItemSuggestedOrder = detailItem
+    ? Math.max(detailItem.max_stock_level - detailItem.quantity_on_hand, 0)
+    : 0;
+  const selectedItemNeedsAttention = detailItem
+    ? isReorderNeeded({
+      quantity_on_hand: detailItem.quantity_on_hand,
+      safety_stock: detailItem.safety_stock,
+      needs_reorder: selectedItem?.needs_reorder ?? false,
+    })
+    : false;
+  const detailPrimaryActionLabel = !isItemEditMode
+    ? '수정하기'
+    : isSavingItemDetail
+      ? '저장 중...'
+      : isItemDirty
+        ? '수정사항 저장'
+        : '닫기';
+  const normalizedIntermediateRecipeDetailForm = intermediateRecipeDetailForm
+    ? normalizeIntermediateRecipeForm(intermediateRecipeDetailForm)
+    : null;
+  const normalizedOriginalIntermediateRecipeDetailForm = originalIntermediateRecipeDetailForm
+    ? normalizeIntermediateRecipeForm(originalIntermediateRecipeDetailForm)
+    : null;
+  const isIntermediateRecipeDirty = Boolean(
+    isIntermediateRecipeEditMode
+    && normalizedIntermediateRecipeDetailForm
+    && normalizedOriginalIntermediateRecipeDetailForm
+    && !areIntermediateRecipeFormsEqual(
+      normalizedIntermediateRecipeDetailForm,
+      normalizedOriginalIntermediateRecipeDetailForm,
+    )
+  );
+  const intermediateRecipePrimaryActionLabel = !isIntermediateRecipeEditMode
+    ? '수정하기'
+    : isSavingIntermediateRecipeDetail
+      ? '저장 중...'
+      : isIntermediateRecipeDirty
+        ? '수정사항 저장'
+        : '닫기';
+  const modalPortalTarget = typeof document !== 'undefined' ? document.body : null;
+
 
 
 
@@ -1338,7 +2421,7 @@ export default function Inventory() {
           <p>전체 50개 품목의 실시간 소진량과 발주 타이밍을 AI가 분석합니다.</p>
         </div>
         <div className="header-actions">
-          <button className="btn btn-secondary" onClick={fetchInventory}>
+          <button className="btn btn-secondary" onClick={() => void fetchInventory()}>
             <RefreshCw size={18} /> 전체 불러오기
           </button>
           {activeTab === 'overview' && (
@@ -1381,6 +2464,12 @@ export default function Inventory() {
         >
           📈 수요예측
         </button>
+        <button
+          className={`tab-btn ${activeTab === 'intermediate' ? 'active' : ''}`}
+          onClick={() => setActiveTab('intermediate')}
+        >
+          🧪 중간재 관리
+        </button>
       </nav>
 
       {/* 탭 컨텐츠 */}
@@ -1394,23 +2483,486 @@ export default function Inventory() {
             {activeTab === 'receiving' && renderReceivingTab()}
             {activeTab === 'history' && renderHistoryTab()}
             {activeTab === 'forecast' && renderForecastTab()}
+            {activeTab === 'intermediate' && renderIntermediateTab()}
           </>
         )}
       </div>
 
       {/* 품목 추가 모달 */}
-      {showAddModal && (
-        <div className="modal-overlay" onClick={handleCloseModal}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>📦 새 재고 품목 등록</h2>
-              <button className="modal-close" onClick={handleCloseModal} aria-label="재고 품목 등록 모달 닫기">
+      {selectedItem && modalPortalTarget && createPortal(
+        <div className="inventory-modal-overlay" onClick={handleCloseItemDetail}>
+          <div className="inventory-modal-content detail-modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="inventory-modal-header">
+              <h2>📦 품목 상세 정보</h2>
+              <button className="inventory-modal-close" onClick={handleCloseItemDetail} aria-label="품목 상세 모달 닫기">
                 <X size={20} />
               </button>
             </div>
 
-            <form onSubmit={handleSubmit}>
-              <div className="modal-body">
+            <div className="inventory-modal-body detail-modal-body">
+              <section className="detail-hero">
+                <div className="detail-hero-copy">
+                  <span
+                    className="category-badge detail-category-badge"
+                    style={{ backgroundColor: getCategoryColor(detailItem?.category ?? selectedItem.category) }}
+                  >
+                    {detailItem?.category ?? selectedItem.category}
+                  </span>
+                  <h3>{detailItem?.id ?? selectedItem.id}</h3>
+                  <p>현재 재고, 단가 정보와 최근 입고 이력을 한 번에 확인할 수 있습니다.</p>
+                </div>
+                <div className={`detail-status-pill ${selectedItemStatus}`}>
+                  {selectedItemNeedsAttention ? '발주 확인 필요' : '재고 안정'}
+                </div>
+              </section>
+
+              {selectedItemError && (
+                <div className="detail-inline-message error">
+                  {selectedItemError}
+                </div>
+              )}
+
+              {itemDetailMessage && (
+                <div className={`detail-inline-message ${itemDetailMessage.type}`}>
+                  {itemDetailMessage.text}
+                </div>
+              )}
+
+              {detailItem && itemDetailForm && (
+                <section className="detail-form-section">
+                  <div className="detail-section-header detail-form-header">
+                    <div>
+                      <h4>기본 정보</h4>
+                      <p>
+                        {isItemEditMode
+                          ? '입력 필드가 활성화되었습니다. 현재 단계에서는 저장 없이 닫을 수 있습니다.'
+                          : '최초 진입 시에는 조회 전용 상태입니다. 수정하기를 누르면 편집 모드로 전환됩니다.'}
+                      </p>
+                    </div>
+                    <span className={`detail-form-mode ${isItemEditMode ? 'edit' : 'readonly'}`}>
+                      {isItemEditMode ? '수정 모드' : '읽기 전용'}
+                    </span>
+                  </div>
+
+                  <div className="detail-form-grid">
+                    <div className="detail-form-group">
+                      <label htmlFor="detail-item-name">품목 이름</label>
+                      <input
+                        id="detail-item-name"
+                        className="detail-form-input"
+                        type="text"
+                        value={detailItem.id}
+                        disabled={!isItemEditMode}
+                        onChange={(e) => handleDetailFieldChange('id', e.target.value)}
+                      />
+                    </div>
+                    <div className="detail-form-group">
+                      <label htmlFor="detail-item-category">카테고리</label>
+                      <input
+                        id="detail-item-category"
+                        className="detail-form-input"
+                        type="text"
+                        value={detailItem.category}
+                        disabled={!isItemEditMode}
+                        onChange={(e) => handleDetailFieldChange('category', e.target.value)}
+                      />
+                    </div>
+                    <div className="detail-form-group">
+                      <label htmlFor="detail-item-quantity">현재 재고</label>
+                      <input
+                        id="detail-item-quantity"
+                        className="detail-form-input"
+                        type="number"
+                        value={itemDetailForm.quantity_on_hand}
+                        disabled={!isItemEditMode}
+                        onChange={(e) => handleDetailFieldChange('quantity_on_hand', e.target.value === '' ? '' : Number(e.target.value))}
+                      />
+                    </div>
+                    <div className="detail-form-group">
+                      <label htmlFor="detail-item-uom">단위</label>
+                      <select
+                        id="detail-item-uom"
+                        className="detail-form-input"
+                        value={detailItem.uom}
+                        disabled={!isItemEditMode}
+                        onChange={(e) => handleDetailFieldChange('uom', e.target.value)}
+                      >
+                        <option value="g">g</option>
+                        <option value="kg">kg</option>
+                        <option value="ml">ml</option>
+                        <option value="L">L</option>
+                        <option value="ea">ea</option>
+                      </select>
+                    </div>
+                    <div className="detail-form-group">
+                      <label htmlFor="detail-item-safety">안전 재고</label>
+                      <input
+                        id="detail-item-safety"
+                        className="detail-form-input"
+                        type="number"
+                        value={itemDetailForm.safety_stock}
+                        disabled={!isItemEditMode}
+                        onChange={(e) => handleDetailFieldChange('safety_stock', e.target.value === '' ? '' : Number(e.target.value))}
+                      />
+                    </div>
+                    <div className="detail-form-group">
+                      <label htmlFor="detail-item-max">최대 재고량</label>
+                      <input
+                        id="detail-item-max"
+                        className="detail-form-input"
+                        type="number"
+                        value={itemDetailForm.max_stock_level}
+                        disabled={!isItemEditMode}
+                        onChange={(e) => handleDetailFieldChange('max_stock_level', e.target.value === '' ? '' : Number(e.target.value))}
+                      />
+                    </div>
+                    <div className="detail-form-group detail-form-group-full">
+                      <label htmlFor="detail-item-cost">단위당 단가 (원)</label>
+                      <input
+                        id="detail-item-cost"
+                        className="detail-form-input"
+                        type="number"
+                        value={itemDetailForm.unit_cost}
+                        disabled={!isItemEditMode}
+                        onChange={(e) => handleDetailFieldChange('unit_cost', e.target.value === '' ? '' : Number(e.target.value))}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="detail-summary-grid">
+                    <article className="detail-stat-card">
+                      <span className="detail-stat-label">현재고 요약</span>
+                      <strong>{formatQuantity(detailItem.quantity_on_hand, detailItem.uom)}</strong>
+                      <p>최대 재고 대비 {selectedItemPercentage}%</p>
+                    </article>
+                    <article className="detail-stat-card">
+                      <span className="detail-stat-label">발주 가이드</span>
+                      <strong>{formatQuantity(selectedItemSuggestedOrder, detailItem.uom)}</strong>
+                      <p>권장 발주량</p>
+                    </article>
+                    <article className="detail-stat-card">
+                      <span className="detail-stat-label">단가 요약</span>
+                      <strong>{formatCurrency(detailItem.unit_cost)}</strong>
+                      <p>현재 평균 원가 기준</p>
+                    </article>
+                    <article className="detail-stat-card">
+                      <span className="detail-stat-label">현재 재고 가치</span>
+                      <strong>{formatCurrency(selectedItemStockValue)}</strong>
+                      <p>
+                        {selectedItemCoverage === null
+                          ? '안전 재고 미설정'
+                          : `안전 재고 대비 ${selectedItemCoverage.toFixed(2)}배`}
+                      </p>
+                    </article>
+                  </div>
+                </section>
+              )}
+
+              <section className="detail-history-section">
+                <div className="detail-section-header">
+                  <div>
+                    <h4>최근 입고 이력</h4>
+                    <p>최근 100건 기준으로 이 품목과 연결된 기록만 표시합니다.</p>
+                  </div>
+                  <span className="detail-history-count">{selectedItemHistory.length}건</span>
+                </div>
+
+                {loadingSelectedItem ? (
+                  <div className="detail-empty-state">
+                    <div className="loading-spinner"></div>
+                    <p>상세 정보를 불러오는 중입니다.</p>
+                  </div>
+                ) : selectedItemHistory.length === 0 ? (
+                  <div className="detail-empty-state">
+                    <p>최근 입고 이력이 없습니다.</p>
+                  </div>
+                ) : (
+                  <div className="detail-history-list">
+                    {selectedItemHistory.slice(0, 8).map((record) => (
+                      <article key={record.id} className="detail-history-item">
+                        <div className="detail-history-meta">
+                          <strong>{formatTimestamp(record.timestamp)}</strong>
+                          <span>{record.category || detailItem?.category || selectedItem.category}</span>
+                        </div>
+                        <div className="detail-history-values">
+                          <span>{record.quantity.toLocaleString()}개</span>
+                          <span>{record.volume.toLocaleString()}{record.uom || detailItem?.uom || selectedItem.uom}</span>
+                          <span>{formatCurrency(record.price_per_unit)} / 건</span>
+                          <strong>{formatCurrency(record.total_amount)}</strong>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                )}
+              </section>
+            </div>
+
+            <div className="inventory-modal-footer detail-modal-footer">
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={loadingSelectedItem || isSavingItemDetail}
+                onClick={() => {
+                  if (isItemEditMode) {
+                    if (isItemDirty) {
+                      void handleSaveItemDetail();
+                      return;
+                    }
+                    handleCloseItemDetail();
+                    return;
+                  }
+                  setItemDetailMessage(null);
+                  setIsItemEditMode(true);
+                }}
+              >
+                {detailPrimaryActionLabel}
+              </button>
+            </div>
+          </div>
+        </div>,
+        modalPortalTarget
+      )}
+
+      {selectedIntermediateRecipe && modalPortalTarget && createPortal(
+        <div className="inventory-modal-overlay" onClick={handleCloseIntermediateRecipe}>
+          <div className="inventory-modal-content detail-modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="inventory-modal-header">
+              <h2>🧪 중간재 레시피 상세</h2>
+              <button className="inventory-modal-close" onClick={handleCloseIntermediateRecipe} aria-label="중간재 레시피 상세 모달 닫기">
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="inventory-modal-body detail-modal-body">
+              <section className="detail-hero">
+                <div className="detail-hero-copy">
+                  <span
+                    className="category-badge detail-category-badge"
+                    style={{ backgroundColor: getCategoryColor(findInventoryItem(intermediateRecipeDetailForm?.output_item_id || selectedIntermediateRecipe.output_item_id)?.category || '중간재') }}
+                  >
+                    {findInventoryItem(intermediateRecipeDetailForm?.output_item_id || selectedIntermediateRecipe.output_item_id)?.category || '중간재'}
+                  </span>
+                  <h3>{intermediateRecipeDetailForm?.output_item_search || selectedIntermediateRecipe.output_item_name}</h3>
+                  <p>레시피를 먼저 확인하고, 필요하면 수정 모드로 전환해 바로 저장할 수 있습니다.</p>
+                </div>
+                <div className={`detail-status-pill ${isIntermediateRecipeEditMode ? 'warning' : 'good'}`}>
+                  {isIntermediateRecipeEditMode ? '수정 모드' : `재료 ${selectedIntermediateRecipe.ingredients.length}개`}
+                </div>
+              </section>
+
+              {intermediateRecipeDetailMessage && (
+                <div className={`detail-inline-message ${intermediateRecipeDetailMessage.type}`}>
+                  {intermediateRecipeDetailMessage.text}
+                </div>
+              )}
+
+              {intermediateRecipeDetailForm && (
+                <>
+                  <section className="detail-form-section">
+                    <div className="detail-section-header detail-form-header">
+                      <div>
+                        <h4>기본 정보</h4>
+                        <p>
+                          {isIntermediateRecipeEditMode
+                            ? '입력 필드가 활성화되었습니다. 값을 수정하면 저장 버튼으로 바뀝니다.'
+                            : '최초 진입 시에는 조회 전용 상태입니다. 수정하기를 누르면 편집 모드로 전환됩니다.'}
+                        </p>
+                      </div>
+                      <span className={`detail-form-mode ${isIntermediateRecipeEditMode ? 'edit' : 'readonly'}`}>
+                        {isIntermediateRecipeEditMode ? '수정 모드' : '읽기 전용'}
+                      </span>
+                    </div>
+
+                    <div className="detail-form-grid">
+                      <div className="detail-form-group">
+                        <label htmlFor="intermediate-output-item">중간재 검색</label>
+                        <input
+                          id="intermediate-output-item"
+                          list="inventory-item-search-list"
+                          className="detail-form-input"
+                          value={intermediateRecipeDetailForm.output_item_search}
+                          disabled={!isIntermediateRecipeEditMode}
+                          onChange={(e) => handleIntermediateRecipeDetailOutputChange(e.target.value)}
+                        />
+                      </div>
+                      <div className="detail-form-group">
+                        <label htmlFor="intermediate-output-quantity">1배치 생산량</label>
+                        <input
+                          id="intermediate-output-quantity"
+                          className="detail-form-input"
+                          type="number"
+                          min="0"
+                          value={intermediateRecipeDetailForm.output_quantity}
+                          disabled={!isIntermediateRecipeEditMode}
+                          onChange={(e) => {
+                            setIntermediateRecipeDetailMessage(null);
+                            setIntermediateRecipeDetailForm((prev) => (prev ? {
+                              ...prev,
+                              output_quantity: e.target.value === '' ? '' : Number(e.target.value),
+                            } : prev));
+                          }}
+                        />
+                      </div>
+                      <div className="detail-form-group detail-form-group-full">
+                        <label htmlFor="intermediate-note">메모</label>
+                        <input
+                          id="intermediate-note"
+                          className="detail-form-input"
+                          type="text"
+                          value={intermediateRecipeDetailForm.note}
+                          disabled={!isIntermediateRecipeEditMode}
+                          onChange={(e) => {
+                            setIntermediateRecipeDetailMessage(null);
+                            setIntermediateRecipeDetailForm((prev) => (prev ? {
+                              ...prev,
+                              note: e.target.value,
+                            } : prev));
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="detail-summary-grid">
+                      <article className="detail-stat-card">
+                        <span className="detail-stat-label">현재 생산 대상</span>
+                        <strong>{intermediateRecipeDetailForm.output_item_id || '-'}</strong>
+                        <p>Inventory 연동 품목</p>
+                      </article>
+                      <article className="detail-stat-card">
+                        <span className="detail-stat-label">최종 수정</span>
+                        <strong>{formatTimestamp(selectedIntermediateRecipe.updated_at)}</strong>
+                        <p>최근 저장 시각 기준</p>
+                      </article>
+                    </div>
+                  </section>
+
+                  <section className="detail-history-section">
+                    <div className="detail-section-header">
+                      <div>
+                        <h4>투입 재료 목록</h4>
+                        <p>1배치 기준으로 차감되는 원재료 구성입니다.</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="detail-history-count">{intermediateRecipeDetailForm.ingredients.length}개</span>
+                        {isIntermediateRecipeEditMode && (
+                          <button
+                            type="button"
+                            className="btn btn-secondary"
+                            onClick={handleAddIntermediateRecipeDetailIngredient}
+                          >
+                            <Plus size={16} />
+                            재료 추가
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {intermediateRecipeDetailForm.ingredients.length === 0 ? (
+                      <div className="detail-empty-state">
+                        <p>등록된 재료가 없습니다.</p>
+                      </div>
+                    ) : (
+                      <div className="detail-history-list">
+                        {intermediateRecipeDetailForm.ingredients.map((ingredient, index) => (
+                          <article key={ingredient.row_id} className="detail-history-item">
+                            <div className="detail-history-meta">
+                              <strong>재료 {index + 1}</strong>
+                              <span>{ingredient.ingredient_uom || '-'}</span>
+                            </div>
+                            <div className="detail-form-grid">
+                              <div className="detail-form-group">
+                                <label>원재료 검색</label>
+                                <input
+                                  list="inventory-item-search-list"
+                                  className="detail-form-input"
+                                  value={ingredient.ingredient_search}
+                                  disabled={!isIntermediateRecipeEditMode}
+                                  onChange={(e) => handleIntermediateRecipeDetailIngredientChange(ingredient.row_id, e.target.value)}
+                                />
+                              </div>
+                              <div className="detail-form-group">
+                                <label>투입량</label>
+                                <input
+                                  className="detail-form-input"
+                                  type="number"
+                                  min="0"
+                                  value={ingredient.usage_amount}
+                                  disabled={!isIntermediateRecipeEditMode}
+                                  onChange={(e) => handleIntermediateRecipeDetailIngredientUsageChange(
+                                    ingredient.row_id,
+                                    e.target.value === '' ? '' : Number(e.target.value),
+                                  )}
+                                />
+                              </div>
+                            </div>
+                            {isIntermediateRecipeEditMode && intermediateRecipeDetailForm.ingredients.length > 1 && (
+                              <div className="flex justify-end pt-3">
+                                <button
+                                  type="button"
+                                  className="btn-remove-row"
+                                  onClick={() => handleRemoveIntermediateRecipeDetailIngredient(ingredient.row_id)}
+                                  aria-label="재료 삭제"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              </div>
+                            )}
+                          </article>
+                        ))}
+                      </div>
+                    )}
+                  </section>
+                </>
+              )}
+            </div>
+
+            <div className="inventory-modal-footer detail-modal-footer">
+              {!isIntermediateRecipeEditMode && (
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => handleOpenProductionFromRecipe(selectedIntermediateRecipe)}
+                >
+                  생산 등록으로 이동
+                </button>
+              )}
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={isSavingIntermediateRecipeDetail}
+                onClick={() => {
+                  if (isIntermediateRecipeEditMode) {
+                    if (isIntermediateRecipeDirty) {
+                      void handleSaveIntermediateRecipeDetail();
+                      return;
+                    }
+                    handleCloseIntermediateRecipe();
+                    return;
+                  }
+                  setIntermediateRecipeDetailMessage(null);
+                  setIsIntermediateRecipeEditMode(true);
+                }}
+              >
+                {intermediateRecipePrimaryActionLabel}
+              </button>
+            </div>
+          </div>
+        </div>,
+        modalPortalTarget
+      )}
+
+      {showAddModal && modalPortalTarget && createPortal(
+        <div className="inventory-modal-overlay" onClick={handleCloseModal}>
+          <div className="inventory-modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="inventory-modal-header">
+              <h2>📦 새 재고 품목 등록</h2>
+              <button className="inventory-modal-close" onClick={handleCloseModal} aria-label="재고 품목 등록 모달 닫기">
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmit} noValidate>
+              <div className="inventory-modal-body">
                 {/* 품목 이름 */}
                 <div className="form-group">
                   <label>품목 이름</label>
@@ -1475,7 +3027,7 @@ export default function Inventory() {
                     <label>단위</label>
                     <select
                       value={formData.uom}
-                      onChange={(e) => handleInputChange('uom', e.target.value)}
+                      onChange={(e) => handleInputChange('uom', e.target.value as AddItemFormData['uom'])}
                       required
                     >
                       <option value="g">g</option>
@@ -1507,8 +3059,8 @@ export default function Inventory() {
                     <input
                       type="number"
                       value={formData.safety_stock}
-                      onChange={(e) => handleInputChange('safety_stock', Number(e.target.value))}
-                      required
+                      onChange={(e) => handleInputChange('safety_stock', e.target.value === '' ? '' : Number(e.target.value))}
+                      placeholder="미입력 시 0"
                       min="0"
                     />
                   </div>
@@ -1517,8 +3069,8 @@ export default function Inventory() {
                     <input
                       type="number"
                       value={formData.max_stock_level}
-                      onChange={(e) => handleInputChange('max_stock_level', Number(e.target.value))}
-                      required
+                      onChange={(e) => handleInputChange('max_stock_level', e.target.value === '' ? '' : Number(e.target.value))}
+                      placeholder="미입력 시 0"
                       min="0"
                     />
                   </div>
@@ -1532,7 +3084,7 @@ export default function Inventory() {
                 )}
               </div>
 
-              <div className="modal-footer">
+              <div className="inventory-modal-footer">
                 <button type="button" className="btn btn-secondary" onClick={handleCloseModal}>
                   취소
                 </button>
@@ -1542,7 +3094,8 @@ export default function Inventory() {
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        modalPortalTarget
       )}
     </div>
   );

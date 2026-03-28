@@ -3,248 +3,25 @@
  * GCP-ERP 스타일 원가 및 레시피 관리 - Migrated from GCP-ERP-web-build-2.0-main
  */
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { ChevronDown, ChevronRight, Plus, Trash2, DollarSign, Calculator, Archive, AlertCircle, ArrowUp, ArrowDown, X, Save } from 'lucide-react';
-import { recipeCostApi, inventoryApi } from '../services/api';
-
-// --- Types for this Module ---
-
-interface RawMaterial {
-    id: string;
-    category: string;
-    name: string;
-    purchasePrice: number;
-    purchaseUnitQty: number;
-    unit: string;
-    currentStock: number;
-}
-
-interface RecipeIngredient {
-    id: string;
-    materialId: string;
-    qty: number;
-}
-
-interface MenuRecipe {
-    id: string;
-    category: string;
-    name: string;
-    salePrice: number;
-    ingredients: RecipeIngredient[];
-}
-
-// --- Empty Initial Data (사용자가 직접 추가하거나 향후 API 연동) ---
-
-// --- Empty Initial Data (사용자가 직접 추가하거나 향후 API 연동) ---
-// const INITIAL_MATERIALS: RawMaterial[] = [];
-// const INITIAL_RECIPES: MenuRecipe[] = [];
-
-
-// --- Helpers ---
-
-const getUnitPrice = (material: RawMaterial) => {
-    if (material.purchaseUnitQty === 0) return 0;
-    return material.purchasePrice / material.purchaseUnitQty;
-};
-
-const calculateRecipeCost = (ingredients: RecipeIngredient[], materials: RawMaterial[]) => {
-    return ingredients.reduce((total, ing) => {
-        const mat = materials.find(m => m.id === ing.materialId);
-        if (!mat) return total;
-        return total + (getUnitPrice(mat) * ing.qty);
-    }, 0);
-};
+import { recipeCostApi, inventoryApi, type InventoryUsageImpact } from '../services/api';
+import { supabase } from '../supabase';
+import { useAuth } from '../contexts/AuthContext';
+import { RecipeIngredientsTable } from './cost-recipe/RecipeIngredientsTable';
+import {
+    buildRecipePayload,
+    calculateRecipeCost,
+    createDraftId,
+    formatInventoryUsageImpact,
+    formatUnitCost,
+    getMaterialValidationMessage,
+    getRecipeValidationMessage,
+    getUnitPrice,
+} from './cost-recipe/helpers';
+import type { MenuRecipe, RawMaterial, RecipeIngredient } from './cost-recipe/types';
 
 // --- Sub Components ---
-
-// Modal Component for Adding Material
-const AddMaterialModal = ({
-    isOpen,
-    onClose,
-    onSave,
-    existingCategories
-}: {
-    isOpen: boolean;
-    onClose: () => void;
-    onSave: (material: Omit<RawMaterial, 'id'>) => void;
-    existingCategories: string[];
-}) => {
-    const [mode, setMode] = useState<'existing' | 'new'>('existing');
-    const [category, setCategory] = useState(existingCategories[0] || 'Etc');
-    const [newCategoryName, setNewCategoryName] = useState('');
-    const [name, setName] = useState('');
-    const [price, setPrice] = useState<number | ''>('');
-    const [qty, setQty] = useState<number | ''>('');
-    const [unit, setUnit] = useState('g');
-    const [stock, setStock] = useState<number | ''>('');
-
-    if (!isOpen) return null;
-
-    const handleSave = () => {
-        const finalCategory = mode === 'existing' ? category : newCategoryName;
-
-        if (!finalCategory.trim()) {
-            alert("카테고리를 입력해주세요.");
-            return;
-        }
-        if (!name.trim()) {
-            alert("원재료명을 입력해주세요.");
-            return;
-        }
-
-        onSave({
-            category: finalCategory,
-            name,
-            purchasePrice: Number(price) || 0,
-            purchaseUnitQty: Number(qty) || 1,
-            unit,
-            currentStock: Number(stock) || 0
-        });
-
-        setNewCategoryName('');
-        setName('');
-        setPrice('');
-        setQty('');
-        setStock('');
-        onClose();
-    };
-
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 animate-fade-in">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
-                <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                    <h3 className="font-bold text-slate-800 text-lg flex items-center gap-2">
-                        <Archive size={20} className="text-indigo-600" /> 새 원재료 추가
-                    </h3>
-                    <button onClick={onClose} className="p-1 rounded-full hover:bg-slate-200 text-slate-500 transition-colors" aria-label="원재료 추가 모달 닫기">
-                        <X size={20} />
-                    </button>
-                </div>
-
-                <div className="p-5 sm:p-6 space-y-5">
-                    {/* Category Selection */}
-                    <div>
-                        <label className="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide">카테고리 선택</label>
-                        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-3">
-                            <label className="flex items-center gap-2 cursor-pointer group">
-                                <input
-                                    type="radio"
-                                    checked={mode === 'existing'}
-                                    onChange={() => setMode('existing')}
-                                    className="text-indigo-600 focus:ring-indigo-500"
-                                />
-                                <span className="text-sm text-slate-700 group-hover:text-indigo-600 transition-colors">기존 카테고리</span>
-                            </label>
-                            <label className="flex items-center gap-2 cursor-pointer group">
-                                <input
-                                    type="radio"
-                                    checked={mode === 'new'}
-                                    onChange={() => setMode('new')}
-                                    className="text-indigo-600 focus:ring-indigo-500"
-                                />
-                                <span className="text-sm text-slate-700 group-hover:text-indigo-600 transition-colors">새 카테고리</span>
-                            </label>
-                        </div>
-
-                        {mode === 'existing' ? (
-                            <select
-                                value={category}
-                                onChange={(e) => setCategory(e.target.value)}
-                                className="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                            >
-                                {existingCategories.map(c => <option key={c} value={c}>{c}</option>)}
-                            </select>
-                        ) : (
-                            <input
-                                type="text"
-                                placeholder="새 카테고리 이름 (예: Bakery)"
-                                value={newCategoryName}
-                                onChange={(e) => setNewCategoryName(e.target.value)}
-                                className="w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                                autoFocus
-                            />
-                        )}
-                    </div>
-
-                    {/* Material Info */}
-                    <div>
-                        <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wide">원재료명</label>
-                        <input
-                            type="text"
-                            value={name}
-                            onChange={(e) => setName(e.target.value)}
-                            placeholder="예: 초코 시럽"
-                            className="w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                        />
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wide">구매가 (원)</label>
-                            <input
-                                type="number"
-                                value={price}
-                                onChange={(e) => setPrice(e.target.value === '' ? '' : Number(e.target.value))}
-                                placeholder="0"
-                                className="w-full p-2.5 border border-slate-300 rounded-lg text-sm text-right focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wide">구매 용량 및 단위</label>
-                            <div className="flex gap-2">
-                                <input
-                                    type="number"
-                                    value={qty}
-                                    onChange={(e) => setQty(e.target.value === '' ? '' : Number(e.target.value))}
-                                    placeholder="1000"
-                                    className="w-full p-2.5 border border-slate-300 rounded-lg text-sm text-right focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                                />
-                                <select
-                                    value={unit}
-                                    onChange={(e) => setUnit(e.target.value)}
-                                    className="bg-slate-100 border border-slate-200 rounded-lg text-sm px-2 focus:outline-none"
-                                >
-                                    <option value="g">g</option>
-                                    <option value="ml">ml</option>
-                                    <option value="ea">ea</option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div>
-                        <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wide">현재 재고</label>
-                        <div className="relative">
-                            <input
-                                type="number"
-                                value={stock}
-                                onChange={(e) => setStock(e.target.value === '' ? '' : Number(e.target.value))}
-                                placeholder="0"
-                                className="w-full p-2.5 border border-slate-300 rounded-lg text-sm text-right pr-12 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                            />
-                            <span className="absolute right-3 top-2.5 text-sm text-slate-500 font-bold">{unit}</span>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="p-4 bg-slate-50 flex flex-col-reverse sm:flex-row justify-end gap-3 border-t border-slate-100">
-                    <button
-                        onClick={onClose}
-                        className="w-full sm:w-auto px-5 py-2.5 text-slate-600 font-bold hover:bg-slate-200 rounded-lg text-sm transition-colors"
-                    >
-                        취소
-                    </button>
-                    <button
-                        onClick={handleSave}
-                        className="w-full sm:w-auto px-5 py-2.5 bg-indigo-600 text-white font-bold rounded-lg text-sm hover:bg-indigo-700 shadow-md shadow-indigo-200 transition-colors"
-                    >
-                        저장하기
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
-};
 
 // Modal Component for Adding Recipe
 const AddRecipeModal = ({
@@ -256,16 +33,18 @@ const AddRecipeModal = ({
 }: {
     isOpen: boolean;
     onClose: () => void;
-    onSave: (recipe: Omit<MenuRecipe, 'id'>) => void;
+    onSave: (recipe: Omit<MenuRecipe, 'id'>) => Promise<boolean>;
     existingCategories: string[];
     materials: RawMaterial[];
 }) => {
-    const [mode, setMode] = useState<'existing' | 'new'>('existing');
+    const [mode, setMode] = useState<'existing' | 'new'>(existingCategories.length > 0 ? 'existing' : 'new');
     const [category, setCategory] = useState(existingCategories[0] || '');
     const [newCategoryName, setNewCategoryName] = useState('');
     const [menuName, setMenuName] = useState('');
     const [salePrice, setSalePrice] = useState<number | ''>('');
     const [ingredients, setIngredients] = useState<RecipeIngredient[]>([]);
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
+    const [isSaving, setIsSaving] = useState(false);
 
     if (!isOpen) return null;
 
@@ -276,7 +55,7 @@ const AddRecipeModal = ({
             return;
         }
         setIngredients(prev => [...prev, {
-            id: Math.random().toString(36).substr(2, 9),
+            id: createDraftId('recipe-ingredient'),
             materialId: firstMat.id,
             qty: 0
         }]);
@@ -292,23 +71,7 @@ const AddRecipeModal = ({
         ));
     };
 
-    const totalCost = ingredients.reduce((sum, ing) => {
-        const mat = materials.find(m => m.id === ing.materialId);
-        if (!mat) return sum;
-        const unitPrice = getUnitPrice(mat);
-        return sum + (unitPrice * ing.qty);
-    }, 0);
-
-    const handleSave = () => {
-        if (!menuName.trim()) {
-            alert('메뉴명을 입력해주세요.');
-            return;
-        }
-        if (salePrice === '' || salePrice <= 0) {
-            alert('판매가를 입력해주세요.');
-            return;
-        }
-
+    const handleSave = async () => {
         const finalCategory = mode === 'new'
             ? (newCategoryName.trim() || 'Uncategorized')
             : category;
@@ -320,10 +83,23 @@ const AddRecipeModal = ({
             ingredients: ingredients
         };
 
-        onSave(newRecipe);
+        const validationMessage = getRecipeValidationMessage(newRecipe, materials);
+        if (validationMessage) {
+            setErrorMessage(validationMessage);
+            return;
+        }
 
-        // Reset form
-        setMode('existing');
+        setIsSaving(true);
+        setErrorMessage(null);
+        const saved = await onSave(newRecipe);
+        setIsSaving(false);
+
+        if (!saved) {
+            setErrorMessage('메뉴 저장에 실패했습니다. 다시 시도해주세요.');
+            return;
+        }
+
+        setMode(existingCategories.length > 0 ? 'existing' : 'new');
         setCategory(existingCategories[0] || '');
         setNewCategoryName('');
         setMenuName('');
@@ -416,78 +192,19 @@ const AddRecipeModal = ({
                     {/* Ingredients Section */}
                     <div>
                         <label className="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide">레시피 구성</label>
-                        <div className="bg-slate-50 rounded-lg border border-slate-200 overflow-hidden">
-                            <div className="responsive-table-shell">
-                            <table className="w-full min-w-[720px] text-sm text-left">
-                                <thead className="bg-slate-100 text-slate-600 font-semibold">
-                                    <tr>
-                                        <th className="px-4 py-2">원재료 선택</th>
-                                        <th className="px-4 py-2 text-right">사용 용량</th>
-                                        <th className="px-4 py-2 text-right">단위</th>
-                                        <th className="px-4 py-2 text-right">단위당 원가</th>
-                                        <th className="px-4 py-2 text-right">재료비</th>
-                                        <th className="px-4 py-2 text-center">삭제</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100 bg-white">
-                                    {ingredients.map(ing => {
-                                        const mat = materials.find(m => m.id === ing.materialId);
-                                        const unitPrice = mat ? getUnitPrice(mat) : 0;
-                                        const cost = unitPrice * ing.qty;
-
-                                        return (
-                                            <tr key={ing.id} className="hover:bg-slate-50">
-                                                <td className="px-4 py-2">
-                                                    <select
-                                                        value={ing.materialId}
-                                                        onChange={(e) => handleUpdateIngredient(ing.id, 'materialId', e.target.value)}
-                                                        className="w-full p-1 border border-slate-300 rounded text-sm"
-                                                    >
-                                                        {materials.map(m => (
-                                                            <option key={m.id} value={m.id}>{m.name} ({m.category})</option>
-                                                        ))}
-                                                    </select>
-                                                </td>
-                                                <td className="px-4 py-2 text-right">
-                                                    <input
-                                                        type="number"
-                                                        value={ing.qty}
-                                                        onChange={(e) => handleUpdateIngredient(ing.id, 'qty', parseFloat(e.target.value) || 0)}
-                                                        className="w-24 p-1 border border-slate-300 rounded text-right text-sm inline-block"
-                                                    />
-                                                </td>
-                                                <td className="px-4 py-2 text-right text-slate-500">{mat?.unit}</td>
-                                                <td className="px-4 py-2 text-right text-slate-400 font-mono">{unitPrice.toFixed(1)}원</td>
-                                                <td className="px-4 py-2 text-right font-bold text-slate-700 font-mono">{Math.round(cost).toLocaleString()}원</td>
-                                                <td className="px-4 py-2 text-center">
-                                                    <button
-                                                        onClick={() => handleRemoveIngredient(ing.id)}
-                                                        className="text-slate-400 hover:text-red-500"
-                                                        aria-label={`${mat?.name ?? '재료'} 재료 행 삭제`}
-                                                    >
-                                                        <Trash2 size={16} />
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-                                    {ingredients.length === 0 && (
-                                        <tr>
-                                            <td colSpan={6} className="p-4 text-center text-slate-400">등록된 재료가 없습니다. 재료를 추가해주세요.</td>
-                                        </tr>
-                                    )}
-                                </tbody>
-                                <tfoot className="bg-slate-50 font-bold border-t border-slate-200 text-slate-800">
-                                    <tr>
-                                        <td colSpan={4} className="px-4 py-3 text-right">총 원가 합계</td>
-                                        <td className="px-4 py-3 text-right text-blue-600">{Math.round(totalCost).toLocaleString()}원</td>
-                                        <td></td>
-                                    </tr>
-                                </tfoot>
-                            </table>
-                            </div>
-                        </div>
+                        <RecipeIngredientsTable
+                            ingredients={ingredients}
+                            materials={materials}
+                            onUpdateIngredient={handleUpdateIngredient}
+                            onRemoveIngredient={handleRemoveIngredient}
+                            emptyMessage="등록된 재료가 없습니다. 재료를 추가해주세요."
+                        />
                         <p className="responsive-table-hint sm:hidden mt-2">표는 좌우로 밀어서 확인할 수 있습니다.</p>
+                        {errorMessage && (
+                            <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
+                                {errorMessage}
+                            </div>
+                        )}
                         <button
                             onClick={handleAddIngredient}
                             className="mt-3 flex items-center gap-2 text-sm font-bold text-blue-600 hover:text-blue-700 px-2 py-1 rounded hover:bg-blue-50 transition-colors"
@@ -505,10 +222,11 @@ const AddRecipeModal = ({
                         취소
                     </button>
                     <button
-                        onClick={handleSave}
-                        className="w-full sm:w-auto px-5 py-2.5 bg-indigo-600 text-white font-bold rounded-lg text-sm hover:bg-indigo-700 shadow-md shadow-indigo-200 transition-colors"
+                        onClick={() => void handleSave()}
+                        disabled={isSaving}
+                        className="w-full sm:w-auto px-5 py-2.5 bg-indigo-600 text-white font-bold rounded-lg text-sm hover:bg-indigo-700 shadow-md shadow-indigo-200 transition-colors disabled:cursor-not-allowed disabled:bg-indigo-300"
                     >
-                        저장하기
+                        {isSaving ? '저장 중...' : '저장하기'}
                     </button>
                 </div>
             </div>
@@ -526,7 +244,9 @@ interface RecipeRowProps {
     onUpdateIngredient: (recipeId: string, ingId: string, field: keyof RecipeIngredient, value: string | number) => void;
     onRemoveIngredient: (recipeId: string, ingId: string) => void;
     onAddIngredient: (recipeId: string) => void;
-    onSave: (recipe: MenuRecipe) => void;
+    onSave: (recipe: MenuRecipe) => Promise<void>;
+    isSaving: boolean;
+    isDeleting: boolean;
 }
 
 const RecipeRow = ({
@@ -539,11 +259,14 @@ const RecipeRow = ({
     onUpdateIngredient,
     onRemoveIngredient,
     onAddIngredient,
-    onSave
+    onSave,
+    isSaving,
+    isDeleting
 }: RecipeRowProps) => {
     const isExpanded = expandedRecipeId === recipe.id;
     const totalCost = calculateRecipeCost(recipe.ingredients, materials);
     const cogsRatio = recipe.salePrice > 0 ? (totalCost / recipe.salePrice) * 100 : 0;
+    const missingIngredients = recipe.ingredients.filter((ing) => !materials.some((material) => material.id === ing.materialId));
 
     let statusColor = "bg-green-100 text-green-700 border-green-200";
     if (cogsRatio >= 30) statusColor = "bg-red-100 text-red-700 border-red-200";
@@ -573,7 +296,8 @@ const RecipeRow = ({
                     </div>
                     <button
                         onClick={(e) => { e.stopPropagation(); onDelete(recipe.id); }}
-                        className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors"
+                        disabled={isDeleting}
+                        className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors disabled:cursor-not-allowed disabled:text-slate-200"
                         aria-label={`${recipe.name} 레시피 삭제`}
                     >
                         <Trash2 size={18} />
@@ -606,78 +330,22 @@ const RecipeRow = ({
                         </div>
                     </div>
 
-                    {/* Ingredients Table */}
-                    <div className="bg-white rounded-lg border border-slate-200 overflow-hidden mb-4">
-                        <div className="responsive-table-shell">
-                        <table className="w-full min-w-[720px] text-sm text-left">
-                            <thead className="bg-slate-100 text-slate-600 font-semibold">
-                                <tr>
-                                    <th className="px-4 py-2">원재료 선택</th>
-                                    <th className="px-4 py-2 text-right">사용 용량</th>
-                                    <th className="px-4 py-2 text-right">단위</th>
-                                    <th className="px-4 py-2 text-right">단위당 원가</th>
-                                    <th className="px-4 py-2 text-right">재료비</th>
-                                    <th className="px-4 py-2 text-center">삭제</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100">
-                                {recipe.ingredients.map(ing => {
-                                    const mat = materials.find(m => m.id === ing.materialId);
-                                    const unitPrice = mat ? getUnitPrice(mat) : 0;
-                                    const cost = unitPrice * ing.qty;
-
-                                    return (
-                                        <tr key={ing.id} className="hover:bg-slate-50">
-                                            <td className="px-4 py-2">
-                                                <select
-                                                    value={ing.materialId}
-                                                    onChange={(e) => onUpdateIngredient(recipe.id, ing.id, 'materialId', e.target.value)}
-                                                    className="w-full p-1 border border-slate-300 rounded text-sm"
-                                                >
-                                                    {materials.map(m => (
-                                                        <option key={m.id} value={m.id}>{m.name} ({m.category})</option>
-                                                    ))}
-                                                </select>
-                                            </td>
-                                            <td className="px-4 py-2 text-right">
-                                                <input
-                                                    type="number"
-                                                    value={ing.qty}
-                                                    onChange={(e) => onUpdateIngredient(recipe.id, ing.id, 'qty', parseFloat(e.target.value) || 0)}
-                                                    className="w-24 p-1 border border-slate-300 rounded text-right text-sm inline-block"
-                                                />
-                                            </td>
-                                            <td className="px-4 py-2 text-right text-slate-500">{mat?.unit}</td>
-                                            <td className="px-4 py-2 text-right text-slate-400 font-mono">{unitPrice.toFixed(1)}원</td>
-                                            <td className="px-4 py-2 text-right font-bold text-slate-700 font-mono">{Math.round(cost).toLocaleString()}원</td>
-                                            <td className="px-4 py-2 text-center">
-                                                <button
-                                                    onClick={() => onRemoveIngredient(recipe.id, ing.id)}
-                                                    className="text-slate-400 hover:text-red-500"
-                                                    aria-label={`${recipe.name}의 ${mat?.name ?? '재료'} 삭제`}
-                                                >
-                                                    <Trash2 size={16} />
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                                {recipe.ingredients.length === 0 && (
-                                    <tr>
-                                        <td colSpan={6} className="p-4 text-center text-slate-400">등록된 재료가 없습니다. 재료를 추가해주세요.</td>
-                                    </tr>
-                                )}
-                            </tbody>
-                            <tfoot className="bg-slate-50 font-bold border-t border-slate-200 text-slate-800">
-                                <tr>
-                                    <td colSpan={4} className="px-4 py-3 text-right">총 원가 합계</td>
-                                    <td className="px-4 py-3 text-right text-blue-600">{Math.round(totalCost).toLocaleString()}원</td>
-                                    <td></td>
-                                </tr>
-                            </tfoot>
-                        </table>
+                    {missingIngredients.length > 0 && (
+                        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+                            비어있는 재료가 있습니다.
+                            {' '}
+                            {missingIngredients.map((ingredient) => ingredient.materialId).join(', ')}
                         </div>
-                    </div>
+                    )}
+
+                    {/* Ingredients Table */}
+                    <RecipeIngredientsTable
+                        ingredients={recipe.ingredients}
+                        materials={materials}
+                        onUpdateIngredient={(ingredientId, field, value) => onUpdateIngredient(recipe.id, ingredientId, field, value)}
+                        onRemoveIngredient={(ingredientId) => onRemoveIngredient(recipe.id, ingredientId)}
+                        emptyMessage="등록된 재료가 없습니다. 재료를 추가해주세요."
+                    />
                     <p className="responsive-table-hint sm:hidden mb-4">표는 좌우로 밀어서 확인할 수 있습니다.</p>
 
                     <div className="flex justify-between items-center mt-4 border-t border-slate-200 pt-4">
@@ -688,10 +356,11 @@ const RecipeRow = ({
                             <Plus size={16} /> 재료 추가하기
                         </button>
                         <button
-                            onClick={() => onSave(recipe)}
-                            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg font-bold shadow hover:bg-indigo-700 transition-colors"
+                            onClick={() => void onSave(recipe)}
+                            disabled={isSaving}
+                            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg font-bold shadow hover:bg-indigo-700 transition-colors disabled:cursor-not-allowed disabled:bg-indigo-300"
                         >
-                            <Save size={16} /> 변경사항 저장
+                            <Save size={16} /> {isSaving ? '저장 중...' : '변경사항 저장'}
                         </button>
                     </div>
                 </div>
@@ -705,9 +374,11 @@ interface MaterialTableProps {
     onUpdate: (id: string, field: keyof RawMaterial, value: string | number) => void;
     onDelete: (id: string) => void;
     onSave: (material: RawMaterial) => void;
+    savingMaterialId: string | null;
+    deletingMaterialId: string | null;
 }
 
-const MaterialTable = ({ materials, onUpdate, onDelete, onSave }: MaterialTableProps) => {
+const MaterialTable = ({ materials, onUpdate, onDelete, onSave, savingMaterialId, deletingMaterialId }: MaterialTableProps) => {
     const groupedMaterials = useMemo(() => {
         const groups: Record<string, RawMaterial[]> = {};
         materials.forEach(m => {
@@ -753,7 +424,7 @@ const MaterialTable = ({ materials, onUpdate, onDelete, onSave }: MaterialTableP
                                         <input
                                             type="number"
                                             value={mat.purchasePrice}
-                                            onChange={(e) => onUpdate(mat.id, 'purchasePrice', parseInt(e.target.value) || 0)}
+                                            onChange={(e) => onUpdate(mat.id, 'purchasePrice', parseFloat(e.target.value) || 0)}
                                             className="w-24 bg-slate-50 border border-slate-200 rounded p-1 text-right focus:border-blue-500 focus:outline-none"
                                         />
                                     </td>
@@ -761,7 +432,8 @@ const MaterialTable = ({ materials, onUpdate, onDelete, onSave }: MaterialTableP
                                         <input
                                             type="number"
                                             value={mat.purchaseUnitQty}
-                                            onChange={(e) => onUpdate(mat.id, 'purchaseUnitQty', parseInt(e.target.value) || 0)}
+                                            onChange={(e) => onUpdate(mat.id, 'purchaseUnitQty', parseFloat(e.target.value) || 0)}
+                                            step="any"
                                             className="w-20 bg-slate-50 border border-slate-200 rounded p-1 text-right focus:border-blue-500 focus:outline-none"
                                         />
                                     </td>
@@ -777,16 +449,17 @@ const MaterialTable = ({ materials, onUpdate, onDelete, onSave }: MaterialTableP
                                         </select>
                                     </td>
                                     <td className="px-6 py-3 text-right font-mono text-blue-600 bg-blue-50/30 font-bold">
-                                        {getUnitPrice(mat).toFixed(1)}원/{mat.unit}
+                                        {formatUnitCost(getUnitPrice(mat), mat.unit)}
                                     </td>
                                     <td className="px-6 py-3 text-right text-slate-600">
-                                        {mat.currentStock.toLocaleString()}
+                                        {mat.currentStock.toLocaleString('ko-KR', { maximumFractionDigits: 2 })}
                                     </td>
                                     <td className="px-6 py-3 text-center">
                                         <div className="flex gap-2 justify-center">
                                             <button
                                                 onClick={() => onSave(mat)}
-                                                className="text-slate-300 hover:text-indigo-600 transition-colors"
+                                                disabled={savingMaterialId === mat.id || deletingMaterialId === mat.id}
+                                                className="text-slate-300 hover:text-indigo-600 transition-colors disabled:cursor-not-allowed disabled:text-slate-200"
                                                 title="저장"
                                                 aria-label={`${mat.name} 원재료 저장`}
                                             >
@@ -794,7 +467,8 @@ const MaterialTable = ({ materials, onUpdate, onDelete, onSave }: MaterialTableP
                                             </button>
                                             <button
                                                 onClick={() => onDelete(mat.id)}
-                                                className="text-slate-300 hover:text-red-500 transition-colors"
+                                                disabled={savingMaterialId === mat.id || deletingMaterialId === mat.id}
+                                                className="text-slate-300 hover:text-red-500 transition-colors disabled:cursor-not-allowed disabled:text-slate-200"
                                                 aria-label={`${mat.name} 원재료 삭제`}
                                             >
                                                 <Trash2 size={16} />
@@ -815,35 +489,42 @@ const MaterialTable = ({ materials, onUpdate, onDelete, onSave }: MaterialTableP
 // --- Main Component ---
 
 export default function CostRecipeManager() {
+    const { userProfile } = useAuth();
     const [activeTab, setActiveTab] = useState<'recipe' | 'material'>('recipe');
     const [materials, setMaterials] = useState<RawMaterial[]>([]);
     const [recipes, setRecipes] = useState<MenuRecipe[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [fetchError, setFetchError] = useState<string | null>(null);
+    const [savingRecipeId, setSavingRecipeId] = useState<string | null>(null);
+    const [deletingRecipeId, setDeletingRecipeId] = useState<string | null>(null);
+    const [savingMaterialId, setSavingMaterialId] = useState<string | null>(null);
+    const [deletingMaterialId, setDeletingMaterialId] = useState<string | null>(null);
+    const realtimeRefreshTimerRef = useRef<number | null>(null);
 
-    // --- Data Fetching ---
-    useEffect(() => {
-        fetchData();
-    }, []);
-
-    const fetchData = async () => {
+    const fetchData = async ({ silent = false }: { silent?: boolean } = {}) => {
         try {
+            if (!silent) {
+                setIsLoading(true);
+                setFetchError(null);
+            }
+
             const [recipesRes, inventoryRes] = await Promise.all([
                 recipeCostApi.getAll(),
                 inventoryApi.getAll()
             ]);
 
-            // Transform InventoryItem to RawMaterial
             const loadedMaterials: RawMaterial[] = inventoryRes.data.map(item => ({
                 id: item.id,
                 category: item.category,
-                name: item.id, // Using id as name for now based on schema
-                purchasePrice: item.unit_cost * (item.quantity_on_hand > 0 ? 1 : 1), // Approximate
-                purchaseUnitQty: 1, // Default to 1 unit
+                name: item.id,
+                purchasePrice: (item.purchase_price ?? 0) > 0 ? Number(item.purchase_price) : Number(item.unit_cost ?? 0),
+                purchaseUnitQty: (item.purchase_unit_qty ?? 0) > 0 ? Number(item.purchase_unit_qty) : 1,
+                unitCost: Number(item.unit_cost ?? 0),
                 unit: item.uom || 'ea',
                 currentStock: item.quantity_on_hand
             }));
             setMaterials(loadedMaterials);
 
-            // Transform RecipeCost to MenuRecipe
             const loadedRecipes: MenuRecipe[] = recipesRes.data.map(r => ({
                 id: r.menu_name,
                 category: r.category || 'Uncategorized',
@@ -852,28 +533,33 @@ export default function CostRecipeManager() {
                 ingredients: r.ingredients.map((ing, idx) => ({
                     id: `${r.menu_name}-${idx}`,
                     materialId: ing.name,
-                    qty: ing.usage
+                    qty: ing.usage,
+                    fallbackCostPerUnit: ing.cost_per_unit,
+                    fallbackCost: ing.cost,
                 }))
             }));
             setRecipes(loadedRecipes);
-
         } catch (error) {
             console.error("Failed to fetch data", error);
+            if (!silent) {
+                setFetchError('원가/레시피 데이터를 불러오지 못했습니다.');
+            }
+        } finally {
+            if (!silent) {
+                setIsLoading(false);
+            }
         }
     };
 
+    useEffect(() => {
+        void fetchData();
+    }, []);
+
     const [sortConfig, setSortConfig] = useState<{ key: 'name' | 'cogs'; direction: 'asc' | 'desc' }>({ key: 'name', direction: 'asc' });
     const [expandedRecipeId, setExpandedRecipeId] = useState<string | null>(null);
-    // 카테고리 확장 상태 관리 (초기값: 빈 배열=모두 닫힘, 혹은 'ALL' 로직 필요. 일단 1개만 열리거나 다 열리거나)
-    // 여기서는 다수의 카테고리를 열고 닫을 수 있게 Set 또는 배열로 관리
     const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
 
-    const [isAddMaterialModalOpen, setIsAddMaterialModalOpen] = useState(false);
     const [isAddRecipeModalOpen, setIsAddRecipeModalOpen] = useState(false);
-
-    const uniqueMaterialCategories = useMemo(() => {
-        return Array.from(new Set(materials.map(m => m.category))).sort();
-    }, [materials]);
 
     const uniqueRecipeCategories = useMemo(() => {
         const categories = Array.from(new Set(recipes.map(r => r.category || 'Uncategorized')));
@@ -899,9 +585,7 @@ export default function CostRecipeManager() {
         });
     };
 
-    // 카테고리별 그룹화 및 정렬
     const groupedRecipes = useMemo(() => {
-        // 먼저 전체 정렬
         const sorted = [...recipes].sort((a, b) => {
             if (sortConfig.key === 'name') {
                 return sortConfig.direction === 'asc'
@@ -918,7 +602,6 @@ export default function CostRecipeManager() {
             }
         });
 
-        // 그룹화
         const groups: Record<string, MenuRecipe[]> = {};
         sorted.forEach(recipe => {
             const cat = recipe.category || 'Uncategorized';
@@ -935,66 +618,61 @@ export default function CostRecipeManager() {
     };
 
     const handleSaveExistingMaterial = async (material: RawMaterial) => {
+        const validationMessage = getMaterialValidationMessage(material);
+        if (validationMessage) {
+            alert(validationMessage);
+            return;
+        }
+
         try {
+            setSavingMaterialId(material.id);
             await inventoryApi.update(material.id, {
-                category: material.category,
+                id: material.name.trim(),
+                category: material.category.trim(),
                 quantity_on_hand: material.currentStock,
                 uom: material.unit,
-                unit_cost: material.purchasePrice / (material.purchaseUnitQty || 1),
-                safety_stock: 0,
-                max_stock_level: 0,
-                needs_reorder: false
+                unit_cost: getUnitPrice(material),
+                purchase_price: material.purchasePrice,
+                purchase_unit_qty: material.purchaseUnitQty,
             });
+            await fetchData({ silent: true });
             alert("원재료 정보가 저장되었습니다.");
         } catch (error) {
             console.error("Failed to update material", error);
             alert("저장 실패. 다시 시도해주세요.");
+        } finally {
+            setSavingMaterialId(null);
         }
     };
 
     const handleDeleteMaterial = async (id: string) => {
-        if (window.confirm("이 원재료를 삭제하시겠습니까? (사용 중인 레시피에 영향을 줄 수 있습니다.)")) {
-            try {
-                // API 호출 지원 여부에 따라 주석 해제 (inventoryApi에 delete가 있다고 가정하거나 추가 필요)
-                // await inventoryApi.delete(id); 
-                setMaterials(prev => prev.filter(m => m.id !== id));
-            } catch (error) {
-                console.error("Failed to delete material", error);
+        try {
+            const usageRes = await inventoryApi.getUsageImpact(id);
+            const hasLinkedUsage = !usageRes.data.can_delete;
+            const confirmMessage = hasLinkedUsage
+                ? `${formatInventoryUsageImpact(usageRes.data)}\n\n그래도 원재료를 삭제하시겠습니까?`
+                : "이 원재료를 삭제하시겠습니까?";
+
+            if (!window.confirm(confirmMessage)) {
+                return;
+            }
+
+            setDeletingMaterialId(id);
+            await inventoryApi.delete(id);
+            await fetchData({ silent: true });
+            if (hasLinkedUsage) {
+                alert("원재료를 삭제했습니다. 연결된 레시피/중간재에서는 누락 재료 경고가 표시됩니다.");
+            }
+        } catch (error: any) {
+            console.error("Failed to delete material", error);
+            const impact = error?.response?.data?.detail as InventoryUsageImpact | undefined;
+            if (impact?.recipe_names || impact?.intermediate_recipe_names || impact?.stock_intake_count) {
+                alert(formatInventoryUsageImpact(impact));
+            } else {
                 alert("삭제 실패");
             }
-        }
-    };
-
-    const handleOpenAddMaterialModal = () => {
-        setActiveTab('material');
-        setIsAddMaterialModalOpen(true);
-    };
-
-    const handleSaveNewMaterial = async (data: Omit<RawMaterial, 'id'>) => {
-        try {
-            // ID를 이름으로 사용 (백엔드 스키마에 따라 조정)
-            const newItemId = data.name;
-
-            await inventoryApi.create({
-                id: newItemId,
-                category: data.category,
-                quantity_on_hand: data.currentStock,
-                uom: data.unit,
-                unit_cost: data.purchasePrice / (data.purchaseUnitQty || 1), // 단가 계산
-                safety_stock: 0,
-                max_stock_level: 0,
-                needs_reorder: false
-            });
-
-            const newMat: RawMaterial = {
-                id: newItemId,
-                ...data
-            };
-            setMaterials(prev => [...prev, newMat]);
-            alert("원재료가 저장되었습니다.");
-        } catch (error) {
-            console.error("Failed to save material", error);
-            alert("원재료 저장 실패. 다시 시도해주세요.");
+        } finally {
+            setDeletingMaterialId(null);
         }
     };
 
@@ -1002,11 +680,17 @@ export default function CostRecipeManager() {
     const handleDeleteRecipe = async (id: string) => {
         if (window.confirm("이 메뉴 레시피를 삭제하시겠습니까?")) {
             try {
+                setDeletingRecipeId(id);
                 await recipeCostApi.delete(id);
-                setRecipes(prev => prev.filter(r => r.id !== id));
+                await fetchData({ silent: true });
+                if (expandedRecipeId === id) {
+                    setExpandedRecipeId(null);
+                }
             } catch (error) {
                 console.error("Failed to delete recipe", error);
                 alert("삭제 실패");
+            } finally {
+                setDeletingRecipeId(null);
             }
         }
     };
@@ -1017,67 +701,42 @@ export default function CostRecipeManager() {
 
     const handleSaveNewRecipe = async (data: Omit<MenuRecipe, 'id'>) => {
         try {
-            // Transform to API format
-            const apiData = {
-                menu_name: data.name,
-                category: data.category,
-                selling_price: data.salePrice,
-                ingredients: data.ingredients.map(ing => {
-                    const mat = materials.find(m => m.id === ing.materialId);
-                    return {
-                        name: ing.materialId,
-                        cost_per_unit: mat ? getUnitPrice(mat) : 0,
-                        usage: ing.qty,
-                        cost: mat ? getUnitPrice(mat) * ing.qty : 0
-                    };
-                })
-            };
+            const validationMessage = getRecipeValidationMessage(data, materials);
+            if (validationMessage) {
+                alert(validationMessage);
+                return false;
+            }
 
-            await recipeCostApi.create(apiData);
-
-            // Refresh data from backend
-            await fetchData();
-
-            // Expand the category of the new recipe
+            await recipeCostApi.create(buildRecipePayload(data, materials));
+            await fetchData({ silent: true });
             setExpandedCategories(prev => new Set(prev).add(data.category));
-
             alert('메뉴가 성공적으로 추가되었습니다.');
+            return true;
         } catch (error) {
             console.error('Failed to create recipe:', error);
             alert('메뉴 추가에 실패했습니다. 다시 시도해주세요.');
+            return false;
         }
     };
 
     const handleSaveRecipe = async (recipe: MenuRecipe) => {
+        const validationMessage = getRecipeValidationMessage(recipe, materials);
+        if (validationMessage) {
+            alert(validationMessage);
+            return;
+        }
+
         try {
-            // API payload 변환
-            const payload = {
-                menu_name: recipe.name,
-                category: "Uncategorized", // 기본 카테고리 (UI에 카테고리 선택이 없어서)
-                selling_price: recipe.salePrice,
-                ingredients: recipe.ingredients.map(ing => {
-                    const mat = materials.find(m => m.id === ing.materialId);
-                    return {
-                        name: ing.materialId, // materialId를 name으로 사용 (백엔드 스키마 확인 필요)
-                        cost_per_unit: mat ? getUnitPrice(mat) : 0,
-                        usage: ing.qty,
-                        cost: (mat ? getUnitPrice(mat) : 0) * ing.qty
-                    };
-                })
-            };
-
-            await recipeCostApi.create(payload);
-
-            // 만약 ID가 변경되었다면(새 메뉴 저장 등) ID 업데이트 필요하지만 
-            // 현재 구조상 이름이 ID 역할을 하므로 이름 변경 시 처리가 복잡함. 
-            // 일단 저장 성공 메시지 표시.
+            setSavingRecipeId(recipe.id);
+            await recipeCostApi.update(recipe.id, buildRecipePayload(recipe, materials));
             alert(`'${recipe.name}' 레시피가 저장되었습니다.`);
-
-            // 데이터 갱신
-            fetchData();
+            await fetchData({ silent: true });
+            setExpandedRecipeId(recipe.name);
         } catch (error) {
             console.error("Failed to save recipe", error);
             alert("레시피 저장 실패. 다시 시도해주세요.");
+        } finally {
+            setSavingRecipeId(null);
         }
     };
 
@@ -1088,7 +747,7 @@ export default function CostRecipeManager() {
             return {
                 ...r,
                 ingredients: [...r.ingredients, {
-                    id: Math.random().toString(36).substr(2, 9),
+                    id: createDraftId('recipe-ingredient'),
                     materialId: firstMat ? firstMat.id : '',
                     qty: 0
                 }]
@@ -1117,6 +776,88 @@ export default function CostRecipeManager() {
         setRecipes(prev => prev.map(r => r.id === recipeId ? { ...r, [field]: value } : r));
     };
 
+    const scheduleRealtimeRefresh = () => {
+        if (realtimeRefreshTimerRef.current !== null) {
+            return;
+        }
+
+        realtimeRefreshTimerRef.current = window.setTimeout(() => {
+            realtimeRefreshTimerRef.current = null;
+            void fetchData({ silent: true });
+        }, 180);
+    };
+
+    useEffect(() => {
+        const refreshVisibleData = () => {
+            void fetchData({ silent: true });
+        };
+
+        const handleWindowFocus = () => refreshVisibleData();
+        const handleVisibilityChange = () => {
+            if (!document.hidden) {
+                refreshVisibleData();
+            }
+        };
+
+        window.addEventListener('focus', handleWindowFocus);
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        const intervalId = window.setInterval(() => {
+            if (!document.hidden) {
+                refreshVisibleData();
+            }
+        }, 5000);
+
+        return () => {
+            window.removeEventListener('focus', handleWindowFocus);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+            window.clearInterval(intervalId);
+        };
+    }, []);
+
+    useEffect(() => {
+        if (!userProfile?.store_id) {
+            return;
+        }
+
+        const storeFilter = `store_id=eq.${userProfile.store_id}`;
+        const channel = supabase
+            .channel(`cost-recipe-live-${userProfile.store_id}`)
+            .on('postgres_changes', {
+                event: '*',
+                schema: 'public',
+                table: 'inventory_items',
+                filter: storeFilter,
+            }, scheduleRealtimeRefresh)
+            .on('postgres_changes', {
+                event: '*',
+                schema: 'public',
+                table: 'stock_intakes',
+                filter: storeFilter,
+            }, scheduleRealtimeRefresh)
+            .on('postgres_changes', {
+                event: '*',
+                schema: 'public',
+                table: 'recipes',
+                filter: storeFilter,
+            }, scheduleRealtimeRefresh)
+            .on('postgres_changes', {
+                event: '*',
+                schema: 'public',
+                table: 'intermediate_production_logs',
+                filter: storeFilter,
+            }, scheduleRealtimeRefresh)
+            .subscribe();
+
+        return () => {
+            if (realtimeRefreshTimerRef.current !== null) {
+                window.clearTimeout(realtimeRefreshTimerRef.current);
+                realtimeRefreshTimerRef.current = null;
+            }
+            void supabase.removeChannel(channel);
+        };
+    }, [userProfile?.store_id]);
+
 
     // 원가율 33% 이상인 위험 메뉴 필터링
     const dangerRecipes = useMemo(() => {
@@ -1132,12 +873,6 @@ export default function CostRecipeManager() {
     return (
         <div className="space-y-6 animate-fade-in relative">
             {/* Modals */}
-            <AddMaterialModal
-                isOpen={isAddMaterialModalOpen}
-                onClose={() => setIsAddMaterialModalOpen(false)}
-                onSave={handleSaveNewMaterial}
-                existingCategories={uniqueMaterialCategories}
-            />
             <AddRecipeModal
                 isOpen={isAddRecipeModalOpen}
                 onClose={() => setIsAddRecipeModalOpen(false)}
@@ -1163,12 +898,9 @@ export default function CostRecipeManager() {
                             <Plus size={18} /> 새 메뉴 추가
                         </button>
                     ) : (
-                        <button
-                            onClick={handleOpenAddMaterialModal}
-                            className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-slate-800 text-white rounded-lg font-bold shadow hover:bg-slate-900 transition-colors"
-                        >
-                            <Plus size={18} /> 새 원재료 추가
-                        </button>
+                        <div className="flex-1 sm:flex-none rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-medium text-slate-500">
+                            원재료 추가는 재고 관리 탭에서 진행합니다.
+                        </div>
                     )}
                 </div>
             </header>
@@ -1199,7 +931,25 @@ export default function CostRecipeManager() {
 
             {/* Content */}
             <div className="min-h-[500px]">
-                {activeTab === 'recipe' && (
+                {isLoading && (
+                    <div className="rounded-xl border border-slate-200 bg-white px-6 py-12 text-center text-slate-400">
+                        원가 및 레시피 데이터를 불러오는 중입니다.
+                    </div>
+                )}
+
+                {!isLoading && fetchError && (
+                    <div className="rounded-xl border border-red-200 bg-red-50 px-6 py-5 text-sm text-red-600">
+                        <div>{fetchError}</div>
+                        <button
+                            onClick={() => void fetchData()}
+                            className="mt-3 rounded-lg bg-red-600 px-4 py-2 text-white transition-colors hover:bg-red-700"
+                        >
+                            다시 불러오기
+                        </button>
+                    </div>
+                )}
+
+                {!isLoading && !fetchError && activeTab === 'recipe' && (
                     <div className="space-y-4">
                         {/* Danger Section (Cost Ratio >= 33%) */}
                         {dangerRecipes.length > 0 && (
@@ -1234,6 +984,8 @@ export default function CostRecipeManager() {
                                                 onRemoveIngredient={handleRemoveIngredient}
                                                 onAddIngredient={handleAddIngredient}
                                                 onSave={handleSaveRecipe}
+                                                isSaving={savingRecipeId === recipe.id}
+                                                isDeleting={deletingRecipeId === recipe.id}
                                             />
                                         ))}
                                     </div>
@@ -1297,6 +1049,8 @@ export default function CostRecipeManager() {
                                                     onRemoveIngredient={handleRemoveIngredient}
                                                     onAddIngredient={handleAddIngredient}
                                                     onSave={handleSaveRecipe}
+                                                    isSaving={savingRecipeId === recipe.id}
+                                                    isDeleting={deletingRecipeId === recipe.id}
                                                 />
                                             ))}
                                         </div>
@@ -1312,19 +1066,24 @@ export default function CostRecipeManager() {
                             )
                         }
                     </div >
-                )
-                }
+                )}
 
-                {
-                    activeTab === 'material' && (
+                {!isLoading && !fetchError && activeTab === 'material' && (
+                    materials.length > 0 ? (
                         <MaterialTable
                             materials={materials}
                             onUpdate={handleUpdateMaterial}
                             onDelete={handleDeleteMaterial}
                             onSave={handleSaveExistingMaterial}
+                            savingMaterialId={savingMaterialId}
+                            deletingMaterialId={deletingMaterialId}
                         />
+                    ) : (
+                        <div className="text-center p-12 bg-slate-50 rounded-xl border border-dashed border-slate-300 text-slate-400">
+                            등록된 원재료가 없습니다. 재고 관리 탭에서 원재료를 먼저 등록해주세요.
+                        </div>
                     )
-                }
+                )}
             </div >
         </div >
     );

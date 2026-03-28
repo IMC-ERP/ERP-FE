@@ -86,6 +86,21 @@ export interface InventoryItem {
   needs_reorder: boolean;
   unit_cost: number;
   uom: string;
+  purchase_price?: number;
+  purchase_unit_qty?: number;
+}
+
+export interface InventoryUpdatePayload extends Partial<InventoryItem> {
+  id?: string;
+}
+
+export interface InventoryUsageImpact {
+  item_id: string;
+  can_delete: boolean;
+  recipe_names: string[];
+  intermediate_recipe_names: string[];
+  stock_intake_count: number;
+  message?: string;
 }
 
 export interface StockIntake {
@@ -116,6 +131,15 @@ export interface OCRResponse {
   error: string | null;
 }
 
+type OCRBackendItem = OCRReceiptData;
+
+const normalizeOCRResponse = (items: OCRBackendItem[] | OCRBackendItem): OCRResponse => ({
+  success: true,
+  items: Array.isArray(items) ? items : [items],
+  warnings: [],
+  error: null,
+});
+
 export interface DashboardSummary {
   total_revenue: number;
   total_sales_count: number;
@@ -127,21 +151,29 @@ export interface DashboardSummary {
 
 export const ocrApi = {
   // 단일 영수증 이미지 OCR
-  analyzeSingleReceipt: (file: File) => {
+  analyzeSingleReceipt: async (file: File) => {
     const formData = new FormData();
     formData.append('file', file);
-    return api.post<OCRResponse>('/ocr/receipt', formData, {
+    const response = await api.post<OCRBackendItem>('/ocr/receipt', formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     });
+    return {
+      ...response,
+      data: normalizeOCRResponse(response.data),
+    };
   },
 
-  // 다중 영수증: 파일별로 단일 OCR 엔드포인트 호출
-  analyzeMultipleReceipts: (file: File) => {
+  // 다중 품목 영수증: 한 이미지 안의 여러 품목을 추출
+  analyzeMultipleReceipts: async (file: File) => {
     const formData = new FormData();
     formData.append('file', file);
-    return api.post<OCRResponse>('/ocr/receipt', formData, {
+    const response = await api.post<OCRBackendItem[]>('/ocr/receipt/multiple', formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     });
+    return {
+      ...response,
+      data: normalizeOCRResponse(response.data),
+    };
   }
 };
 
@@ -171,20 +203,98 @@ export const salesApi = {
 export const inventoryApi = {
   getAll: () => api.get<InventoryItem[]>('/inventory'),
   getById: (id: string) => api.get<InventoryItem>(`/inventory/${id}`),
+  getUsageImpact: (id: string) => api.get<InventoryUsageImpact>(`/inventory/${id}/usage`),
   create: (data: Omit<InventoryItem, 'id'> & { id: string }) => api.post('/inventory', data),
-  update: (id: string, data: Partial<InventoryItem>) => api.put(`/inventory/${id}`, data),
+  update: (id: string, data: InventoryUpdatePayload) => api.put(`/inventory/${id}`, data),
+  delete: (id: string) => api.delete(`/inventory/${id}`),
 };
 
 // ==================== Stock Intake API ====================
 
 export interface StockIntakeRecord extends StockIntake {
+  id: string;
   timestamp: string; // 문서 ID (타임스탬프)
 }
 
 export const stockIntakeApi = {
   getAll: (limit: number = 100) => api.get<StockIntakeRecord[]>('/stock-intakes', { params: { limit } }),
   create: (data: StockIntake) => api.post('/stock-intake', data),
-  delete: (timestamp: string) => api.delete(`/stock-intake/${timestamp}`),
+  delete: (recordId: string) => api.delete(`/stock-intake/${recordId}`),
+};
+
+// ==================== Intermediate Product API ====================
+
+export interface IntermediateRecipeIngredient {
+  ingredient_id: string;
+  ingredient_name: string;
+  usage_amount: number;
+  ingredient_uom: string;
+}
+
+export interface IntermediateRecipe {
+  id: number;
+  output_item_id: string;
+  output_item_name: string;
+  output_quantity: number;
+  output_uom: string;
+  note: string;
+  created_at: string;
+  updated_at: string;
+  ingredients: IntermediateRecipeIngredient[];
+}
+
+export interface IntermediateRecipeCreatePayload {
+  output_item_id: string;
+  output_quantity: number;
+  note?: string;
+  ingredients: Array<{
+    ingredient_id: string;
+    usage_amount: number;
+  }>;
+}
+
+export interface IntermediateProductionDetail {
+  type: 'ingredient' | 'output';
+  item_id: string;
+  item_name: string;
+  before: number;
+  after: number;
+  uom: string;
+  required_amount?: number;
+  produced_amount?: number;
+  unit_cost?: number;
+  unit_cost_before?: number;
+  unit_cost_after?: number;
+  consumed_total_cost?: number;
+  transferred_total_cost?: number;
+}
+
+export interface IntermediateProductionLog {
+  id: number;
+  recipe_id: number;
+  output_item_id: string;
+  output_item_name: string;
+  batch_count: number;
+  output_amount: number;
+  output_uom: string;
+  note: string;
+  details: IntermediateProductionDetail[];
+  created_at: string;
+}
+
+export interface IntermediateProductionCreatePayload {
+  recipe_id: number;
+  batch_count: number;
+  note?: string;
+}
+
+export const intermediateApi = {
+  getRecipes: () => api.get<IntermediateRecipe[]>('/intermediate-recipes'),
+  createRecipe: (data: IntermediateRecipeCreatePayload) => api.post<IntermediateRecipe>('/intermediate-recipes', data),
+  updateRecipe: (recipeId: number, data: IntermediateRecipeCreatePayload) => api.put<IntermediateRecipe>(`/intermediate-recipes/${recipeId}`, data),
+  getProductionLogs: (limit: number = 20) => api.get<IntermediateProductionLog[]>('/intermediate-productions', { params: { limit } }),
+  createProduction: (data: IntermediateProductionCreatePayload) => api.post<IntermediateProductionLog>('/intermediate-productions', data),
+  deleteProduction: (logId: number) => api.delete(`/intermediate-productions/${logId}`),
 };
 
 // ==================== 레시피 원가 타입 ====================
@@ -210,6 +320,7 @@ export const recipeCostApi = {
   getAll: () => api.get<RecipeCost[]>('/recipe-costs'),
   getByName: (menuName: string) => api.get<RecipeCost>(`/recipe-costs/${encodeURIComponent(menuName)}`),
   create: (data: Omit<RecipeCost, 'total_cost' | 'cost_ratio' | 'status'>) => api.post('/recipe-costs', data),
+  update: (menuName: string, data: Omit<RecipeCost, 'total_cost' | 'cost_ratio' | 'status'>) => api.put(`/recipe-costs/${encodeURIComponent(menuName)}`, data),
   delete: (menuName: string) => api.delete(`/recipe-costs/${encodeURIComponent(menuName)}`),
 };
 
