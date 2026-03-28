@@ -106,12 +106,21 @@
   width: 90%;
   max-width: 500px;
   max-height: 90vh;
-  overflow-y: auto;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
   animation: inventoryModalSlideUp 0.3s ease-out;
   border: 1px solid rgba(255, 255, 255, 0.5);
   transform-origin: center center;
   will-change: transform, opacity;
+}
+
+.inventory-modal-content form {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .inventory-modal-header {
@@ -153,6 +162,26 @@
 
 .inventory-modal-body {
   padding: 10px 24px 24px 24px;
+  overflow-y: auto;
+  min-height: 0;
+  scrollbar-gutter: stable;
+}
+
+.inventory-modal-body::-webkit-scrollbar {
+  width: 8px;
+}
+
+.inventory-modal-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.inventory-modal-body::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.6);
+  border-radius: 999px;
+}
+
+.inventory-modal-body::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.8);
 }
 
 .inventory-modal-footer {
@@ -809,10 +838,19 @@
   width: 100%;
 }
 
-.detail-modal-footer .btn {
+.detail-modal-actions {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.detail-modal-actions .btn {
   flex: 0 0 auto;
   min-width: 140px;
-  margin: 0 auto;
+  justify-content: center;
+  text-align: center;
 }
 
 /* ========== 게이지바 ========== */
@@ -1136,7 +1174,7 @@
 .intake-table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 900px;
+  min-width: 980px;
 }
 
 .intake-table thead {
@@ -1198,6 +1236,10 @@
   background: #f1f5f9;
   cursor: not-allowed;
   color: #94a3b8;
+}
+
+.table-select-uom {
+  min-width: 88px;
 }
 
 /* 총액 셀 */

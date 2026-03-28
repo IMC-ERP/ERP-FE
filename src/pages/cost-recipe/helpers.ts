@@ -59,6 +59,27 @@ export const calculateRecipeCost = (ingredients: RecipeIngredient[], materials: 
     }, 0);
 };
 
+export const getResolvedRecipeCost = (
+    recipe: Pick<MenuRecipe, 'ingredients' | 'storedTotalCost'>,
+    materials: RawMaterial[],
+) => {
+    if (recipe.ingredients.length === 0 && typeof recipe.storedTotalCost === 'number' && recipe.storedTotalCost > 0) {
+        return roundCurrency(recipe.storedTotalCost);
+    }
+    return calculateRecipeCost(recipe.ingredients, materials);
+};
+
+export const getResolvedRecipeCostRatio = (
+    recipe: Pick<MenuRecipe, 'ingredients' | 'storedTotalCost' | 'salePrice'>,
+    materials: RawMaterial[],
+) => {
+    const totalCost = getResolvedRecipeCost(recipe, materials);
+    if (!Number.isFinite(recipe.salePrice) || recipe.salePrice <= 0) {
+        return 0;
+    }
+    return roundTo((totalCost / recipe.salePrice) * 100, 2);
+};
+
 export const getRecipeValidationMessage = (
     recipe: Pick<MenuRecipe, 'name' | 'salePrice' | 'category' | 'ingredients'>,
     materials: RawMaterial[],

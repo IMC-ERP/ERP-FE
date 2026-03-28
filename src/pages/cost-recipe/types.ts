@@ -23,4 +23,6 @@ export interface MenuRecipe {
     name: string;
     salePrice: number;
     ingredients: RecipeIngredient[];
+    storedTotalCost?: number;
+    storedCostRatio?: number;
 }

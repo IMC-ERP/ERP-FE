@@ -29,9 +29,9 @@ const transformSale = (apiSale: Sale): SaleItem => ({
     id: apiSale.id || '',
     date: apiSale.날짜 || new Date().toISOString().split('T')[0],
     time: apiSale.시간 || '00:00:00',
-    itemDetail: apiSale.상품상세,
-    category: apiSale.상품카테고리 || '',
-    type: apiSale.상품타입 || '',
+    itemDetail: apiSale.상품상세 || 'Unknown',
+    category: apiSale.상품카테고리 || '미분류',
+    type: apiSale.상품타입 || apiSale.상품카테고리 || '미분류',
     qty: apiSale.수량,
     price: apiSale.단가,
     revenue: apiSale.수익 || apiSale.단가 * apiSale.수량,
@@ -108,13 +108,17 @@ export const DataProvider = ({ children }: { children?: ReactNode }) => {
 
     useEffect(() => {
         // Auth 상태 변경 감지
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
             if (session?.user) {
+                if (!['INITIAL_SESSION', 'SIGNED_IN', 'USER_UPDATED'].includes(event)) {
+                    setIsLoading(false);
+                    return;
+                }
                 // 등록된 유저인지 먼저 확인 후 데이터 fetch
                 try {
                     const res = await userApi.checkRegistration();
                     if (res.data.is_registered) {
-                        fetchData();
+                        await fetchData();
                     } else {
                         setIsLoading(false);
                     }

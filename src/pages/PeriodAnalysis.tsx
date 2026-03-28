@@ -13,14 +13,16 @@ import { ArrowUpRight, ArrowDownRight, Minus, TrendingUp, Info, Calendar, Clock 
 const CustomTreemapContent = (props: any) => {
     const { x, y, width, height, name, value } = props;
     if (width < 60 || height < 40) return <g />;
+    const label = typeof name === 'string' && name.trim() ? name : 'Unknown';
+    const numericValue = typeof value === 'number' ? value : 0;
     return (
         <g>
             <rect x={x} y={y} width={width} height={height} fill="#60a5fa" stroke="#fff" strokeWidth={2} />
             <text x={x + width / 2} y={y + height / 2 - 8} textAnchor="middle" fill="#fff" fontSize={12} fontWeight="bold" style={{ pointerEvents: 'none' }}>
-                {name.split(' (')[0]}
+                {label.split(' (')[0]}
             </text>
             <text x={x + width / 2} y={y + height / 2 + 12} textAnchor="middle" fill="#e0f2fe" fontSize={11} style={{ pointerEvents: 'none' }}>
-                {value.toLocaleString()}
+                {numericValue.toLocaleString()}
             </text>
         </g>
     );
@@ -195,7 +197,10 @@ export default function PeriodAnalysis() {
 
         const getTopItems = (data: typeof sales) => {
             const map = new Map<string, number>();
-            data.forEach(s => map.set(s.itemDetail, (map.get(s.itemDetail) || 0) + s.qty));
+            data.forEach(s => {
+                const itemName = typeof s.itemDetail === 'string' && s.itemDetail.trim() ? s.itemDetail : 'Unknown';
+                map.set(itemName, (map.get(itemName) || 0) + s.qty);
+            });
             return Array.from(map.entries())
                 .map(([name, count]) => ({ name, count }))
                 .sort((a, b) => b.count - a.count)

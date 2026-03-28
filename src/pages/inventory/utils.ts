@@ -53,6 +53,7 @@ export const createIntermediateIngredientDraft = (): IntermediateIngredientDraft
 export const createInitialIntermediateRecipeForm = (): IntermediateRecipeFormState => ({
   output_item_search: '',
   output_item_id: '',
+  output_uom: 'g',
   output_quantity: '',
   note: '',
   ingredients: [createIntermediateIngredientDraft()],

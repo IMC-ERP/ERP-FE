@@ -5,6 +5,7 @@
  */
 
 import axios from 'axios';
+import type { AxiosRequestConfig, AxiosResponse } from 'axios';
 import axiosRetry from 'axios-retry';
 import { supabase } from '../supabase';
 
@@ -22,6 +23,46 @@ const api = axios.create({
   timeout: 30000, // 30초 타임아웃 (Cloud Run Cold Start 대응)
 });
 
+let cachedAccessToken: string | null = null;
+let accessTokenPromise: Promise<string | null> | null = null;
+const inflightGetRequests = new Map<string, Promise<AxiosResponse<any>>>();
+
+const getRequestKey = (url: string, config?: AxiosRequestConfig) => {
+  const params = config?.params ? JSON.stringify(config.params) : '';
+  return `${url}?${params}`;
+};
+
+const dedupeGet = <T>(url: string, config?: AxiosRequestConfig) => {
+  const key = getRequestKey(url, config);
+  const existing = inflightGetRequests.get(key);
+  if (existing) {
+    return existing as Promise<AxiosResponse<T>>;
+  }
+
+  const request = api.get<T>(url, config).finally(() => {
+    inflightGetRequests.delete(key);
+  });
+  inflightGetRequests.set(key, request);
+  return request;
+};
+
+const resolveAccessToken = async (): Promise<string | null> => {
+  if (cachedAccessToken) {
+    return cachedAccessToken;
+  }
+  if (!accessTokenPromise) {
+    accessTokenPromise = supabase.auth.getSession()
+      .then(({ data: { session } }) => {
+        cachedAccessToken = session?.access_token ?? null;
+        return cachedAccessToken;
+      })
+      .finally(() => {
+        accessTokenPromise = null;
+      });
+  }
+  return accessTokenPromise;
+};
+
 // 지수 백오프 재시도 설정 (네트워크 오류 및 503 에러 대응)
 axiosRetry(api, {
   retries: 3,
@@ -37,9 +78,9 @@ axiosRetry(api, {
 
 // Supabase JWT 자동 첨부 인터셉터
 api.interceptors.request.use(async (config) => {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (session?.access_token) {
-    config.headers.Authorization = `Bearer ${session.access_token}`;
+  const accessToken = await resolveAccessToken();
+  if (accessToken) {
+    config.headers.Authorization = `Bearer ${accessToken}`;
   }
   return config;
 }, (error) => {
@@ -55,6 +96,7 @@ api.interceptors.response.use(
       originalRequest._retry = true;
       const { data: { session } } = await supabase.auth.refreshSession();
       if (session?.access_token) {
+        cachedAccessToken = session.access_token;
         originalRequest.headers.Authorization = `Bearer ${session.access_token}`;
         return api(originalRequest);
       }
@@ -62,6 +104,10 @@ api.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+supabase.auth.onAuthStateChange((_event, session) => {
+  cachedAccessToken = session?.access_token ?? null;
+});
 
 // ==================== Types ====================
 
@@ -193,7 +239,7 @@ export interface SalesByProduct {
 // ==================== Sales API ====================
 
 export const salesApi = {
-  getAll: () => api.get<Sale[]>('/sales'),
+  getAll: () => dedupeGet<Sale[]>('/sales'),
   create: (sale: Omit<Sale, 'id' | '수익'>) => api.post('/sales', sale),
   delete: (id: string) => api.delete(`/sales/${id}`),
 };
@@ -201,7 +247,7 @@ export const salesApi = {
 // ==================== Inventory API ====================
 
 export const inventoryApi = {
-  getAll: () => api.get<InventoryItem[]>('/inventory'),
+  getAll: () => dedupeGet<InventoryItem[]>('/inventory'),
   getById: (id: string) => api.get<InventoryItem>(`/inventory/${id}`),
   getUsageImpact: (id: string) => api.get<InventoryUsageImpact>(`/inventory/${id}/usage`),
   create: (data: Omit<InventoryItem, 'id'> & { id: string }) => api.post('/inventory', data),
@@ -217,7 +263,7 @@ export interface StockIntakeRecord extends StockIntake {
 }
 
 export const stockIntakeApi = {
-  getAll: (limit: number = 100) => api.get<StockIntakeRecord[]>('/stock-intakes', { params: { limit } }),
+  getAll: (limit: number = 100) => dedupeGet<StockIntakeRecord[]>('/stock-intakes', { params: { limit } }),
   create: (data: StockIntake) => api.post('/stock-intake', data),
   delete: (recordId: string) => api.delete(`/stock-intake/${recordId}`),
 };
@@ -245,6 +291,7 @@ export interface IntermediateRecipe {
 
 export interface IntermediateRecipeCreatePayload {
   output_item_id: string;
+  output_uom: string;
   output_quantity: number;
   note?: string;
   ingredients: Array<{
@@ -289,10 +336,10 @@ export interface IntermediateProductionCreatePayload {
 }
 
 export const intermediateApi = {
-  getRecipes: () => api.get<IntermediateRecipe[]>('/intermediate-recipes'),
+  getRecipes: () => dedupeGet<IntermediateRecipe[]>('/intermediate-recipes'),
   createRecipe: (data: IntermediateRecipeCreatePayload) => api.post<IntermediateRecipe>('/intermediate-recipes', data),
   updateRecipe: (recipeId: number, data: IntermediateRecipeCreatePayload) => api.put<IntermediateRecipe>(`/intermediate-recipes/${recipeId}`, data),
-  getProductionLogs: (limit: number = 20) => api.get<IntermediateProductionLog[]>('/intermediate-productions', { params: { limit } }),
+  getProductionLogs: (limit: number = 20) => dedupeGet<IntermediateProductionLog[]>('/intermediate-productions', { params: { limit } }),
   createProduction: (data: IntermediateProductionCreatePayload) => api.post<IntermediateProductionLog>('/intermediate-productions', data),
   deleteProduction: (logId: number) => api.delete(`/intermediate-productions/${logId}`),
 };
@@ -317,7 +364,7 @@ export interface RecipeCost {
 
 // ==================== 레시피 원가 API ====================
 export const recipeCostApi = {
-  getAll: () => api.get<RecipeCost[]>('/recipe-costs'),
+  getAll: () => dedupeGet<RecipeCost[]>('/recipe-costs'),
   getByName: (menuName: string) => api.get<RecipeCost>(`/recipe-costs/${encodeURIComponent(menuName)}`),
   create: (data: Omit<RecipeCost, 'total_cost' | 'cost_ratio' | 'status'>) => api.post('/recipe-costs', data),
   update: (menuName: string, data: Omit<RecipeCost, 'total_cost' | 'cost_ratio' | 'status'>) => api.put(`/recipe-costs/${encodeURIComponent(menuName)}`, data),
@@ -453,7 +500,7 @@ export const dailySalesApi = {
   create: (data: { date: string; sales_by_menu: DailySalesMenuItem[] }) =>
     api.post<DailySales>('/daily-sales', data),
 
-  getAll: () => api.get<DailySales[]>('/daily-sales'),
+  getAll: () => dedupeGet<DailySales[]>('/daily-sales'),
 
   getByDate: (date: string) => api.get<DailySales>(`/daily-sales/${date}`),
 
@@ -523,7 +570,7 @@ export const userApi = {
   register: (data: UserRegistration) => api.post<UserProfile>('/users/register', data),
   getProfile: () => api.get<UserProfile>('/users/profile'),
   updateProfile: (data: UserProfileUpdate) => api.put<UserProfile>('/users/profile', data),
-  checkRegistration: () => api.get<RegistrationStatus>('/users/check-registration'),
+  checkRegistration: () => dedupeGet<RegistrationStatus>('/users/check-registration'),
 };
 
 // ==================== Auth API ====================

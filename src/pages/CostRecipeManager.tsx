@@ -11,15 +11,21 @@ import { useAuth } from '../contexts/AuthContext';
 import { RecipeIngredientsTable } from './cost-recipe/RecipeIngredientsTable';
 import {
     buildRecipePayload,
-    calculateRecipeCost,
     createDraftId,
     formatInventoryUsageImpact,
     formatUnitCost,
     getMaterialValidationMessage,
+    getResolvedRecipeCost,
+    getResolvedRecipeCostRatio,
     getRecipeValidationMessage,
     getUnitPrice,
 } from './cost-recipe/helpers';
 import type { MenuRecipe, RawMaterial, RecipeIngredient } from './cost-recipe/types';
+
+type SaveRecipeResult = {
+    success: boolean;
+    message?: string;
+};
 
 // --- Sub Components ---
 
@@ -33,7 +39,7 @@ const AddRecipeModal = ({
 }: {
     isOpen: boolean;
     onClose: () => void;
-    onSave: (recipe: Omit<MenuRecipe, 'id'>) => Promise<boolean>;
+    onSave: (recipe: Omit<MenuRecipe, 'id'>) => Promise<SaveRecipeResult>;
     existingCategories: string[];
     materials: RawMaterial[];
 }) => {
@@ -91,11 +97,11 @@ const AddRecipeModal = ({
 
         setIsSaving(true);
         setErrorMessage(null);
-        const saved = await onSave(newRecipe);
+        const result = await onSave(newRecipe);
         setIsSaving(false);
 
-        if (!saved) {
-            setErrorMessage('메뉴 저장에 실패했습니다. 다시 시도해주세요.');
+        if (!result.success) {
+            setErrorMessage(result.message ?? '메뉴 저장에 실패했습니다. 다시 시도해주세요.');
             return;
         }
 
@@ -264,8 +270,8 @@ const RecipeRow = ({
     isDeleting
 }: RecipeRowProps) => {
     const isExpanded = expandedRecipeId === recipe.id;
-    const totalCost = calculateRecipeCost(recipe.ingredients, materials);
-    const cogsRatio = recipe.salePrice > 0 ? (totalCost / recipe.salePrice) * 100 : 0;
+    const totalCost = getResolvedRecipeCost(recipe, materials);
+    const cogsRatio = getResolvedRecipeCostRatio(recipe, materials);
     const missingIngredients = recipe.ingredients.filter((ing) => !materials.some((material) => material.id === ing.materialId));
 
     let statusColor = "bg-green-100 text-green-700 border-green-200";
@@ -371,6 +377,7 @@ const RecipeRow = ({
 
 interface MaterialTableProps {
     materials: RawMaterial[];
+    dirtyMaterialIds: Set<string>;
     onUpdate: (id: string, field: keyof RawMaterial, value: string | number) => void;
     onDelete: (id: string) => void;
     onSave: (material: RawMaterial) => void;
@@ -378,7 +385,7 @@ interface MaterialTableProps {
     deletingMaterialId: string | null;
 }
 
-const MaterialTable = ({ materials, onUpdate, onDelete, onSave, savingMaterialId, deletingMaterialId }: MaterialTableProps) => {
+const MaterialTable = ({ materials, dirtyMaterialIds, onUpdate, onDelete, onSave, savingMaterialId, deletingMaterialId }: MaterialTableProps) => {
     const groupedMaterials = useMemo(() => {
         const groups: Record<string, RawMaterial[]> = {};
         materials.forEach(m => {
@@ -410,38 +417,54 @@ const MaterialTable = ({ materials, onUpdate, onDelete, onSave, savingMaterialId
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                            {items.map(mat => (
-                                <tr key={mat.id} className="hover:bg-slate-50">
+                            {items.map(mat => {
+                                const isDirty = dirtyMaterialIds.has(mat.id);
+                                return (
+                                <tr key={mat.id} className={isDirty ? "bg-indigo-50/40 hover:bg-indigo-50" : "hover:bg-slate-50"}>
                                     <td className="px-6 py-3">
-                                        <input
-                                            type="text"
-                                            value={mat.name}
-                                            onChange={(e) => onUpdate(mat.id, 'name', e.target.value)}
-                                            className="w-full bg-transparent border-none focus:ring-0 p-0 font-medium text-slate-800"
-                                        />
+                                        <div className="space-y-1">
+                                            <input
+                                                type="text"
+                                                value={mat.name}
+                                                onChange={(e) => onUpdate(mat.id, 'name', e.target.value)}
+                                                className="w-full bg-transparent border-none focus:ring-0 p-0 font-medium text-slate-800"
+                                            />
+                                            <div className="flex items-center gap-2 text-[11px]">
+                                                <span className="rounded-full bg-slate-100 px-2 py-0.5 font-medium text-slate-500">{mat.category}</span>
+                                                {isDirty && (
+                                                    <span className="rounded-full bg-indigo-100 px-2 py-0.5 font-semibold text-indigo-700">변경됨</span>
+                                                )}
+                                            </div>
+                                        </div>
                                     </td>
                                     <td className="px-6 py-3 text-right">
-                                        <input
-                                            type="number"
-                                            value={mat.purchasePrice}
-                                            onChange={(e) => onUpdate(mat.id, 'purchasePrice', parseFloat(e.target.value) || 0)}
-                                            className="w-24 bg-slate-50 border border-slate-200 rounded p-1 text-right focus:border-blue-500 focus:outline-none"
-                                        />
+                                        <div className="inline-flex w-32 items-center rounded-lg border border-slate-200 bg-white px-2 py-1 shadow-sm">
+                                            <input
+                                                type="number"
+                                                value={mat.purchasePrice}
+                                                onChange={(e) => onUpdate(mat.id, 'purchasePrice', parseFloat(e.target.value) || 0)}
+                                                className="w-full border-none bg-transparent p-0 text-right text-sm font-medium focus:outline-none focus:ring-0"
+                                            />
+                                            <span className="ml-2 text-xs font-medium text-slate-400">원</span>
+                                        </div>
                                     </td>
                                     <td className="px-6 py-3 text-right">
-                                        <input
-                                            type="number"
-                                            value={mat.purchaseUnitQty}
-                                            onChange={(e) => onUpdate(mat.id, 'purchaseUnitQty', parseFloat(e.target.value) || 0)}
-                                            step="any"
-                                            className="w-20 bg-slate-50 border border-slate-200 rounded p-1 text-right focus:border-blue-500 focus:outline-none"
-                                        />
+                                        <div className="inline-flex w-28 items-center rounded-lg border border-slate-200 bg-white px-2 py-1 shadow-sm">
+                                            <input
+                                                type="number"
+                                                value={mat.purchaseUnitQty}
+                                                onChange={(e) => onUpdate(mat.id, 'purchaseUnitQty', parseFloat(e.target.value) || 0)}
+                                                step="any"
+                                                className="w-full border-none bg-transparent p-0 text-right text-sm font-medium focus:outline-none focus:ring-0"
+                                            />
+                                            <span className="ml-2 text-xs font-medium text-slate-400">{mat.unit}</span>
+                                        </div>
                                     </td>
                                     <td className="px-6 py-3 text-center">
                                         <select
                                             value={mat.unit}
                                             onChange={(e) => onUpdate(mat.id, 'unit', e.target.value)}
-                                            className="bg-transparent text-slate-500 text-xs"
+                                            className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-600"
                                         >
                                             <option value="g">g</option>
                                             <option value="ml">ml</option>
@@ -449,7 +472,10 @@ const MaterialTable = ({ materials, onUpdate, onDelete, onSave, savingMaterialId
                                         </select>
                                     </td>
                                     <td className="px-6 py-3 text-right font-mono text-blue-600 bg-blue-50/30 font-bold">
-                                        {formatUnitCost(getUnitPrice(mat), mat.unit)}
+                                        <div className="space-y-1">
+                                            <div>{formatUnitCost(getUnitPrice(mat), mat.unit)}</div>
+                                            <div className="text-[11px] font-medium text-slate-400">구매가/용량 기준</div>
+                                        </div>
                                     </td>
                                     <td className="px-6 py-3 text-right text-slate-600">
                                         {mat.currentStock.toLocaleString('ko-KR', { maximumFractionDigits: 2 })}
@@ -458,12 +484,13 @@ const MaterialTable = ({ materials, onUpdate, onDelete, onSave, savingMaterialId
                                         <div className="flex gap-2 justify-center">
                                             <button
                                                 onClick={() => onSave(mat)}
-                                                disabled={savingMaterialId === mat.id || deletingMaterialId === mat.id}
-                                                className="text-slate-300 hover:text-indigo-600 transition-colors disabled:cursor-not-allowed disabled:text-slate-200"
+                                                disabled={!isDirty || savingMaterialId === mat.id || deletingMaterialId === mat.id}
+                                                className="inline-flex items-center gap-1 rounded-md border border-indigo-200 bg-white px-3 py-1.5 text-xs font-semibold text-indigo-600 transition-colors hover:bg-indigo-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-300"
                                                 title="저장"
                                                 aria-label={`${mat.name} 원재료 저장`}
                                             >
-                                                <Save size={16} />
+                                                <Save size={14} />
+                                                {savingMaterialId === mat.id ? '저장 중' : '저장'}
                                             </button>
                                             <button
                                                 onClick={() => onDelete(mat.id)}
@@ -476,7 +503,7 @@ const MaterialTable = ({ materials, onUpdate, onDelete, onSave, savingMaterialId
                                         </div>
                                     </td>
                                 </tr>
-                            ))}
+                            )})}
                         </tbody>
                     </table>
                     </div>
@@ -500,6 +527,18 @@ export default function CostRecipeManager() {
     const [savingMaterialId, setSavingMaterialId] = useState<string | null>(null);
     const [deletingMaterialId, setDeletingMaterialId] = useState<string | null>(null);
     const realtimeRefreshTimerRef = useRef<number | null>(null);
+    const dirtyRecipeIdsRef = useRef<Set<string>>(new Set());
+    const [dirtyRecipeIds, setDirtyRecipeIds] = useState<Set<string>>(new Set());
+    const dirtyMaterialIdsRef = useRef<Set<string>>(new Set());
+    const [dirtyMaterialIds, setDirtyMaterialIds] = useState<Set<string>>(new Set());
+
+    useEffect(() => {
+        dirtyRecipeIdsRef.current = dirtyRecipeIds;
+    }, [dirtyRecipeIds]);
+
+    useEffect(() => {
+        dirtyMaterialIdsRef.current = dirtyMaterialIds;
+    }, [dirtyMaterialIds]);
 
     const fetchData = async ({ silent = false }: { silent?: boolean } = {}) => {
         try {
@@ -523,22 +562,44 @@ export default function CostRecipeManager() {
                 unit: item.uom || 'ea',
                 currentStock: item.quantity_on_hand
             }));
-            setMaterials(loadedMaterials);
+            setMaterials((prev) => {
+                const dirtyIds = dirtyMaterialIdsRef.current;
+                if (dirtyIds.size === 0) {
+                    return loadedMaterials;
+                }
 
-            const loadedRecipes: MenuRecipe[] = recipesRes.data.map(r => ({
-                id: r.menu_name,
-                category: r.category || 'Uncategorized',
-                name: r.menu_name,
-                salePrice: r.selling_price,
-                ingredients: r.ingredients.map((ing, idx) => ({
-                    id: `${r.menu_name}-${idx}`,
-                    materialId: ing.name,
-                    qty: ing.usage,
-                    fallbackCostPerUnit: ing.cost_per_unit,
-                    fallbackCost: ing.cost,
-                }))
-            }));
-            setRecipes(loadedRecipes);
+                const prevById = new Map(prev.map((material) => [material.id, material]));
+                const mergedLoaded = loadedMaterials.map((material) => {
+                    if (!dirtyIds.has(material.id)) {
+                        return material;
+                    }
+                    return prevById.get(material.id) ?? material;
+                });
+                const mergedIds = new Set(mergedLoaded.map((material) => material.id));
+                const dirtyOnly = prev.filter((material) => dirtyIds.has(material.id) && !mergedIds.has(material.id));
+
+                return [...mergedLoaded, ...dirtyOnly];
+            });
+
+            const loadedRecipes: MenuRecipe[] = recipesRes.data.map(mapApiRecipeToMenuRecipe);
+            setRecipes((prev) => {
+                const dirtyIds = dirtyRecipeIdsRef.current;
+                if (dirtyIds.size === 0) {
+                    return loadedRecipes;
+                }
+
+                const prevById = new Map(prev.map((recipe) => [recipe.id, recipe]));
+                const mergedLoaded = loadedRecipes.map((recipe) => {
+                    if (!dirtyIds.has(recipe.id)) {
+                        return recipe;
+                    }
+                    return prevById.get(recipe.id) ?? recipe;
+                });
+                const mergedIds = new Set(mergedLoaded.map((recipe) => recipe.id));
+                const dirtyOnly = prev.filter((recipe) => dirtyIds.has(recipe.id) && !mergedIds.has(recipe.id));
+
+                return [...mergedLoaded, ...dirtyOnly];
+            });
         } catch (error) {
             console.error("Failed to fetch data", error);
             if (!silent) {
@@ -561,6 +622,29 @@ export default function CostRecipeManager() {
 
     const [isAddRecipeModalOpen, setIsAddRecipeModalOpen] = useState(false);
 
+    const mapApiRecipeToMenuRecipe = (recipe: {
+        menu_name: string;
+        category?: string;
+        selling_price: number;
+        total_cost?: number;
+        cost_ratio?: number;
+        ingredients: Array<{ name: string; usage: number; cost_per_unit?: number; cost?: number }>;
+    }): MenuRecipe => ({
+        id: recipe.menu_name,
+        category: recipe.category || 'Uncategorized',
+        name: recipe.menu_name,
+        salePrice: recipe.selling_price,
+        storedTotalCost: Number(recipe.total_cost ?? 0),
+        storedCostRatio: Number(recipe.cost_ratio ?? 0),
+        ingredients: recipe.ingredients.map((ing, idx) => ({
+            id: `${recipe.menu_name}-${idx}`,
+            materialId: ing.name,
+            qty: ing.usage,
+            fallbackCostPerUnit: ing.cost_per_unit,
+            fallbackCost: ing.cost,
+        })),
+    });
+
     const uniqueRecipeCategories = useMemo(() => {
         const categories = Array.from(new Set(recipes.map(r => r.category || 'Uncategorized')));
         return categories.sort();
@@ -571,6 +655,50 @@ export default function CostRecipeManager() {
             key,
             direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc'
         }));
+    };
+
+    const markMaterialDirty = (materialId: string) => {
+        setDirtyMaterialIds((prev) => {
+            if (prev.has(materialId)) {
+                return prev;
+            }
+            const next = new Set(prev);
+            next.add(materialId);
+            return next;
+        });
+    };
+
+    const clearMaterialDirty = (materialId: string) => {
+        setDirtyMaterialIds((prev) => {
+            if (!prev.has(materialId)) {
+                return prev;
+            }
+            const next = new Set(prev);
+            next.delete(materialId);
+            return next;
+        });
+    };
+
+    const markRecipeDirty = (recipeId: string) => {
+        setDirtyRecipeIds((prev) => {
+            if (prev.has(recipeId)) {
+                return prev;
+            }
+            const next = new Set(prev);
+            next.add(recipeId);
+            return next;
+        });
+    };
+
+    const clearRecipeDirty = (recipeId: string) => {
+        setDirtyRecipeIds((prev) => {
+            if (!prev.has(recipeId)) {
+                return prev;
+            }
+            const next = new Set(prev);
+            next.delete(recipeId);
+            return next;
+        });
     };
 
     const handleToggleCategory = (category: string) => {
@@ -593,8 +721,7 @@ export default function CostRecipeManager() {
                     : b.name.localeCompare(a.name);
             } else {
                 const getCogs = (r: MenuRecipe) => {
-                    const cost = calculateRecipeCost(r.ingredients, materials);
-                    return r.salePrice > 0 ? (cost / r.salePrice) : 0;
+                    return getResolvedRecipeCostRatio(r, materials);
                 };
                 const cogsA = getCogs(a);
                 const cogsB = getCogs(b);
@@ -614,6 +741,7 @@ export default function CostRecipeManager() {
 
     // --- Handlers: Materials ---
     const handleUpdateMaterial = (id: string, field: keyof RawMaterial, value: string | number) => {
+        markMaterialDirty(id);
         setMaterials(prev => prev.map(m => m.id === id ? { ...m, [field]: value } : m));
     };
 
@@ -635,6 +763,7 @@ export default function CostRecipeManager() {
                 purchase_price: material.purchasePrice,
                 purchase_unit_qty: material.purchaseUnitQty,
             });
+            clearMaterialDirty(material.id);
             await fetchData({ silent: true });
             alert("원재료 정보가 저장되었습니다.");
         } catch (error) {
@@ -659,6 +788,7 @@ export default function CostRecipeManager() {
 
             setDeletingMaterialId(id);
             await inventoryApi.delete(id);
+            clearMaterialDirty(id);
             await fetchData({ silent: true });
             if (hasLinkedUsage) {
                 alert("원재료를 삭제했습니다. 연결된 레시피/중간재에서는 누락 재료 경고가 표시됩니다.");
@@ -682,6 +812,7 @@ export default function CostRecipeManager() {
             try {
                 setDeletingRecipeId(id);
                 await recipeCostApi.delete(id);
+                clearRecipeDirty(id);
                 await fetchData({ silent: true });
                 if (expandedRecipeId === id) {
                     setExpandedRecipeId(null);
@@ -699,23 +830,55 @@ export default function CostRecipeManager() {
         setIsAddRecipeModalOpen(true);
     };
 
-    const handleSaveNewRecipe = async (data: Omit<MenuRecipe, 'id'>) => {
+    const handleSaveNewRecipe = async (data: Omit<MenuRecipe, 'id'>): Promise<SaveRecipeResult> => {
         try {
             const validationMessage = getRecipeValidationMessage(data, materials);
             if (validationMessage) {
-                alert(validationMessage);
-                return false;
+                return { success: false, message: validationMessage };
             }
 
-            await recipeCostApi.create(buildRecipePayload(data, materials));
-            await fetchData({ silent: true });
-            setExpandedCategories(prev => new Set(prev).add(data.category));
-            alert('메뉴가 성공적으로 추가되었습니다.');
-            return true;
-        } catch (error) {
+            const response = await recipeCostApi.create(buildRecipePayload(data, materials));
+            const savedRecipe = mapApiRecipeToMenuRecipe(response.data);
+            setRecipes((prev) => {
+                const withoutDuplicate = prev.filter((recipe) => recipe.id !== savedRecipe.id);
+                return [...withoutDuplicate, savedRecipe];
+            });
+            setExpandedCategories((prev) => new Set(prev).add(savedRecipe.category));
+            setExpandedRecipeId(savedRecipe.id);
+            clearRecipeDirty(savedRecipe.id);
+            void fetchData({ silent: true });
+            return { success: true, message: '메뉴가 성공적으로 추가되었습니다.' };
+        } catch (error: any) {
             console.error('Failed to create recipe:', error);
-            alert('메뉴 추가에 실패했습니다. 다시 시도해주세요.');
-            return false;
+            const detail =
+                typeof error?.response?.data?.detail === 'string'
+                    ? error.response.data.detail
+                    : typeof error?.message === 'string'
+                        ? error.message
+                        : '메뉴 추가에 실패했습니다. 다시 시도해주세요.';
+
+            if (data.name.trim() && detail.includes('이미 존재')) {
+                try {
+                    const existingResponse = await recipeCostApi.getByName(data.name.trim());
+                    const existingRecipe = mapApiRecipeToMenuRecipe(existingResponse.data);
+                    setRecipes((prev) => {
+                        const withoutDuplicate = prev.filter((recipe) => recipe.id !== existingRecipe.id);
+                        return [...withoutDuplicate, existingRecipe];
+                    });
+                    setExpandedCategories((prev) => new Set(prev).add(existingRecipe.category));
+                    setExpandedRecipeId(existingRecipe.id);
+                    clearRecipeDirty(existingRecipe.id);
+                    void fetchData({ silent: true });
+                    return {
+                        success: true,
+                        message: `'${existingRecipe.name}' 메뉴는 이미 저장되어 있어 기존 데이터를 불러왔습니다.`,
+                    };
+                } catch (recoverError) {
+                    console.error('Failed to recover existing recipe after duplicate error:', recoverError);
+                }
+            }
+
+            return { success: false, message: detail };
         }
     };
 
@@ -730,6 +893,7 @@ export default function CostRecipeManager() {
             setSavingRecipeId(recipe.id);
             await recipeCostApi.update(recipe.id, buildRecipePayload(recipe, materials));
             alert(`'${recipe.name}' 레시피가 저장되었습니다.`);
+            clearRecipeDirty(recipe.id);
             await fetchData({ silent: true });
             setExpandedRecipeId(recipe.name);
         } catch (error) {
@@ -741,6 +905,7 @@ export default function CostRecipeManager() {
     };
 
     const handleAddIngredient = (recipeId: string) => {
+        markRecipeDirty(recipeId);
         setRecipes(prev => prev.map(r => {
             if (r.id !== recipeId) return r;
             const firstMat = materials[0];
@@ -756,6 +921,7 @@ export default function CostRecipeManager() {
     };
 
     const handleRemoveIngredient = (recipeId: string, ingId: string) => {
+        markRecipeDirty(recipeId);
         setRecipes(prev => prev.map(r => {
             if (r.id !== recipeId) return r;
             return { ...r, ingredients: r.ingredients.filter(i => i.id !== ingId) };
@@ -763,6 +929,7 @@ export default function CostRecipeManager() {
     };
 
     const handleUpdateIngredient = (recipeId: string, ingId: string, field: keyof RecipeIngredient, value: string | number) => {
+        markRecipeDirty(recipeId);
         setRecipes(prev => prev.map(r => {
             if (r.id !== recipeId) return r;
             return {
@@ -773,6 +940,7 @@ export default function CostRecipeManager() {
     };
 
     const handleUpdateRecipeMeta = (recipeId: string, field: keyof MenuRecipe, value: string | number) => {
+        markRecipeDirty(recipeId);
         setRecipes(prev => prev.map(r => r.id === recipeId ? { ...r, [field]: value } : r));
     };
 
@@ -862,8 +1030,7 @@ export default function CostRecipeManager() {
     // 원가율 33% 이상인 위험 메뉴 필터링
     const dangerRecipes = useMemo(() => {
         return recipes.filter(r => {
-            const cost = calculateRecipeCost(r.ingredients, materials);
-            const ratio = r.salePrice > 0 ? (cost / r.salePrice) * 100 : 0;
+            const ratio = getResolvedRecipeCostRatio(r, materials);
             return ratio >= 33;
         });
     }, [recipes, materials]);
@@ -1072,6 +1239,7 @@ export default function CostRecipeManager() {
                     materials.length > 0 ? (
                         <MaterialTable
                             materials={materials}
+                            dirtyMaterialIds={dirtyMaterialIds}
                             onUpdate={handleUpdateMaterial}
                             onDelete={handleDeleteMaterial}
                             onSave={handleSaveExistingMaterial}

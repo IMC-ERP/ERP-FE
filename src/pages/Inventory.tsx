@@ -115,29 +115,43 @@ export default function Inventory() {
   // 자동완성 드롭다운 상태
   const [activeSearchIndex, setActiveSearchIndex] = useState<number | null>(null);
   const [dropdownPosition, setDropdownPosition] = useState<{ top: number; left: number; width: number } | null>(null);
+  const [activeCategoryDropdownId, setActiveCategoryDropdownId] = useState<number | null>(null);
+  const [categoryDropdownPosition, setCategoryDropdownPosition] = useState<{ top: number; left: number; width: number } | null>(null);
 
-  const handleInputFocus = (index: number, e: React.FocusEvent<HTMLInputElement> | React.MouseEvent<HTMLInputElement>) => {
-    setActiveSearchIndex(index);
-    const rect = e.currentTarget.getBoundingClientRect();
+  const getDropdownPosition = (element: HTMLElement) => {
+    const rect = element.getBoundingClientRect();
     const viewportWidth = window.innerWidth;
     const desiredWidth = Math.min(Math.max(rect.width, 240), viewportWidth - 24);
     const maxLeft = window.scrollX + viewportWidth - desiredWidth - 12;
-    setDropdownPosition({
+    return {
       top: rect.bottom + window.scrollY,
       left: Math.max(window.scrollX + 12, Math.min(rect.left + window.scrollX, maxLeft)),
       width: desiredWidth
-    });
+    };
+  };
+
+  const handleInputFocus = (index: number, e: React.FocusEvent<HTMLInputElement> | React.MouseEvent<HTMLInputElement>) => {
+    setActiveCategoryDropdownId(null);
+    setActiveSearchIndex(index);
+    setDropdownPosition(getDropdownPosition(e.currentTarget));
+  };
+
+  const handleCategoryInputFocus = (itemId: number, e: React.FocusEvent<HTMLInputElement> | React.MouseEvent<HTMLInputElement>) => {
+    setActiveSearchIndex(null);
+    setActiveCategoryDropdownId(itemId);
+    setCategoryDropdownPosition(getDropdownPosition(e.currentTarget));
   };
 
   useEffect(() => {
     const handleScroll = () => {
-      if (activeSearchIndex !== null) {
-        setActiveSearchIndex(null); // 스크롤 시 드롭다운 닫기
+      if (activeSearchIndex !== null || activeCategoryDropdownId !== null) {
+        setActiveSearchIndex(null);
+        setActiveCategoryDropdownId(null);
       }
     };
     window.addEventListener('scroll', handleScroll, true);
     return () => window.removeEventListener('scroll', handleScroll, true);
-  }, [activeSearchIndex]);
+  }, [activeSearchIndex, activeCategoryDropdownId]);
 
   const fetchInventory = async ({ silent = false }: { silent?: boolean } = {}) => {
     try {
@@ -357,11 +371,10 @@ export default function Inventory() {
   const findInventoryItem = (value: string) => inventory.find((item) => item.id === value);
 
   const handleIntermediateOutputChange = (value: string) => {
-    const matched = findInventoryItem(value);
     setIntermediateRecipeForm((prev) => ({
       ...prev,
       output_item_search: value,
-      output_item_id: matched?.id ?? '',
+      output_item_id: value.trim(),
     }));
     setIntermediateMessage(null);
   };
@@ -407,12 +420,11 @@ export default function Inventory() {
   };
 
   const handleIntermediateRecipeDetailOutputChange = (value: string) => {
-    const matched = findInventoryItem(value);
     setIntermediateRecipeDetailMessage(null);
     setIntermediateRecipeDetailForm((prev) => (prev ? {
       ...prev,
       output_item_search: value,
-      output_item_id: matched?.id ?? '',
+      output_item_id: value.trim(),
     } : prev));
   };
 
@@ -460,7 +472,12 @@ export default function Inventory() {
 
   const handleSaveIntermediateRecipe = async () => {
     if (!intermediateRecipeForm.output_item_id) {
-      setIntermediateMessage({ type: 'error', text: '생산할 중간재를 inventory에서 선택해주세요.' });
+      setIntermediateMessage({ type: 'error', text: '새로 추가할 중간재 이름을 입력해주세요.' });
+      return;
+    }
+
+    if (!intermediateRecipeForm.output_uom) {
+      setIntermediateMessage({ type: 'error', text: '중간재 단위를 선택해주세요.' });
       return;
     }
 
@@ -472,7 +489,7 @@ export default function Inventory() {
       }));
 
     if (Number(intermediateRecipeForm.output_quantity || 0) <= 0) {
-      setIntermediateMessage({ type: 'error', text: '1배치 생산 수량을 입력해주세요.' });
+      setIntermediateMessage({ type: 'error', text: '1회 생산 수량을 입력해주세요.' });
       return;
     }
 
@@ -497,13 +514,14 @@ export default function Inventory() {
     try {
       await intermediateApi.createRecipe({
         output_item_id: intermediateRecipeForm.output_item_id,
+        output_uom: intermediateRecipeForm.output_uom,
         output_quantity: Number(intermediateRecipeForm.output_quantity),
         note: intermediateRecipeForm.note.trim(),
         ingredients: normalizedIngredients,
       });
       setIntermediateRecipeForm(createInitialIntermediateRecipeForm());
-      await fetchIntermediateData();
-      setIntermediateMessage({ type: 'success', text: '중간재 레시피가 생성되었습니다.' });
+      await Promise.all([fetchIntermediateData(), fetchInventory({ silent: true })]);
+      setIntermediateMessage({ type: 'success', text: '중간재 레시피가 생성되고 새 중간재 품목이 등록되었습니다.' });
     } catch (err: any) {
       const errorMsg = err.response?.data?.detail || '중간재 레시피 생성에 실패했습니다.';
       setIntermediateMessage({ type: 'error', text: errorMsg });
@@ -519,7 +537,7 @@ export default function Inventory() {
     }
 
     if (Number(productionBatchCount || 0) <= 0) {
-      setIntermediateMessage({ type: 'error', text: '생산 배치 수를 입력해주세요.' });
+      setIntermediateMessage({ type: 'error', text: '생산 횟수를 입력해주세요.' });
       return;
     }
 
@@ -595,6 +613,7 @@ export default function Inventory() {
 
   const normalizeIntermediateRecipeForm = (form: IntermediateRecipeFormState): IntermediateRecipeFormValues => ({
     output_item_id: form.output_item_id.trim(),
+    output_uom: form.output_uom,
     output_quantity: Number(form.output_quantity || 0),
     note: form.note.trim(),
     ingredients: form.ingredients
@@ -607,6 +626,7 @@ export default function Inventory() {
 
   const areIntermediateRecipeFormsEqual = (left: IntermediateRecipeFormValues, right: IntermediateRecipeFormValues) => (
     left.output_item_id === right.output_item_id
+    && left.output_uom === right.output_uom
     && left.output_quantity === right.output_quantity
     && left.note === right.note
     && JSON.stringify(left.ingredients) === JSON.stringify(right.ingredients)
@@ -620,12 +640,17 @@ export default function Inventory() {
     const normalizedForm = normalizeIntermediateRecipeForm(intermediateRecipeDetailForm);
 
     if (!normalizedForm.output_item_id) {
-      setIntermediateRecipeDetailMessage({ type: 'error', text: '생산할 중간재를 inventory에서 선택해주세요.' });
+      setIntermediateRecipeDetailMessage({ type: 'error', text: '중간재 이름을 입력해주세요.' });
+      return;
+    }
+
+    if (!normalizedForm.output_uom) {
+      setIntermediateRecipeDetailMessage({ type: 'error', text: '중간재 단위를 선택해주세요.' });
       return;
     }
 
     if (normalizedForm.output_quantity <= 0) {
-      setIntermediateRecipeDetailMessage({ type: 'error', text: '1배치 생산 수량을 입력해주세요.' });
+      setIntermediateRecipeDetailMessage({ type: 'error', text: '1회 생산 수량을 입력해주세요.' });
       return;
     }
 
@@ -660,7 +685,7 @@ export default function Inventory() {
       setOriginalIntermediateRecipeDetailForm(refreshedDetailForm);
       setIsIntermediateRecipeEditMode(false);
       setIntermediateRecipeDetailMessage({ type: 'success', text: '중간재 레시피가 수정되었습니다.' });
-      await fetchIntermediateData();
+      await Promise.all([fetchIntermediateData(), fetchInventory({ silent: true })]);
     } catch (err: any) {
       const errorMsg = err.response?.data?.detail || '중간재 레시피 수정에 실패했습니다.';
       setIntermediateRecipeDetailMessage({ type: 'error', text: errorMsg });
@@ -764,6 +789,7 @@ export default function Inventory() {
     setImagePreviewUrls([]);
     setOcrError(null);
     setActiveSearchIndex(null);
+    setActiveCategoryDropdownId(null);
   };
 
   // ==================== 이미지 업로드 모드 ====================
@@ -925,11 +951,6 @@ export default function Inventory() {
           updated.total_amount = calculateIntakeTotalAmount(updated.quantity, updated.price_per_unit);
         }
 
-        // 카테고리가 변경되면 품목 이름 초기화
-        if (field === 'category') {
-          updated.name = '';
-        }
-
         // 품목 이름이 변경되면 해당 inventory의 category와 uom 가져오기
         if (field === 'name' && value) {
           const selectedInventory = inventory.find(inv => inv.id === value);
@@ -960,6 +981,15 @@ export default function Inventory() {
       return item;
     }));
     setActiveSearchIndex(null);
+  };
+
+  const handleCategorySelect = (id: number, category: string) => {
+    setIntakeItems(prev => prev.map(item => (
+      item.id === id
+        ? { ...item, category }
+        : item
+    )));
+    setActiveCategoryDropdownId(null);
   };
 
   const handleSubmitIntake = async () => {
@@ -1087,7 +1117,7 @@ export default function Inventory() {
     });
   };
 
-  const selectedIntermediateOutputItem = intermediateRecipeForm.output_item_id
+  const existingIntermediateOutputItem = intermediateRecipeForm.output_item_id
     ? findInventoryItem(intermediateRecipeForm.output_item_id)
     : null;
   const selectedProductionRecipe = selectedProductionRecipeId
@@ -1464,28 +1494,44 @@ export default function Inventory() {
           <section className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
             <div className="mb-5">
               <h3 className="text-lg font-bold text-slate-800">레시피 설계</h3>
-              <p className="text-sm text-slate-500 mt-1">중간재와 원재료를 검색해서 간단히 연결하세요.</p>
+              <p className="text-sm text-slate-500 mt-1">새로 추가할 중간재 이름과 단위를 입력하면, 저장 시 재고 품목도 함께 생성됩니다.</p>
             </div>
 
             <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-[1.4fr_0.6fr] gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-[1.2fr_0.5fr_0.7fr] gap-4">
                 <div>
-                  <label className="block text-sm font-semibold text-slate-600 mb-2">중간재 검색</label>
+                  <label className="block text-sm font-semibold text-slate-600 mb-2">중간재 이름</label>
                   <input
-                    list="inventory-item-search-list"
                     className="detail-form-input"
-                    placeholder="생산할 중간재를 검색"
+                    placeholder="새로 추가할 중간재 이름 입력"
                     value={intermediateRecipeForm.output_item_search}
                     onChange={(e) => handleIntermediateOutputChange(e.target.value)}
                   />
                   <p className="mt-2 text-xs text-slate-500">
-                    {selectedIntermediateOutputItem
-                      ? `선택됨: ${selectedIntermediateOutputItem.id} · ${selectedIntermediateOutputItem.uom}`
-                      : '검색 후 목록에서 정확한 품목을 선택하세요.'}
+                    {existingIntermediateOutputItem
+                      ? `이미 등록된 품목입니다: ${existingIntermediateOutputItem.id} · ${existingIntermediateOutputItem.uom}. 다른 이름을 입력해주세요.`
+                      : '저장하면 중간재 품목이 새로 생성됩니다.'}
                   </p>
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-slate-600 mb-2">1배치 생산량</label>
+                  <label className="block text-sm font-semibold text-slate-600 mb-2">단위</label>
+                  <select
+                    className="detail-form-input"
+                    value={intermediateRecipeForm.output_uom}
+                    onChange={(e) => setIntermediateRecipeForm((prev) => ({
+                      ...prev,
+                      output_uom: e.target.value,
+                    }))}
+                  >
+                    <option value="g">g</option>
+                    <option value="kg">kg</option>
+                    <option value="ml">ml</option>
+                    <option value="L">L</option>
+                    <option value="ea">ea</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-600 mb-2">1회 생산량</label>
                   <input
                     className="detail-form-input"
                     type="number"
@@ -1600,7 +1646,7 @@ export default function Inventory() {
                     <div>
                       <p className="text-sm font-semibold text-slate-800">{recipe.output_item_name}</p>
                       <p className="text-xs text-slate-500">
-                        1배치 {recipe.output_quantity.toLocaleString()}{recipe.output_uom} · 재료 {recipe.ingredients.length}개
+                        1회 {recipe.output_quantity.toLocaleString()}{recipe.output_uom} · 재료 {recipe.ingredients.length}개
                       </p>
                     </div>
                     <span className="text-xs font-semibold text-slate-400">{formatTimestamp(recipe.updated_at)}</span>
@@ -1615,7 +1661,7 @@ export default function Inventory() {
           <section className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
             <div className="mb-5">
               <h3 className="text-lg font-bold text-slate-800">생산 등록</h3>
-              <p className="text-sm text-slate-500 mt-1">레시피를 선택하고 배치 수만 입력하면 됩니다. 재고가 부족하면 저장되지 않습니다.</p>
+              <p className="text-sm text-slate-500 mt-1">레시피를 선택하고 생산 횟수만 입력하면 됩니다. 재고가 부족하면 저장되지 않습니다.</p>
             </div>
 
             <div className="space-y-4">
@@ -1629,7 +1675,7 @@ export default function Inventory() {
                   <option value="">생산할 레시피를 선택하세요</option>
                   {intermediateRecipes.map((recipe) => (
                     <option key={recipe.id} value={recipe.id}>
-                      {recipe.output_item_name} ({recipe.output_quantity}{recipe.output_uom}/배치)
+                      {recipe.output_item_name} ({recipe.output_quantity}{recipe.output_uom}/회)
                     </option>
                   ))}
                 </select>
@@ -1637,7 +1683,7 @@ export default function Inventory() {
 
               <div className="grid grid-cols-1 md:grid-cols-[0.7fr_1.3fr] gap-3">
                 <div>
-                  <label className="block text-sm font-semibold text-slate-600 mb-2">배치 수</label>
+                  <label className="block text-sm font-semibold text-slate-600 mb-2">생산 횟수</label>
                   <input
                     className="detail-form-input"
                     type="number"
@@ -1711,7 +1757,7 @@ export default function Inventory() {
                       <div>
                         <p className="text-sm font-semibold text-slate-800">{log.output_item_name}</p>
                         <p className="text-xs text-slate-500">
-                          {log.batch_count.toLocaleString()}배치 · {log.output_amount.toLocaleString()}{log.output_uom}
+                          {log.batch_count.toLocaleString()}회 생산 · {log.output_amount.toLocaleString()}{log.output_uom}
                         </p>
                       </div>
                       <div className="flex items-center gap-3">
@@ -1928,11 +1974,50 @@ export default function Inventory() {
                         <input
                           type="text"
                           value={item.category}
-                          readOnly
-                          className="table-input bg-slate-100 text-slate-500 cursor-not-allowed text-center"
-                          placeholder="자동"
-                          title="품목 선택 시 자동으로 설정됩니다"
+                          onChange={(e) => handleIntakeItemChange(item.id, 'category', e.target.value)}
+                          onFocus={(e) => handleCategoryInputFocus(item.id, e)}
+                          onClick={(e) => handleCategoryInputFocus(item.id, e)}
+                          className="table-input"
+                          placeholder="카테고리 입력 또는 선택"
+                          title="자동 입력 후에도 직접 수정할 수 있습니다"
                         />
+                        {activeCategoryDropdownId === item.id && categoryDropdownPosition && createPortal(
+                          <>
+                            <div
+                              className="fixed inset-0 z-[9998]"
+                              onClick={() => setActiveCategoryDropdownId(null)}
+                            />
+                            <div
+                              className="absolute z-[9999] bg-white border border-slate-300 rounded-lg shadow-xl max-h-60 overflow-y-auto"
+                              style={{
+                                top: `${categoryDropdownPosition.top}px`,
+                                left: `${categoryDropdownPosition.left}px`,
+                                width: `${categoryDropdownPosition.width}px`,
+                              }}
+                            >
+                              {existingCategories
+                                .filter(category =>
+                                  !item.category || category.toLowerCase().includes(item.category.toLowerCase())
+                                )
+                                .slice(0, 50)
+                                .map(category => (
+                                  <button
+                                    key={category}
+                                    className="w-full text-left px-4 py-3 hover:bg-blue-50 text-sm flex items-center border-b border-slate-50 last:border-0 transition-colors"
+                                    onClick={() => handleCategorySelect(item.id, category)}
+                                  >
+                                    <span className="font-medium text-slate-800 whitespace-nowrap overflow-hidden text-ellipsis">{category}</span>
+                                  </button>
+                                ))}
+                              {existingCategories.filter(category => !item.category || category.toLowerCase().includes(item.category.toLowerCase())).length === 0 && (
+                                <div className="px-4 py-4 text-center text-sm text-slate-400">
+                                  등록된 카테고리가 없습니다
+                                </div>
+                              )}
+                            </div>
+                          </>,
+                          document.body
+                        )}
                       </td>
                       <td className="relative">
                         <input
@@ -2006,9 +2091,8 @@ export default function Inventory() {
                         <select
                           value={item.uom}
                           onChange={(e) => handleIntakeItemChange(item.id, 'uom', e.target.value)}
-                          disabled={!!item.name} // 품목이 선택되면 단위도 자동 설정됨 (필요시 해제 가능)
-                          className={`table-select ${!!item.name ? 'bg-slate-100 cursor-not-allowed' : ''}`}
-                          title={item.name ? `${item.name}의 재고 단위: ${item.uom}` : '품목 선택 시 자동 설정'}
+                          className="table-select table-select-uom"
+                          title={item.name ? `${item.name}의 재고 단위가 자동 입력되었습니다. 필요하면 직접 변경할 수 있습니다.` : '단위를 선택해주세요'}
                         >
                           <option value="g">g</option>
                           <option value="ml">ml</option>
@@ -2384,7 +2468,7 @@ export default function Inventory() {
       ? '저장 중...'
       : isItemDirty
         ? '수정사항 저장'
-        : '닫기';
+        : '수정 중';
   const normalizedIntermediateRecipeDetailForm = intermediateRecipeDetailForm
     ? normalizeIntermediateRecipeForm(intermediateRecipeDetailForm)
     : null;
@@ -2698,25 +2782,32 @@ export default function Inventory() {
             </div>
 
             <div className="inventory-modal-footer detail-modal-footer">
-              <button
-                type="button"
-                className="btn btn-primary"
-                disabled={loadingSelectedItem || isSavingItemDetail}
-                onClick={() => {
-                  if (isItemEditMode) {
-                    if (isItemDirty) {
-                      void handleSaveItemDetail();
+              <div className="detail-modal-actions">
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  disabled={loadingSelectedItem || isSavingItemDetail || (isItemEditMode && !isItemDirty)}
+                  onClick={() => {
+                    if (isItemEditMode) {
+                      if (isItemDirty) {
+                        void handleSaveItemDetail();
+                      }
                       return;
                     }
-                    handleCloseItemDetail();
-                    return;
-                  }
-                  setItemDetailMessage(null);
-                  setIsItemEditMode(true);
-                }}
-              >
-                {detailPrimaryActionLabel}
-              </button>
+                    setItemDetailMessage(null);
+                    setIsItemEditMode(true);
+                  }}
+                >
+                  {detailPrimaryActionLabel}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={handleCloseItemDetail}
+                >
+                  닫기
+                </button>
+              </div>
             </div>
           </div>
         </div>,
@@ -2775,18 +2866,40 @@ export default function Inventory() {
 
                     <div className="detail-form-grid">
                       <div className="detail-form-group">
-                        <label htmlFor="intermediate-output-item">중간재 검색</label>
+                        <label htmlFor="intermediate-output-item">중간재 이름</label>
                         <input
                           id="intermediate-output-item"
-                          list="inventory-item-search-list"
                           className="detail-form-input"
+                          placeholder="새로 추가할 중간재 이름 입력"
                           value={intermediateRecipeDetailForm.output_item_search}
                           disabled={!isIntermediateRecipeEditMode}
                           onChange={(e) => handleIntermediateRecipeDetailOutputChange(e.target.value)}
                         />
                       </div>
                       <div className="detail-form-group">
-                        <label htmlFor="intermediate-output-quantity">1배치 생산량</label>
+                        <label htmlFor="intermediate-output-uom">단위</label>
+                        <select
+                          id="intermediate-output-uom"
+                          className="detail-form-input"
+                          value={intermediateRecipeDetailForm.output_uom}
+                          disabled={!isIntermediateRecipeEditMode}
+                          onChange={(e) => {
+                            setIntermediateRecipeDetailMessage(null);
+                            setIntermediateRecipeDetailForm((prev) => (prev ? {
+                              ...prev,
+                              output_uom: e.target.value,
+                            } : prev));
+                          }}
+                        >
+                          <option value="g">g</option>
+                          <option value="kg">kg</option>
+                          <option value="ml">ml</option>
+                          <option value="L">L</option>
+                          <option value="ea">ea</option>
+                        </select>
+                      </div>
+                      <div className="detail-form-group">
+                        <label htmlFor="intermediate-output-quantity">1회 생산량</label>
                         <input
                           id="intermediate-output-quantity"
                           className="detail-form-input"
@@ -2824,9 +2937,9 @@ export default function Inventory() {
 
                     <div className="detail-summary-grid">
                       <article className="detail-stat-card">
-                        <span className="detail-stat-label">현재 생산 대상</span>
+                        <span className="detail-stat-label">중간재 품목</span>
                         <strong>{intermediateRecipeDetailForm.output_item_id || '-'}</strong>
-                        <p>Inventory 연동 품목</p>
+                        <p>저장 시 신규 중간재 기준으로 관리됩니다.</p>
                       </article>
                       <article className="detail-stat-card">
                         <span className="detail-stat-label">최종 수정</span>
@@ -2840,7 +2953,7 @@ export default function Inventory() {
                     <div className="detail-section-header">
                       <div>
                         <h4>투입 재료 목록</h4>
-                        <p>1배치 기준으로 차감되는 원재료 구성입니다.</p>
+                        <p>1회 기준으로 차감되는 원재료 구성입니다.</p>
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="detail-history-count">{intermediateRecipeDetailForm.ingredients.length}개</span>

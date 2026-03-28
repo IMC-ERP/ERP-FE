@@ -54,6 +54,7 @@ export interface IntermediateIngredientDraft {
 export interface IntermediateRecipeFormState {
   output_item_search: string;
   output_item_id: string;
+  output_uom: string;
   output_quantity: number | '';
   note: string;
   ingredients: IntermediateIngredientDraft[];
@@ -61,6 +62,7 @@ export interface IntermediateRecipeFormState {
 
 export interface IntermediateRecipeFormValues {
   output_item_id: string;
+  output_uom: string;
   output_quantity: number;
   note: string;
   ingredients: Array<{
@@ -94,8 +96,9 @@ export const createIntermediateRecipeDetailForm = (
   createIntermediateIngredientDraft: () => IntermediateIngredientDraft,
   createRowId: () => number,
 ): IntermediateRecipeFormState => ({
-  output_item_search: recipe.output_item_id,
+  output_item_search: recipe.output_item_name,
   output_item_id: recipe.output_item_id,
+  output_uom: recipe.output_uom || 'g',
   output_quantity: recipe.output_quantity === 0 ? '' : recipe.output_quantity,
   note: recipe.note ?? '',
   ingredients: recipe.ingredients.length > 0
