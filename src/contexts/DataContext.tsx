@@ -5,7 +5,7 @@
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import type { SaleItem, InventoryItem, StoreProfile, AppSettings } from '../types';
-import { salesApi, inventoryApi, userApi, type Sale, type InventoryItem as APIInventoryItem } from '../services/api';
+import { salesApi, inventoryApi, type Sale } from '../services/api';
 import { supabase } from '../supabase';
 
 interface DataContextType {
@@ -38,18 +38,7 @@ const transformSale = (apiSale: Sale): SaleItem => ({
     dayOfWeek: new Date(apiSale.날짜 || Date.now()).toLocaleDateString('ko-KR', { weekday: 'short' })
 });
 
-const transformInventory = (apiItem: APIInventoryItem): InventoryItem => ({
-    id: apiItem.id,
-    name_en: apiItem.id,
-    name_ko: apiItem.id,
-    currentStock: apiItem.quantity_on_hand,
-    uom: apiItem.uom,
-    isIngredient: true,
-    leadTimeDays: 3, // 기본값
-    safetyStock: apiItem.safety_stock,
-    supplyMode: '거래처 도매', // 기본값
-    avgDailyUsage: undefined
-});
+// transformInventory function removed to directly consume API response
 
 export const DataProvider = ({ children }: { children?: ReactNode }) => {
     const [sales, setSales] = useState<SaleItem[]>([]);
@@ -59,24 +48,63 @@ export const DataProvider = ({ children }: { children?: ReactNode }) => {
 
     // Default Profile
     const [storeProfile, setStoreProfile] = useState<StoreProfile>({
-        name: "Coffee ERP",
-        ceoName: "홍길동",
-        foundedYear: "2023",
-        location: "서울시 강남구 테헤란로 123",
-        contact: "02-1234-5678"
+        store_id: "default",
+        store_name: "Coffee ERP",
+        status: "ACTIVE",
+        owner_name: "홍길동",
+        established_year: 2023,
+        address: "서울시 강남구 테헤란로 123",
+        contact_number: "02-1234-5678"
     });
 
-    // Default Settings
-    const [appSettings, setAppSettings] = useState<AppSettings>({
-        themeColor: 'blue',
-        darkMode: false,
-        fontSize: 'medium',
-        notifications: {
-            lowStock: true,
-            dailyReport: true,
-            marketing: false
-        }
+    // Default Settings — localStorage에서 복원
+    const [appSettings, setAppSettings] = useState<AppSettings>(() => {
+        try {
+            const saved = localStorage.getItem('erp_app_settings');
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                return {
+                    themeColor: parsed.themeColor || 'blue',
+                    darkMode: parsed.darkMode ?? false,
+                    fontSize: parsed.fontSize || 'medium',
+                    notifications: {
+                        lowStock: parsed.notifications?.lowStock ?? true,
+                        dailyReport: parsed.notifications?.dailyReport ?? true,
+                        marketing: parsed.notifications?.marketing ?? false,
+                    },
+                };
+            }
+        } catch { /* ignore */ }
+        return {
+            themeColor: 'blue',
+            darkMode: false,
+            fontSize: 'medium',
+            notifications: { lowStock: true, dailyReport: true, marketing: false },
+        };
     });
+
+    // appSettings 변경 시: localStorage 저장 + DOM 반영
+    useEffect(() => {
+        // localStorage 저장
+        localStorage.setItem('erp_app_settings', JSON.stringify(appSettings));
+
+        // <html> 요소에 테마 반영
+        const html = document.documentElement;
+
+        // 1) 테마 색상
+        html.setAttribute('data-theme', appSettings.themeColor);
+
+        // 2) 다크모드
+        if (appSettings.darkMode) {
+            html.classList.add('dark');
+        } else {
+            html.classList.remove('dark');
+        }
+
+        // 3) 폰트 사이즈
+        html.classList.remove('text-small', 'text-medium', 'text-large');
+        html.classList.add(`text-${appSettings.fontSize}`);
+    }, [appSettings]);
 
     const fetchData = async () => {
         setIsLoading(true);
@@ -91,10 +119,9 @@ export const DataProvider = ({ children }: { children?: ReactNode }) => {
 
             // 데이터 변환 및 저장
             const transformedSales = salesRes.data.map(transformSale);
-            const transformedInventory = inventoryRes.data.map(transformInventory);
 
             setSales(transformedSales);
-            setInventory(transformedInventory);
+            setInventory(inventoryRes.data);
         } catch (err) {
             console.error('Failed to fetch data from API:', err);
             setError('백엔드 서버에 연결할 수 없습니다. 서버가 실행 중인지 확인해주세요.');
@@ -108,19 +135,9 @@ export const DataProvider = ({ children }: { children?: ReactNode }) => {
 
     useEffect(() => {
         // Auth 상태 변경 감지
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
             if (session?.user) {
-                // 등록된 유저인지 먼저 확인 후 데이터 fetch
-                try {
-                    const res = await userApi.checkRegistration();
-                    if (res.data.is_registered) {
-                        fetchData();
-                    } else {
-                        setIsLoading(false);
-                    }
-                } catch {
-                    setIsLoading(false);
-                }
+                fetchData();
             } else {
                 // 로그아웃 시 데이터 초기화
                 setSales([]);

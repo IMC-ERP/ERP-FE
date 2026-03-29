@@ -5,7 +5,8 @@
 
 import { useEffect, useState } from 'react';
 import { RefreshCw, ChevronDown, ChevronRight, Trash2, Coffee, Layers, Utensils, Leaf, Plus, X } from 'lucide-react';
-import { recipeCostApi, inventoryApi, type RecipeCost, type InventoryItem } from '../services/api';
+import { recipeCostApi, inventoryApi } from '../services/api';
+import type { RecipeCost, InventoryItem } from '../types';
 import './Recipes.css';
 
 interface NewIngredient {
@@ -155,11 +156,11 @@ export default function Recipes() {
 
   // 검색 필터링
   const filteredRecipes = recipes.filter(recipe =>
-    recipe.menu_name.toLowerCase().includes(searchQuery.toLowerCase())
+    recipe.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // danger 메뉴 추출 (원가율 33% 이상, 혹은 status가 danger)
-  const dangerRecipes = filteredRecipes.filter(recipe => recipe.status === 'danger' || recipe.cost_ratio >= 33);
+  // danger 메뉴 추출 (마진율이 20% 미만, 혹은 status가 danger)
+  const dangerRecipes = filteredRecipes.filter(recipe => recipe.status === 'danger' || recipe.marginRate < 20);
 
   // 카테고리별 그룹핑
   const groupedRecipes = filteredRecipes.reduce((acc, recipe) => {
@@ -217,9 +218,9 @@ export default function Recipes() {
     }
   };
 
-  // 원가율 색상 클래스
-  const getCostRatioClass = (status: string, ratio: number) => {
-    if (ratio >= 33) return 'cost-ratio-danger';
+  // 마진율 색상 클래스 (원가율 역산 개념)
+  const getMarginRateClass = (status: string | null | undefined, rate: number) => {
+    if (rate < 20) return 'cost-ratio-danger';
 
     switch (status) {
       case 'safe':
@@ -319,31 +320,29 @@ export default function Recipes() {
           </div>
           <div className="danger-menu-cards">
             {dangerRecipes.map((recipe) => (
-              <div key={recipe.menu_name} className="danger-menu-card">
+              <div key={recipe.name} className="danger-menu-card">
                 <div className="danger-card-header">
                   <button
                     className="menu-expand-btn"
-                    onClick={() => toggleMenu(recipe.menu_name)}
-                    aria-label={expandedMenus.has(recipe.menu_name) ? `${recipe.menu_name} 상세 접기` : `${recipe.menu_name} 상세 펼치기`}
+                    onClick={() => toggleMenu(recipe.name)}
                   >
-                    {expandedMenus.has(recipe.menu_name) ? (
+                    {expandedMenus.has(recipe.name) ? (
                       <ChevronDown size={20} />
                     ) : (
                       <ChevronRight size={20} />
                     )}
                   </button>
                   <div className="menu-info">
-                    <h4>{recipe.menu_name}</h4>
-                    <p>판매가: {recipe.selling_price.toLocaleString()}원 · 원가: {recipe.total_cost.toLocaleString()}원</p>
+                    <h4>{recipe.name}</h4>
+                    <p>판매가: {recipe.price.toLocaleString()}원 · 원가: {recipe.totalCost.toLocaleString()}원</p>
                   </div>
                   <div className="menu-card-right">
-                    <div className={`cost-ratio-badge ${getCostRatioClass(recipe.status, recipe.cost_ratio)}`}>
-                      원가율 {recipe.cost_ratio.toFixed(1)}%
+                    <div className={`cost-ratio-badge ${getMarginRateClass(recipe.status, recipe.marginRate)}`}>
+                      마진율 {recipe.marginRate?.toFixed(1) || '0.0'}%
                     </div>
                     <button
                       className="btn-delete-menu"
-                      onClick={() => handleDeleteMenu(recipe.menu_name)}
-                      aria-label={`${recipe.menu_name} 메뉴 삭제`}
+                      onClick={() => handleDeleteMenu(recipe.name)}
                     >
                       <Trash2 size={18} />
                     </button>
@@ -351,13 +350,13 @@ export default function Recipes() {
                 </div>
 
                 {/* 메뉴 상세 */}
-                {expandedMenus.has(recipe.menu_name) && (
+                {expandedMenus.has(recipe.name) && (
                   <div className="menu-detail">
                     <div className="detail-row">
                       <label>메뉴 이름</label>
                       <input
                         type="text"
-                        value={recipe.menu_name}
+                        value={recipe.name}
                         readOnly
                         className="readonly-input"
                       />
@@ -367,7 +366,7 @@ export default function Recipes() {
                       <div className="price-input-group">
                         <input
                           type="number"
-                          value={recipe.selling_price}
+                          value={recipe.price}
                           readOnly
                           className="readonly-input"
                         />
@@ -376,32 +375,30 @@ export default function Recipes() {
                     </div>
                     <div className="recipe-section">
                       <h5>📋 레시피 구성 (재료)</h5>
-                      <div className="responsive-table-shell">
-                        <table className="recipe-table">
-                          <thead>
-                            <tr>
-                              <th>재료 품목</th>
-                              <th>사용량</th>
-                              <th>단위 원가</th>
-                              <th>원가</th>
+                      <table className="recipe-table">
+                        <thead>
+                          <tr>
+                            <th>재료 품목</th>
+                            <th>사용량</th>
+                            <th>단위 원가</th>
+                            <th>원가</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {recipe.ingredients.map((ingredient, idx) => (
+                            <tr key={idx}>
+                              <td>{ingredient.name}</td>
+                              <td>{ingredient.quantity}</td>
+                              <td>{ingredient.unit_cost.toFixed(2)}원</td>
+                              <td>{ingredient.total_ingredient_cost.toLocaleString()}원</td>
                             </tr>
-                          </thead>
-                          <tbody>
-                            {recipe.ingredients.map((ingredient, idx) => (
-                              <tr key={idx}>
-                                <td>{ingredient.name}</td>
-                                <td>{ingredient.usage}</td>
-                                <td>{ingredient.cost_per_unit.toFixed(2)}원</td>
-                                <td>{ingredient.cost.toLocaleString()}원</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
                     <div className="recipe-total">
                       <div className="total-label">레시피 총 원가 (Food Cost)</div>
-                      <div className="total-value">{recipe.total_cost.toLocaleString()}원</div>
+                      <div className="total-value">{recipe.totalCost.toLocaleString()}원</div>
                     </div>
                   </div>
                 )}
@@ -446,34 +443,32 @@ export default function Recipes() {
               {expandedCategories.has(category) && (
                 <div className="menu-cards">
                   {categoryRecipes.map((recipe) => (
-                    <div key={recipe.menu_name} className="menu-card">
+                    <div key={recipe.name} className="menu-card">
                       {/* 메뉴 카드 헤더 */}
                       <div className="menu-card-header">
                         <div className="menu-card-left">
                           <button
                             className="menu-expand-btn"
-                            onClick={() => toggleMenu(recipe.menu_name)}
-                            aria-label={expandedMenus.has(recipe.menu_name) ? `${recipe.menu_name} 상세 접기` : `${recipe.menu_name} 상세 펼치기`}
+                            onClick={() => toggleMenu(recipe.name)}
                           >
-                            {expandedMenus.has(recipe.menu_name) ? (
+                            {expandedMenus.has(recipe.name) ? (
                               <ChevronDown size={20} />
                             ) : (
                               <ChevronRight size={20} />
                             )}
                           </button>
                           <div className="menu-info">
-                            <h4>{recipe.menu_name}</h4>
-                            <p>판매가: {recipe.selling_price.toLocaleString()}원 · 원가: {recipe.total_cost.toLocaleString()}원</p>
+                            <h4>{recipe.name}</h4>
+                            <p>판매가: {recipe.price.toLocaleString()}원 · 원가: {recipe.totalCost.toLocaleString()}원</p>
                           </div>
                         </div>
                         <div className="menu-card-right">
-                          <div className={`cost-ratio-badge ${getCostRatioClass(recipe.status, recipe.cost_ratio)}`}>
-                            원가율 {recipe.cost_ratio.toFixed(1)}%
+                          <div className={`cost-ratio-badge ${getMarginRateClass(recipe.status, recipe.marginRate)}`}>
+                            마진율 {recipe.marginRate?.toFixed(1) || '0.0'}%
                           </div>
                           <button
                             className="btn-delete-menu"
-                            onClick={() => handleDeleteMenu(recipe.menu_name)}
-                            aria-label={`${recipe.menu_name} 메뉴 삭제`}
+                            onClick={() => handleDeleteMenu(recipe.name)}
                           >
                             <Trash2 size={18} />
                           </button>
@@ -481,14 +476,14 @@ export default function Recipes() {
                       </div>
 
                       {/* 메뉴 상세 (펼쳐졌을 때) */}
-                      {expandedMenus.has(recipe.menu_name) && (
+                      {expandedMenus.has(recipe.name) && (
                         <div className="menu-detail">
                           {/* 메뉴 이름 */}
                           <div className="detail-row">
                             <label>메뉴 이름</label>
                             <input
                               type="text"
-                              value={recipe.menu_name}
+                              value={recipe.name}
                               readOnly
                               className="readonly-input"
                             />
@@ -500,7 +495,7 @@ export default function Recipes() {
                             <div className="price-input-group">
                               <input
                                 type="number"
-                                value={recipe.selling_price}
+                                value={recipe.price}
                                 readOnly
                                 className="readonly-input"
                               />
@@ -511,34 +506,32 @@ export default function Recipes() {
                           {/* 레시피 구성 */}
                           <div className="recipe-section">
                             <h5>📋 레시피 구성 (재료)</h5>
-                            <div className="responsive-table-shell">
-                              <table className="recipe-table">
-                                <thead>
-                                  <tr>
-                                    <th>재료 품목</th>
-                                    <th>사용량</th>
-                                    <th>단위 원가</th>
-                                    <th>원가</th>
+                            <table className="recipe-table">
+                              <thead>
+                                <tr>
+                                  <th>재료 품목</th>
+                                  <th>사용량</th>
+                                  <th>단위 원가</th>
+                                  <th>원가</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {recipe.ingredients.map((ingredient, idx) => (
+                                  <tr key={idx}>
+                                    <td>{ingredient.name}</td>
+                                    <td>{ingredient.quantity}</td>
+                                    <td>{ingredient.unit_cost.toFixed(2)}원</td>
+                                    <td>{ingredient.total_ingredient_cost.toLocaleString()}원</td>
                                   </tr>
-                                </thead>
-                                <tbody>
-                                  {recipe.ingredients.map((ingredient, idx) => (
-                                    <tr key={idx}>
-                                      <td>{ingredient.name}</td>
-                                      <td>{ingredient.usage}</td>
-                                      <td>{ingredient.cost_per_unit.toFixed(2)}원</td>
-                                      <td>{ingredient.cost.toLocaleString()}원</td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            </div>
+                                ))}
+                              </tbody>
+                            </table>
                           </div>
 
                           {/* 레시피 총 원가 */}
                           <div className="recipe-total">
                             <div className="total-label">레시피 총 원가 (Food Cost)</div>
-                            <div className="total-value">{recipe.total_cost.toLocaleString()}원</div>
+                            <div className="total-value">{recipe.totalCost.toLocaleString()}원</div>
                           </div>
                         </div>
                       )}
@@ -564,7 +557,7 @@ export default function Recipes() {
                   <p>메뉴 원가와 레시피를 상세히 설정합니다.</p>
                 </div>
               </div>
-              <button className="modal-close-btn" onClick={handleCloseNewMenu} aria-label="새 메뉴 등록 모달 닫기">
+              <button className="modal-close-btn" onClick={handleCloseNewMenu}>
                 <X size={24} />
               </button>
             </div>
@@ -747,7 +740,6 @@ export default function Recipes() {
                               <button
                                 className="btn-remove-ingredient"
                                 onClick={() => handleRemoveIngredient(ingredient.id)}
-                                aria-label={`${ingredient.name || '신규 재료'} 삭제`}
                               >
                                 <Trash2 size={16} />
                               </button>

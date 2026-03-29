@@ -7,7 +7,7 @@ import { createContext, useContext, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { User, Session } from '@supabase/supabase-js';
 import { supabase } from '../supabase';
-import { userApi, type UserProfile } from '../services/api';
+import { userApi, setAuthToken, type UserProfile } from '../services/api';
 
 interface AuthContextType {
     user: User | null;
@@ -15,7 +15,7 @@ interface AuthContextType {
     userProfile: UserProfile | null;
     loading: boolean;
     needsRegistration: boolean;
-    signInWithGoogle: () => Promise<void>;
+    signInWithGoogle: (redirectPath?: string) => Promise<void>;
     logout: () => Promise<void>;
     refreshProfile: () => Promise<void>;
 }
@@ -63,6 +63,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
                 await supabase.auth.signOut();
                 setUser(null);
                 setSession(null);
+                setAuthToken(null);
                 setUserProfile(null);
                 setNeedsRegistration(false);
                 return;
@@ -80,12 +81,15 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     };
 
     // Google 로그인
-    const signInWithGoogle = async () => {
+    const signInWithGoogle = async (redirectPath?: string) => {
         try {
+            const redirectTo = redirectPath
+                ? `${window.location.origin}${redirectPath}`
+                : window.location.origin;
             const { error } = await supabase.auth.signInWithOAuth({
                 provider: 'google',
                 options: {
-                    redirectTo: window.location.origin,
+                    redirectTo,
                 },
             });
             if (error) throw error;
@@ -101,6 +105,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
             const { error } = await supabase.auth.signOut();
             if (error) throw error;
             setUserProfile(null);
+            setAuthToken(null);
             setNeedsRegistration(false);
         } catch (error) {
             console.error('로그아웃 실패:', error);
@@ -122,17 +127,20 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
                     console.warn('[AUTH] Session refresh failed, clearing stale session');
                     await supabase.auth.signOut();
                     setSession(null);
+                    setAuthToken(null);
                     setUser(null);
                     setLoading(false);
                     initialLoadDone = true;
                     return;
                 }
                 setSession(refreshed);
+                setAuthToken(refreshed.access_token || null);
                 setUser(refreshed.user);
                 // 프로필은 비동기로 로드 (loading 블로킹 안 함)
                 loadUserProfile();
             } else {
                 setSession(null);
+                setAuthToken(null);
                 setUser(null);
             }
             setLoading(false);
@@ -146,6 +154,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
             async (_event, currentSession) => {
                 setSession(currentSession);
+                setAuthToken(currentSession?.access_token || null);
                 setUser(currentSession?.user ?? null);
 
                 if (currentSession?.user) {

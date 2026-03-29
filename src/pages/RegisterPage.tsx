@@ -16,7 +16,8 @@ export default function RegisterPage() {
         storeName: '',
         ownerName: '',
         phone: '',
-        address: ''
+        address: '',
+        establishedYear: ''
     });
 
     const [loading, setLoading] = useState(false);
@@ -60,9 +61,10 @@ export default function RegisterPage() {
             await userApi.register({
                 email: user.email,
                 store_name: formData.storeName,
-                owner_name: formData.ownerName,
+                name: formData.ownerName,
                 phone: formData.phone,
-                address: formData.address
+                address: formData.address,
+                established_year: formData.establishedYear ? parseInt(formData.establishedYear) : undefined,
             });
 
             // 등록 성공 - 프로필 새로고침 후 대시보드로 이동
@@ -160,6 +162,23 @@ export default function RegisterPage() {
                             placeholder="예: 서울시 강남구 테헤란로 123"
                             rows={3}
                             className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all resize-none"
+                        />
+                    </div>
+
+                    <div>
+                        <label htmlFor="establishedYear" className="block text-sm font-medium text-slate-700 mb-2">
+                            설립 연도
+                        </label>
+                        <input
+                            type="number"
+                            id="establishedYear"
+                            name="establishedYear"
+                            value={formData.establishedYear}
+                            onChange={handleChange}
+                            placeholder="예: 2024"
+                            min="1900"
+                            max="2100"
+                            className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all"
                         />
                     </div>
 
