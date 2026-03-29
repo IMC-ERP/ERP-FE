@@ -19,7 +19,7 @@ interface MonthlyUtilities {
 }
 
 export default function Dashboard() {
-  const { sales } = useData();
+  const { sales, isLoading } = useData();
 
   // --- State Configuration ---
   const [showProfitDetails, setShowProfitDetails] = useState(false);
@@ -119,6 +119,23 @@ export default function Dashboard() {
     subTitleColor: isPositive ? "text-rose-100" : "text-blue-100"
   };
 
+  if (isLoading) {
+    return (
+      <div className="max-w-4xl mx-auto space-y-4 sm:space-y-6 animate-fade-in overflow-visible">
+        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden">
+          <div className="bg-gradient-to-r from-slate-200 to-slate-300 p-5 md:p-8 rounded-2xl animate-pulse">
+            <div className="h-4 w-32 bg-slate-300 rounded mb-4" />
+            <div className="h-10 w-64 bg-slate-300 rounded" />
+          </div>
+        </div>
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6 animate-pulse">
+          <div className="h-4 w-48 bg-slate-200 rounded mb-4" />
+          <div className="h-6 w-56 bg-slate-200 rounded" />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-4xl mx-auto space-y-4 sm:space-y-6 animate-fade-in overflow-visible">
 
@@ -132,7 +149,7 @@ export default function Dashboard() {
                 <div className="group relative hidden md:block">
                   <Info size={16} className={`${theme.iconColor} cursor-help`} />
                   <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block w-72 p-3 bg-slate-800 text-xs text-slate-200 rounded-lg shadow-xl z-[60]">
-                    이번 달 1일({dateRange.start.toLocaleDateString()})부터 어제({dateRange.end.toLocaleDateString()})까지의 데이터 기준 이익률입니다.
+                    이번 달 1일({dateRange.start.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })})부터 어제({dateRange.end.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })})까지의 데이터 기준 이익률입니다.
                     <div className="absolute left-1.5 top-full w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-slate-800"></div>
                   </div>
                 </div>

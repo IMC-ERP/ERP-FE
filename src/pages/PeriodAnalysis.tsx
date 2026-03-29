@@ -7,7 +7,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useData } from '../contexts/DataContext';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, CartesianGrid, Treemap, Legend } from 'recharts';
 import { WEEKDAY_ORDER } from '../constants';
-import { ArrowUpRight, ArrowDownRight, Minus, TrendingUp, Info, Calendar, Clock } from 'lucide-react';
+import { ArrowUpRight, ArrowDownRight, Minus, TrendingUp, Info, Calendar, Clock, AlertTriangle } from 'lucide-react';
 
 // Custom content renderer for Treemap
 const CustomTreemapContent = (props: any) => {
@@ -353,6 +353,12 @@ export default function PeriodAnalysis() {
                                 <button onClick={() => { setStartDate("2025-10-25"); setEndDate("2025-11-24") }} className="px-4 py-1.5 bg-slate-100 text-[11px] font-bold text-slate-600 rounded-md hover:bg-slate-200 hover:text-blue-600 transition-all">최근 1개월</button>
                                 <button onClick={() => { setStartDate("2025-08-25"); setEndDate("2025-11-24") }} className="px-4 py-1.5 bg-slate-100 text-[11px] font-bold text-slate-600 rounded-md hover:bg-slate-200 hover:text-blue-600 transition-all">최근 3개월</button>
                             </div>
+                            {comparisonMetrics.diffDays > 90 && (
+                                <div className="mt-3 flex items-center gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 px-3 py-2 rounded-lg">
+                                    <AlertTriangle size={14} className="flex-shrink-0" />
+                                    <span>조회 기간이 90일을 초과했습니다 ({comparisonMetrics.diffDays}일). 최대 3개월까지 조회하는 것을 권장합니다.</span>
+                                </div>
+                            )}
                         </div>
 
                         {/* 2. 총 매출 KPI */}
@@ -482,6 +488,11 @@ export default function PeriodAnalysis() {
                             </div>
 
                             <div className="h-56 sm:h-64 flex-1">
+                              {hourlyData.every(d => d.revenue === 0) ? (
+                                <div className="flex items-center justify-center h-full text-slate-400 text-sm">
+                                  선택한 시간대({startHour}시~{endHour}시)에 매출 데이터가 없습니다.
+                                </div>
+                              ) : (
                                 <ResponsiveContainer width="100%" height="100%">
                                     <LineChart data={hourlyData} margin={{ top: 10, right: isMobile ? 10 : 30, left: 10, bottom: 0 }}>
                                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
@@ -527,6 +538,7 @@ export default function PeriodAnalysis() {
                                         />
                                     </LineChart>
                                 </ResponsiveContainer>
+                              )}
                             </div>
 
                             {/* Peak/Low Analysis Footer */}

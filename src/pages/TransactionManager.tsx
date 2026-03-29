@@ -86,8 +86,24 @@ const HistoryView = () => {
         setEditForm(updatedForm);
     };
 
+    // Helper to get original data for comparison
+    const originalData = useMemo(() => {
+        return sales.find(s => s.id === editingId);
+    }, [sales, editingId]);
+
+    const hasChanges = useMemo(() => {
+        if (!originalData || !editForm) return false;
+        return originalData.itemDetail !== editForm.itemDetail ||
+            originalData.qty !== editForm.qty ||
+            originalData.price !== editForm.price ||
+            originalData.date !== editForm.date ||
+            originalData.category !== editForm.category ||
+            originalData.time !== editForm.time;
+    }, [originalData, editForm]);
+
     const initiateSave = () => {
         if (!editingId || !editForm) return;
+        if (!hasChanges) return;
         setShowConfirmModal(true);
     };
 
@@ -105,11 +121,6 @@ const HistoryView = () => {
         setEditForm(null);
         setShowConfirmModal(false);
     };
-
-    // Helper to get original data for comparison
-    const originalData = useMemo(() => {
-        return sales.find(s => s.id === editingId);
-    }, [sales, editingId]);
 
     return (
         <div className="space-y-4 md:space-y-5 animate-fade-in relative min-w-0">
@@ -330,7 +341,8 @@ const HistoryView = () => {
                         </button>
                         <button
                             onClick={initiateSave}
-                            className="flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-full shadow-xl hover:bg-blue-700 font-bold transition-all hover:scale-105 ring-4 ring-blue-100"
+                            disabled={!hasChanges}
+                            className={`flex items-center justify-center gap-2 px-6 py-3 text-white rounded-full shadow-xl font-bold transition-all ring-4 ${hasChanges ? 'bg-blue-600 hover:bg-blue-700 hover:scale-105 ring-blue-100' : 'bg-slate-400 cursor-not-allowed ring-slate-200'}`}
                         >
                             <Save size={20} /> 변경사항 저장하기
                         </button>
@@ -350,8 +362,8 @@ const HistoryView = () => {
 
             {/* Confirmation Modal */}
             {showConfirmModal && originalData && editForm && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
-                    <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4" onClick={() => setShowConfirmModal(false)}>
+                    <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden" onClick={(e) => e.stopPropagation()}>
                         <div className="p-6 border-b border-slate-100 flex items-start gap-4 bg-amber-50">
                             <div className="p-3 bg-amber-100 rounded-full flex-shrink-0">
                                 <AlertTriangle className="text-amber-600" size={24} />
@@ -535,16 +547,23 @@ const AddView = () => {
                                 type="number"
                                 min="1"
                                 value={qty}
-                                onChange={(e) => setQty(parseInt(e.target.value))}
+                                onChange={(e) => {
+                                    const val = parseInt(e.target.value);
+                                    setQty(isNaN(val) ? 0 : Math.max(0, val));
+                                }}
                                 className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
                             />
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-slate-700 mb-2">단가 (원)</label>
                             <input
-                                type="text"
+                                type="number"
+                                min="0"
                                 value={price}
-                                onChange={(e) => setPrice(parseInt(e.target.value) || 0)}
+                                onChange={(e) => {
+                                    const val = parseInt(e.target.value);
+                                    setPrice(isNaN(val) ? 0 : Math.max(0, val));
+                                }}
                                 className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
                             />
                         </div>
@@ -561,13 +580,14 @@ const AddView = () => {
                     </div>
 
                     <div className="bg-slate-50 p-4 rounded-lg flex flex-col gap-2 sm:flex-row sm:justify-between sm:items-center">
-                        <span className="text-slate-600 font-medium">💰 계산된 수익</span>
+                        <span className="text-slate-600 font-medium">💰 총 결제 금액</span>
                         <span className="text-xl font-bold text-blue-600">{(price * qty).toLocaleString()}원</span>
                     </div>
 
                     <button
                         type="submit"
-                        className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-colors shadow-lg shadow-blue-200"
+                        disabled={!selectedItem || !price || price <= 0 || !qty || qty <= 0}
+                        className={`w-full py-4 font-bold rounded-xl transition-colors shadow-lg ${!selectedItem || !price || price <= 0 || !qty || qty <= 0 ? 'bg-slate-400 cursor-not-allowed shadow-slate-200 text-white' : 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-200'}`}
                     >
                         거래 등록하기
                     </button>

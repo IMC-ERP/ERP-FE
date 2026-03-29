@@ -24,6 +24,15 @@ export default function SettingsPage() {
     };
 
     const saveProfile = () => {
+        const year = tempProfile.foundedYear;
+        if (year) {
+            const yearNum = parseInt(year);
+            const currentYear = new Date().getFullYear();
+            if (isNaN(yearNum) || yearNum < 1900 || yearNum > currentYear) {
+                alert(`설립연도는 1900년 ~ ${currentYear}년 사이의 값을 입력해주세요.`);
+                return;
+            }
+        }
         updateStoreProfile(tempProfile);
         setSaved(true);
         setTimeout(() => setSaved(false), 2000);

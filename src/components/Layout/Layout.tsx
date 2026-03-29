@@ -44,7 +44,7 @@ const NavItem = ({ to, icon: Icon, label, active, onClick }: NavItemProps) => (
     to={to}
     onClick={onClick}
     className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors duration-200 ${active
-      ? 'bg-blue-100 text-blue-700 font-semibold'
+      ? 'bg-blue-100 text-blue-700 font-semibold nav-item-active'
       : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
       }`}
   >
@@ -105,6 +105,7 @@ export default function Layout() {
   };
 
   const handleLogout = async () => {
+    if (!window.confirm('정말 로그아웃 하시겠습니까?')) return;
     try {
       await logout();
     } catch (error) {
@@ -186,7 +187,7 @@ export default function Layout() {
         ${isMobile && isMobileSidebarOpen ? 'mobile-sidebar-open' : ''}
         ${isMobile && !isMobileSidebarOpen ? 'mobile-sidebar-closed' : ''}
       `}>
-        <div className="p-6 border-b border-slate-100 flex items-center gap-3">
+        <Link to="/" className="p-6 border-b border-slate-100 flex items-center gap-3 cursor-pointer hover:bg-slate-50 transition-colors">
           {storeProfile.logoUrl ? (
             <img src={storeProfile.logoUrl} alt="Logo" className="w-10 h-10 rounded-full object-cover border border-slate-200" />
           ) : (
@@ -207,7 +208,7 @@ export default function Layout() {
               <X size={20} />
             </button>
           )}
-        </div>
+        </Link>
 
         <nav className="p-4 space-y-1 flex-1 overflow-y-auto">
           {navItems.map(item => (
@@ -312,7 +313,7 @@ export default function Layout() {
           </div>
           <button
             onClick={() => setIsAIDrawerOpen(false)}
-            className="p-1 text-slate-400 hover:text-slate-600 hover:bg-white/50 rounded-full transition-colors"
+            className="p-2.5 text-slate-400 hover:text-slate-600 hover:bg-white/50 rounded-full transition-colors"
           >
             <X size={20} />
           </button>
