@@ -434,9 +434,11 @@ export const userApi = {
   registerMember: (data: { owner_name: string; phone?: string }) =>
     api.post<{ uid: string; email: string; owner_name: string; phone?: string; role: string; profile_id: string }>('/users/register-member', data),
   getInvitations: () =>
-    api.get<{ code: string; used_by: string | null; created_at: string; status: string }[]>('/users/invitations'),
+    api.get<{ code: string; used_by: string | null; used_by_name: string | null; created_at: string; status: string; expires_at: string | null }[]>('/users/invitations'),
   expireInvitation: (code: string) =>
     api.put<{ success: boolean; code: string }>(`/users/invitations/${code}/expire`),
+  cleanupInvitations: () =>
+    api.delete<{ deleted: number }>('/users/invitations/cleanup'),
   forceRemoveMember: (email: string) =>
     api.delete<{ success: boolean; email: string }>(`/users/members/${encodeURIComponent(email)}`),
 };

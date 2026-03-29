@@ -17,8 +17,10 @@ import {
 interface InvitationRecord {
     code: string;
     used_by: string | null;
+    used_by_name: string | null;
     created_at: string;
     status: string;
+    expires_at: string | null;
 }
 
 type SettingsTab = 'profile' | 'account' | 'display';
@@ -115,6 +117,7 @@ export default function SettingsPage() {
 
     // ========== 구성원 강제 탈퇴 상태 ==========
     const [removingMemberEmail, setRemovingMemberEmail] = useState<string | null>(null);
+    const [removeMemberTarget, setRemoveMemberTarget] = useState<{ email: string; name: string } | null>(null);
 
     // ========== 카드 접기/펼치기 상태 ==========
     const [membersExpanded, setMembersExpanded] = useState(true);
@@ -318,15 +321,16 @@ export default function SettingsPage() {
     };
 
     // ========== 구성원 강제 탈퇴 핸들러 ==========
-    const handleForceRemoveMember = async (email: string, name: string) => {
-        if (!window.confirm(`정말 "${name}" 구성원을 강제 탈퇴시키겠습니까?\n이 작업은 되돌릴 수 없습니다.`)) return;
+    const handleForceRemoveMember = async () => {
+        if (!removeMemberTarget) return;
+        const { email, name } = removeMemberTarget;
+        setRemoveMemberTarget(null);
         setRemovingMemberEmail(email);
         try {
             await userApi.forceRemoveMember(email);
-            // 구성원 목록 새로고침
             const res = await userApi.getStoreMembers();
             setMembers(res.data);
-            setInviteToast('구성원이 강제 탈퇴되었습니다.');
+            setInviteToast(`"${name}" 구성원이 강제 탈퇴되었습니다.`);
             setTimeout(() => setInviteToast(''), 2000);
         } catch (err: any) {
             setInviteToast(err.response?.data?.detail || '구성원 강제 탈퇴에 실패했습니다.');
@@ -591,7 +595,11 @@ export default function SettingsPage() {
                                                                     <td className="px-4 py-3 text-center">
                                                                         {member.email !== userProfile?.email && member.role !== 'owner' ? (
                                                                             <button
-                                                                                onClick={() => handleForceRemoveMember(member.email!, member.name)}
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation();
+                                                                                    e.preventDefault();
+                                                                                    setRemoveMemberTarget({ email: member.email!, name: member.name });
+                                                                                }}
                                                                                 disabled={removingMemberEmail === member.email}
                                                                                 className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
                                                                                 title="구성원 강제 탈퇴"
@@ -674,7 +682,7 @@ export default function SettingsPage() {
                                                         {invitations.map((inv, idx) => (
                                                             <tr key={idx} className="hover:bg-slate-50 transition-colors">
                                                                 <td className="px-4 py-3 font-mono font-medium text-slate-800 tracking-wider">{inv.code}</td>
-                                                                <td className="px-4 py-3 text-slate-600">{inv.used_by || '미사용'}</td>
+                                                                <td className="px-4 py-3 text-slate-600">{inv.used_by_name || (inv.used_by ? inv.used_by : '미사용')}</td>
                                                                 <td className="px-4 py-3 text-slate-600">
                                                                     {(() => {
                                                                         const d = new Date(inv.created_at);
@@ -683,16 +691,24 @@ export default function SettingsPage() {
                                                                     })()}
                                                                 </td>
                                                                 <td className="px-4 py-3">
-                                                                    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${
-                                                                        inv.status === 'active'
-                                                                            ? 'bg-emerald-100 text-emerald-700'
-                                                                            : 'bg-slate-100 text-slate-500'
-                                                                    }`}>
-                                                                        {inv.status === 'active' ? '사용 가능' : '만료'}
-                                                                    </span>
+                                                                    {(() => {
+                                                                        const isExpired = inv.status !== 'active' ||
+                                                                            (inv.expires_at != null && new Date() > new Date(inv.expires_at));
+                                                                        return (
+                                                                            <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${
+                                                                                !isExpired
+                                                                                    ? 'bg-emerald-100 text-emerald-700'
+                                                                                    : inv.status === 'dismiss'
+                                                                                    ? 'bg-blue-100 text-blue-600'
+                                                                                    : 'bg-slate-100 text-slate-500'
+                                                                            }`}>
+                                                                                {!isExpired ? '사용 가능' : inv.status === 'dismiss' ? '사용됨' : '만료됨'}
+                                                                            </span>
+                                                                        );
+                                                                    })()}
                                                                 </td>
                                                                 <td className="px-4 py-3 text-center">
-                                                                    {inv.status === 'active' ? (
+                                                                    {inv.status === 'active' && (inv.expires_at == null || new Date() <= new Date(inv.expires_at)) ? (
                                                                         <button
                                                                             onClick={() => handleExpireInvitation(inv.code)}
                                                                             className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
@@ -1064,6 +1080,45 @@ export default function SettingsPage() {
                                 ) : (
                                     <><Trash2 size={16} /> 탈퇴 확정</>
                                 )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* 구성원 강제 탈퇴 확인 모달 */}
+            {removeMemberTarget && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
+                    <div className="bg-white rounded-2xl w-full max-w-sm shadow-xl overflow-hidden">
+                        <div className="p-6">
+                            <div className="flex justify-between items-center mb-5">
+                                <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                                    <AlertCircle className="text-red-500" size={20} /> 구성원 강제 탈퇴
+                                </h3>
+                                <button
+                                    onClick={() => setRemoveMemberTarget(null)}
+                                    className="text-slate-400 hover:text-slate-600 transition-colors"
+                                >
+                                    <X size={20} />
+                                </button>
+                            </div>
+                            <div className="p-4 bg-red-50 text-red-700 rounded-xl text-sm leading-relaxed border border-red-100 font-medium">
+                                정말 <strong>"{removeMemberTarget.name}"</strong> 구성원을 강제 탈퇴시키겠습니까?<br />
+                                이 작업은 되돌릴 수 없습니다.
+                            </div>
+                        </div>
+                        <div className="p-4 bg-slate-50 flex gap-3 justify-end border-t border-slate-100">
+                            <button
+                                onClick={() => setRemoveMemberTarget(null)}
+                                className="px-5 py-2 text-sm font-semibold text-slate-600 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
+                            >
+                                취소
+                            </button>
+                            <button
+                                onClick={handleForceRemoveMember}
+                                className="flex items-center gap-2 px-5 py-2 text-sm font-bold text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors shadow-sm"
+                            >
+                                <Trash2 size={16} /> 탈퇴 확정
                             </button>
                         </div>
                     </div>
