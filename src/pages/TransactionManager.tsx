@@ -154,8 +154,19 @@ const HistoryView = () => {
         setEditForm(updatedForm);
     };
 
+    const hasChanges = useMemo(() => {
+        if (!originalData || !editForm) return false;
+        return originalData.itemDetail !== editForm.itemDetail ||
+            originalData.qty !== editForm.qty ||
+            originalData.price !== editForm.price ||
+            originalData.date !== editForm.date ||
+            originalData.category !== editForm.category ||
+            originalData.time !== editForm.time;
+    }, [originalData, editForm]);
+
     const initiateSave = () => {
         if (!editingId || !editForm) return;
+        if (!hasChanges) return;
         setShowConfirmModal(true);
     };
 
@@ -475,7 +486,8 @@ const HistoryView = () => {
                         </button>
                         <button
                             onClick={initiateSave}
-                            className="flex items-center gap-2 px-8 py-3 bg-indigo-600 text-white rounded-[18px] shadow-xl shadow-indigo-200 hover:bg-indigo-700 font-black text-sm transition-all hover:scale-105 active:scale-95"
+                            disabled={!hasChanges}
+                            className={`flex items-center gap-2 px-8 py-3 text-white rounded-[18px] shadow-xl font-black text-sm transition-all ${hasChanges ? 'bg-indigo-600 shadow-indigo-200 hover:bg-indigo-700 hover:scale-105 active:scale-95' : 'bg-slate-400 cursor-not-allowed shadow-slate-200'}`}
                         >
                             <Check size={18} /> 변경사항 저장
                         </button>
@@ -493,8 +505,8 @@ const HistoryView = () => {
 
             {/* Confirmation Modal */}
             {showConfirmModal && originalData && editForm && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
-                    <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4" onClick={() => setShowConfirmModal(false)}>
+                    <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden" onClick={(e) => e.stopPropagation()}>
                         <div className="p-6 border-b border-slate-100 flex items-start gap-4 bg-amber-50">
                             <div className="p-3 bg-amber-100 rounded-full flex-shrink-0">
                                 <AlertTriangle className="text-amber-600" size={24} />

@@ -199,6 +199,14 @@ export default function SettingsPage() {
     };
 
     const saveStoreProfile = async () => {
+        if (storeForm.established_year) {
+            const yearNum = parseInt(storeForm.established_year);
+            const currentYear = new Date().getFullYear();
+            if (isNaN(yearNum) || yearNum < 1900 || yearNum > currentYear) {
+                setStoreError(`설립연도는 1900년 ~ ${currentYear}년 사이의 값을 입력해주세요.`);
+                return;
+            }
+        }
         setStoreSaving(true);
         setStoreError('');
         try {
