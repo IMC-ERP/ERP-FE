@@ -83,7 +83,7 @@
 
 
 /* ========== 모달 UI 고도화 ========== */
-.modal-overlay {
+.inventory-modal-overlay {
   position: fixed;
   top: 0;
   left: 0;
@@ -94,23 +94,36 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 20px;
+  box-sizing: border-box;
   z-index: 1000;
-  animation: fadeIn 0.2s ease-out;
+  animation: inventoryFadeIn 0.2s ease-out;
 }
 
-.modal-content {
+.inventory-modal-content {
   background: white;
   border-radius: 24px;
   width: 90%;
   max-width: 500px;
   max-height: 90vh;
-  overflow-y: auto;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-  animation: slideUp 0.3s ease-out;
+  animation: inventoryModalSlideUp 0.3s ease-out;
   border: 1px solid rgba(255, 255, 255, 0.5);
+  transform-origin: center center;
+  will-change: transform, opacity;
 }
 
-.modal-header {
+.inventory-modal-content form {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.inventory-modal-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -118,7 +131,7 @@
   border-bottom: none;
 }
 
-.modal-header h2 {
+.inventory-modal-header h2 {
   font-size: 1.25rem;
   font-weight: 800;
   color: #1e293b;
@@ -128,7 +141,7 @@
   gap: 8px;
 }
 
-.modal-close {
+.inventory-modal-close {
   background: transparent;
   border: none;
   cursor: pointer;
@@ -142,24 +155,47 @@
   transition: all 0.2s;
 }
 
-.modal-close:hover {
+.inventory-modal-close:hover {
   background: #f1f5f9;
   color: #ef4444;
 }
 
-.modal-body {
+.inventory-modal-body {
   padding: 10px 24px 24px 24px;
+  overflow-y: auto;
+  min-height: 0;
+  scrollbar-gutter: stable;
 }
 
-.modal-footer {
+.inventory-modal-body::-webkit-scrollbar {
+  width: 8px;
+}
+
+.inventory-modal-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.inventory-modal-body::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.6);
+  border-radius: 999px;
+}
+
+.inventory-modal-body::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.8);
+}
+
+.inventory-modal-footer {
   display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
   gap: 12px;
   padding: 0 24px 24px 24px;
   border-top: none;
 }
 
-.modal-footer button {
-  flex: 1;
+.inventory-modal-footer button {
+  flex: 0 0 auto;
+  min-width: 150px;
   padding: 14px;
   font-size: 1rem;
   border-radius: 12px;
@@ -248,8 +284,15 @@
   box-shadow: 0 6px 8px -1px rgba(79, 70, 229, 0.3);
 }
 
+.btn-primary:disabled {
+  opacity: 0.7;
+  cursor: wait;
+  transform: none;
+  box-shadow: none;
+}
+
 /* ========== 애니메이션 ========== */
-@keyframes fadeIn {
+@keyframes inventoryFadeIn {
   from {
     opacity: 0;
   }
@@ -259,7 +302,7 @@
   }
 }
 
-@keyframes slideUp {
+@keyframes inventoryModalSlideUp {
   from {
     opacity: 0;
     transform: translateY(20px) scale(0.95);
@@ -421,13 +464,22 @@
   border-radius: 8px;
   padding: 10px;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  border: 1px solid #e2e8f0;
   border-left: 3px solid #22c55e;
   transition: transform 0.2s, box-shadow 0.2s;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
 }
 
 .inventory-card-new:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+.inventory-card-new:focus-visible {
+  outline: 3px solid rgba(79, 70, 229, 0.18);
+  outline-offset: 2px;
 }
 
 .inventory-card-new.warning {
@@ -481,6 +533,324 @@
   font-size: 0.75rem;
   color: #64748b;
   margin: 0;
+}
+
+/* ========== 품목 상세 모달 ========== */
+.detail-modal-content {
+  max-width: 760px;
+}
+
+.detail-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.detail-hero {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 18px 20px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%);
+  border: 1px solid #e2e8f0;
+}
+
+.detail-hero-copy {
+  min-width: 0;
+}
+
+.detail-category-badge {
+  display: inline-flex;
+  margin-bottom: 10px;
+}
+
+.detail-hero-copy h3 {
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 0 0 6px 0;
+}
+
+.detail-hero-copy p {
+  margin: 0;
+  color: #64748b;
+  line-height: 1.5;
+}
+
+.detail-status-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 14px;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.detail-status-pill.good {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.detail-status-pill.warning {
+  background: #ffedd5;
+  color: #c2410c;
+}
+
+.detail-status-pill.danger {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.detail-inline-message {
+  padding: 12px 14px;
+  border-radius: 12px;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.detail-inline-message.error {
+  background: #fee2e2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+}
+
+.detail-inline-message.success {
+  background: #dcfce7;
+  color: #166534;
+  border: 1px solid #86efac;
+}
+
+.detail-form-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.detail-form-header {
+  border: 1px solid #e2e8f0;
+  border-radius: 18px;
+  background: #f8fafc;
+}
+
+.detail-form-mode {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: fit-content;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.detail-form-mode.readonly {
+  background: #e2e8f0;
+  color: #475569;
+}
+
+.detail-form-mode.edit {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.detail-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.detail-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.detail-form-group-full {
+  grid-column: 1 / -1;
+}
+
+.detail-form-group label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #64748b;
+}
+
+.detail-form-input {
+  width: 100%;
+  padding: 13px 14px;
+  border-radius: 12px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #0f172a;
+  font-size: 0.95rem;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+}
+
+.detail-form-input:focus {
+  outline: none;
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
+}
+
+.detail-form-input:disabled {
+  background: #f8fafc;
+  color: #64748b;
+  border-color: #e2e8f0;
+  cursor: not-allowed;
+}
+
+.detail-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.detail-stat-card {
+  padding: 18px;
+  border-radius: 16px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.detail-stat-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #64748b;
+  letter-spacing: 0.02em;
+}
+
+.detail-stat-card strong {
+  font-size: 1.12rem;
+  color: #0f172a;
+  line-height: 1.35;
+}
+
+.detail-stat-card p {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.88rem;
+}
+
+.detail-history-section {
+  border: 1px solid #e2e8f0;
+  border-radius: 18px;
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.detail-section-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 20px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+.detail-section-header h4 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.detail-section-header p {
+  margin: 4px 0 0 0;
+  font-size: 0.84rem;
+  color: #64748b;
+}
+
+.detail-history-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: fit-content;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #e0e7ff;
+  color: #3730a3;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.detail-history-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.detail-history-item {
+  padding: 16px 20px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.detail-history-item:last-child {
+  border-bottom: none;
+}
+
+.detail-history-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+  color: #475569;
+  font-size: 0.88rem;
+}
+
+.detail-history-meta strong {
+  color: #0f172a;
+}
+
+.detail-history-values {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  font-size: 0.88rem;
+  color: #475569;
+}
+
+.detail-history-values strong {
+  color: #0f172a;
+}
+
+.detail-empty-state {
+  padding: 32px 20px;
+  text-align: center;
+  color: #64748b;
+}
+
+.detail-empty-state p {
+  margin: 0;
+}
+
+.detail-modal-footer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+}
+
+.detail-modal-actions {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.detail-modal-actions .btn {
+  flex: 0 0 auto;
+  min-width: 140px;
+  justify-content: center;
+  text-align: center;
 }
 
 /* ========== 게이지바 ========== */
@@ -804,7 +1174,7 @@
 .intake-table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 900px;
+  min-width: 980px;
 }
 
 .intake-table thead {
@@ -866,6 +1236,10 @@
   background: #f1f5f9;
   cursor: not-allowed;
   color: #94a3b8;
+}
+
+.table-select-uom {
+  min-width: 88px;
 }
 
 /* 총액 셀 */
@@ -1214,6 +1588,24 @@
   .btn-submit-intake {
     width: 100%;
     justify-content: center;
+  }
+
+  .detail-hero,
+  .detail-section-header,
+  .detail-history-meta {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .detail-summary-grid,
+  .detail-form-grid,
+  .detail-history-values {
+    grid-template-columns: 1fr;
+  }
+
+  .detail-modal-content {
+    width: calc(100% - 20px);
+    max-height: calc(100vh - 20px);
   }
 
   .btn,
@@ -1746,7 +2138,7 @@
 html[data-theme="dark"] .inventory-page-new,
 html[data-theme="dark"] .receiving-tab,
 html[data-theme="dark"] .option-card,
-html[data-theme="dark"] .modal-content,
+html[data-theme="dark"] .inventory-modal-content,
 html[data-theme="dark"] .drag-drop-zone,
 html[data-theme="dark"] .upload-header,
 html[data-theme="dark"] .intake-table,
@@ -1760,7 +2152,7 @@ html[data-theme="dark"] .btn-secondary {
 
 html[data-theme="dark"] .inventory-page-new,
 html[data-theme="dark"] .option-card,
-html[data-theme="dark"] .modal-content,
+html[data-theme="dark"] .inventory-modal-content,
 html[data-theme="dark"] .drag-drop-zone,
 html[data-theme="dark"] .upload-header,
 html[data-theme="dark"] .intake-table,

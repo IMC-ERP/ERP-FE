@@ -5,30 +5,15 @@
  */
 
 import axios from 'axios';
-import { supabase } from '../supabase';
+import type { AxiosRequestConfig, AxiosResponse } from 'axios';
 import axiosRetry from 'axios-retry';
-import type {
-  InventoryItem,
-  StoreProfile,
-  OCRSalesResponse,
-  StockIntake,
-  RecipeCost,
-  SaleItem,
-  ManualSaleRequest,
-  ManualSaleResponse
-} from '../types';
+import { supabase } from '../supabase';
 
 // 개발 환경에서는 localhost, 프로덕션에서는 Cloud Run 백엔드 사용
 const API_BASE_URL = import.meta.env.VITE_API_URL
   || (import.meta.env.DEV
     ? 'http://localhost:8000/api'
     : 'https://coffee-erp-backend-427178764915.asia-northeast3.run.app/api');
-
-let currentToken: string | null = null;
-
-export const setAuthToken = (token: string | null) => {
-  currentToken = token;
-};
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -38,23 +23,69 @@ const api = axios.create({
   timeout: 30000, // 30초 타임아웃 (Cloud Run Cold Start 대응)
 });
 
-// 지수 백오프 재시도 설정 제거 (디버깅 목적)
-// axiosRetry(api, {
-//  retries: 3,
-//  retryDelay: axiosRetry.exponentialDelay,
-//  retryCondition: (error) => {
-//    return axiosRetry.isNetworkOrIdempotentRequestError(error) ||
-//      error.response?.status === 503;
-//  },
-//  onRetry: (_retryCount, _error) => {
-//    // retry silently
-//  }
-// });
+let cachedAccessToken: string | null = null;
+
+// AuthContext 호환용: setAuthToken 호출 시 cachedAccessToken도 갱신
+export const setAuthToken = (token: string | null) => {
+  cachedAccessToken = token;
+};
+let accessTokenPromise: Promise<string | null> | null = null;
+const inflightGetRequests = new Map<string, Promise<AxiosResponse<any>>>();
+
+const getRequestKey = (url: string, config?: AxiosRequestConfig) => {
+  const params = config?.params ? JSON.stringify(config.params) : '';
+  return `${url}?${params}`;
+};
+
+const dedupeGet = <T>(url: string, config?: AxiosRequestConfig) => {
+  const key = getRequestKey(url, config);
+  const existing = inflightGetRequests.get(key);
+  if (existing) {
+    return existing as Promise<AxiosResponse<T>>;
+  }
+
+  const request = api.get<T>(url, config).finally(() => {
+    inflightGetRequests.delete(key);
+  });
+  inflightGetRequests.set(key, request);
+  return request;
+};
+
+const resolveAccessToken = async (): Promise<string | null> => {
+  if (cachedAccessToken) {
+    return cachedAccessToken;
+  }
+  if (!accessTokenPromise) {
+    accessTokenPromise = supabase.auth.getSession()
+      .then(({ data: { session } }) => {
+        cachedAccessToken = session?.access_token ?? null;
+        return cachedAccessToken;
+      })
+      .finally(() => {
+        accessTokenPromise = null;
+      });
+  }
+  return accessTokenPromise;
+};
+
+// 지수 백오프 재시도 설정 (네트워크 오류 및 503 에러 대응)
+axiosRetry(api, {
+  retries: 3,
+  retryDelay: axiosRetry.exponentialDelay,
+  retryCondition: (error) => {
+    return axiosRetry.isNetworkOrIdempotentRequestError(error) ||
+      error.response?.status === 503;
+  },
+  onRetry: (_retryCount, _error) => {
+    // retry silently
+  }
+});
 
 // Supabase JWT 자동 첨부 인터셉터
-api.interceptors.request.use((config) => {
-  if (currentToken) {
-    config.headers.Authorization = `Bearer ${currentToken}`;
+api.interceptors.request.use(async (config) => {
+  const accessToken = await resolveAccessToken();
+  if (accessToken) {
+    config.headers.Authorization = `Bearer ${accessToken}`;
   }
   return config;
 }, (error) => {
@@ -65,23 +96,23 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
-    console.error('[Axios Response Error]', error.message, error.config?.url);
     const originalRequest = error.config;
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
-      try {
-        const { data: { session } } = await supabase.auth.refreshSession();
-        if (session?.access_token) {
-          originalRequest.headers.Authorization = `Bearer ${session.access_token}`;
-          return api(originalRequest);
-        }
-      } catch (e) {
-        console.error('[Refresh Session Error]', e);
+      const { data: { session } } = await supabase.auth.refreshSession();
+      if (session?.access_token) {
+        cachedAccessToken = session.access_token;
+        originalRequest.headers.Authorization = `Bearer ${session.access_token}`;
+        return api(originalRequest);
       }
     }
     return Promise.reject(error);
   }
 );
+
+supabase.auth.onAuthStateChange((_event, session) => {
+  cachedAccessToken = session?.access_token ?? null;
+});
 
 // ==================== Types ====================
 
@@ -97,9 +128,41 @@ export interface Sale {
   시간?: string;
 }
 
-// InventoryItem is now imported from types.ts
+export interface InventoryItem {
+  id: string;
+  category: string;
+  max_stock_level: number;
+  quantity_on_hand: number;
+  safety_stock: number;
+  needs_reorder: boolean;
+  unit_cost: number;
+  uom: string;
+  purchase_price?: number;
+  purchase_unit_qty?: number;
+}
 
-// StockIntake is now imported from types.ts
+export interface InventoryUpdatePayload extends Partial<InventoryItem> {
+  id?: string;
+}
+
+export interface InventoryUsageImpact {
+  item_id: string;
+  can_delete: boolean;
+  recipe_names: string[];
+  intermediate_recipe_names: string[];
+  stock_intake_count: number;
+  message?: string;
+}
+
+export interface StockIntake {
+  category: string;
+  name: string;
+  price_per_unit: number;
+  quantity: number;
+  total_amount: number;
+  volume: number;
+  uom?: string;
+}
 
 
 export interface OCRReceiptData {
@@ -119,6 +182,15 @@ export interface OCRResponse {
   error: string | null;
 }
 
+type OCRBackendItem = OCRReceiptData;
+
+const normalizeOCRResponse = (items: OCRBackendItem[] | OCRBackendItem): OCRResponse => ({
+  success: true,
+  items: Array.isArray(items) ? items : [items],
+  warnings: [],
+  error: null,
+});
+
 export interface DashboardSummary {
   total_revenue: number;
   total_sales_count: number;
@@ -130,21 +202,29 @@ export interface DashboardSummary {
 
 export const ocrApi = {
   // 단일 영수증 이미지 OCR
-  analyzeSingleReceipt: (file: File) => {
+  analyzeSingleReceipt: async (file: File) => {
     const formData = new FormData();
     formData.append('file', file);
-    return api.post<OCRResponse>('/ocr/receipt', formData, {
+    const response = await api.post<OCRBackendItem>('/ocr/receipt', formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     });
+    return {
+      ...response,
+      data: normalizeOCRResponse(response.data),
+    };
   },
 
-  // 다중 영수증: 파일별로 단일 OCR 엔드포인트 호출
-  analyzeMultipleReceipts: (file: File) => {
+  // 다중 품목 영수증: 한 이미지 안의 여러 품목을 추출
+  analyzeMultipleReceipts: async (file: File) => {
     const formData = new FormData();
     formData.append('file', file);
-    return api.post<OCRResponse>('/ocr/receipt', formData, {
+    const response = await api.post<OCRBackendItem[]>('/ocr/receipt/multiple', formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     });
+    return {
+      ...response,
+      data: normalizeOCRResponse(response.data),
+    };
   }
 };
 
@@ -164,7 +244,7 @@ export interface SalesByProduct {
 // ==================== Sales API ====================
 
 export const salesApi = {
-  getAll: () => api.get<Sale[]>('/sales'),
+  getAll: () => dedupeGet<Sale[]>('/sales'),
   create: (sale: Omit<Sale, 'id' | '수익'>) => api.post('/sales', sale),
   delete: (id: string) => api.delete(`/sales/${id}`),
 };
@@ -172,31 +252,127 @@ export const salesApi = {
 // ==================== Inventory API ====================
 
 export const inventoryApi = {
-  getAll: () => api.get<InventoryItem[]>('/inventory'),
+  getAll: () => dedupeGet<InventoryItem[]>('/inventory'),
   getById: (id: string) => api.get<InventoryItem>(`/inventory/${id}`),
+  getUsageImpact: (id: string) => api.get<InventoryUsageImpact>(`/inventory/${id}/usage`),
   create: (data: Omit<InventoryItem, 'id'> & { id: string }) => api.post('/inventory', data),
-  update: (id: string, data: Partial<InventoryItem>) => api.put(`/inventory/${id}`, data),
+  update: (id: string, data: InventoryUpdatePayload) => api.put(`/inventory/${id}`, data),
+  delete: (id: string) => api.delete(`/inventory/${id}`),
 };
 
 // ==================== Stock Intake API ====================
 
 export interface StockIntakeRecord extends StockIntake {
+  id: string;
   timestamp: string; // 문서 ID (타임스탬프)
 }
 
 export const stockIntakeApi = {
-  getAll: (limit: number = 100) => api.get<StockIntakeRecord[]>('/stock-intakes', { params: { limit } }),
+  getAll: (limit: number = 100) => dedupeGet<StockIntakeRecord[]>('/stock-intakes', { params: { limit } }),
   create: (data: StockIntake) => api.post('/stock-intake', data),
-  delete: (timestamp: string) => api.delete(`/stock-intake/${timestamp}`),
+  delete: (recordId: string) => api.delete(`/stock-intake/${recordId}`),
 };
 
-// 레시피 원가 관련 타입들은 types.ts에서 임포트합니다.
+// ==================== Intermediate Product API ====================
+
+export interface IntermediateRecipeIngredient {
+  ingredient_id: string;
+  ingredient_name: string;
+  usage_amount: number;
+  ingredient_uom: string;
+}
+
+export interface IntermediateRecipe {
+  id: number;
+  output_item_id: string;
+  output_item_name: string;
+  output_quantity: number;
+  output_uom: string;
+  note: string;
+  created_at: string;
+  updated_at: string;
+  ingredients: IntermediateRecipeIngredient[];
+}
+
+export interface IntermediateRecipeCreatePayload {
+  output_item_id: string;
+  output_uom: string;
+  output_quantity: number;
+  note?: string;
+  ingredients: Array<{
+    ingredient_id: string;
+    usage_amount: number;
+  }>;
+}
+
+export interface IntermediateProductionDetail {
+  type: 'ingredient' | 'output';
+  item_id: string;
+  item_name: string;
+  before: number;
+  after: number;
+  uom: string;
+  required_amount?: number;
+  produced_amount?: number;
+  unit_cost?: number;
+  unit_cost_before?: number;
+  unit_cost_after?: number;
+  consumed_total_cost?: number;
+  transferred_total_cost?: number;
+}
+
+export interface IntermediateProductionLog {
+  id: number;
+  recipe_id: number;
+  output_item_id: string;
+  output_item_name: string;
+  batch_count: number;
+  output_amount: number;
+  output_uom: string;
+  note: string;
+  details: IntermediateProductionDetail[];
+  created_at: string;
+}
+
+export interface IntermediateProductionCreatePayload {
+  recipe_id: number;
+  batch_count: number;
+  note?: string;
+}
+
+export const intermediateApi = {
+  getRecipes: () => dedupeGet<IntermediateRecipe[]>('/intermediate-recipes'),
+  createRecipe: (data: IntermediateRecipeCreatePayload) => api.post<IntermediateRecipe>('/intermediate-recipes', data),
+  updateRecipe: (recipeId: number, data: IntermediateRecipeCreatePayload) => api.put<IntermediateRecipe>(`/intermediate-recipes/${recipeId}`, data),
+  getProductionLogs: (limit: number = 20) => dedupeGet<IntermediateProductionLog[]>('/intermediate-productions', { params: { limit } }),
+  createProduction: (data: IntermediateProductionCreatePayload) => api.post<IntermediateProductionLog>('/intermediate-productions', data),
+  deleteProduction: (logId: number) => api.delete(`/intermediate-productions/${logId}`),
+};
+
+// ==================== 레시피 원가 타입 ====================
+export interface Ingredient {
+  name: string;
+  cost_per_unit: number;
+  usage: number;
+  cost: number;
+}
+
+export interface RecipeCost {
+  menu_name: string;
+  category: string;
+  selling_price: number;
+  total_cost: number;
+  cost_ratio: number;
+  status: 'safe' | 'needs_check' | 'danger';
+  ingredients: Ingredient[];
+}
 
 // ==================== 레시피 원가 API ====================
 export const recipeCostApi = {
-  getAll: () => api.get<RecipeCost[]>('/recipe-costs'),
+  getAll: () => dedupeGet<RecipeCost[]>('/recipe-costs'),
   getByName: (menuName: string) => api.get<RecipeCost>(`/recipe-costs/${encodeURIComponent(menuName)}`),
-  create: (data: Omit<RecipeCost, 'totalCost' | 'marginRate' | 'status'>) => api.post('/recipe-costs', data),
+  create: (data: Omit<RecipeCost, 'total_cost' | 'cost_ratio' | 'status'>) => api.post('/recipe-costs', data),
+  update: (menuName: string, data: Omit<RecipeCost, 'total_cost' | 'cost_ratio' | 'status'>) => api.put(`/recipe-costs/${encodeURIComponent(menuName)}`, data),
   delete: (menuName: string) => api.delete(`/recipe-costs/${encodeURIComponent(menuName)}`),
 };
 
@@ -215,127 +391,6 @@ export const dashboardApi = {
     sales_by_date: SalesByDate[];
     sales_by_product: SalesByProduct[];
   }>('/dashboard/all'),
-};
-// ==================== Analytics API ====================
-
-export interface WeekdaySales { weekday: string; weekdayEn: string; sales: number; }
-export interface HourlySales { hour: string; sales: number; }
-export interface MenuTreemapItem { name: string; category: string; qty: number; revenue: number; cost: number; percentage: number; }
-export interface CategorySales { category: string; revenue: number; percentage: number; }
-export interface DailySalesItem { date: string; sales: number; }
-
-export interface SalesAnalyticsResponse {
-  totalRevenue: number;
-  previousTotalRevenue: number;
-  changeRate: number;
-  openHour: number;
-  closeHour: number;
-  dailySales: DailySalesItem[];
-  salesByWeekday: WeekdaySales[];
-  salesByHour: HourlySales[];
-  menuTreemap: MenuTreemapItem[];
-  menuTop5: MenuTreemapItem[];
-  salesByCategory: CategorySales[];
-}
-
-export interface ComparisonMetric { periodA: number; periodB: number; variance: number; diff: number; }
-export interface ComparisonSummary { revenue: ComparisonMetric; orderCount: ComparisonMetric; aov: ComparisonMetric; }
-export interface CompareCategoryShare { category: string; periodA: number; periodB: number; variance: number; }
-export interface RankingItem { rank: number; name: string; qty: number; revenue: number; status?: 'up' | 'down' | 'new' | 'unchanged' | '-'; rankChange?: number; }
-export interface CompareRankings { periodA: RankingItem[]; periodB: RankingItem[]; }
-export interface SalesComparisonResponse {
-  summary: ComparisonSummary;
-  categoryShare: CompareCategoryShare[];
-  rankings: CompareRankings;
-}
-
-export const analyticsApi = {
-  getSales: (startDate: string, endDate: string) =>
-    api.get<SalesAnalyticsResponse>('/analytics/sales', { params: { start_date: startDate, end_date: endDate } }),
-
-  getAvailableDates: () =>
-    api.get<{ min_date: string; max_date: string }>('/analytics/available-dates'),
-
-  getCompareSales: (period_a_start: string, period_a_end: string, period_b_start: string, period_b_end: string, category?: string) =>
-    api.get<SalesComparisonResponse>('/analytics/compare', { params: { period_a_start, period_a_end, period_b_start, period_b_end, category } }),
-};
-
-// ==================== Profit Dashboard API ====================
-
-export interface ProfitDashboardSummary {
-  accumulated_sales: number;
-  accumulated_cogs: number;
-  accumulated_gross_profit: number;
-}
-
-export interface ProfitDashboardExpenses {
-  total_expenses: number;
-  fixed_expenses: number;
-  variable_expenses: number;
-}
-
-export interface ProfitDailyStats {
-  date: string;
-  sales: number;
-  cogs: number;
-  gross_profit: number;
-}
-
-export interface ProfitDashboardResponse {
-  period: { start_date: string; end_date: string };
-  summary: ProfitDashboardSummary;
-  monthly_expenses: ProfitDashboardExpenses;
-  daily_stats: ProfitDailyStats[];
-}
-
-export const profitDashboardApi = {
-  get: (yearMonth: string) => api.get<ProfitDashboardResponse>(`/dashboard/profit/${yearMonth}`),
-};
-
-// ==================== Home API ====================
-
-export interface HomeSummary {
-  todaySales: number;
-  salesTrend: number;
-  todayProfit: number;
-  profitTrend: number;
-  todayOrders: number;
-  orderTrend: number;
-}
-
-export interface HomeHourlyData {
-  hour: string;
-  amount: number;
-}
-
-export interface HomeStockWarning {
-  id: string;
-  name: string;
-  current: number;
-  safety: number;
-  unit: string;
-}
-
-export interface HomeMarginWarning {
-  id: string;
-  name: string;
-  margin: number;
-  price: number;
-}
-
-export interface HomeDataResponse {
-  summary: HomeSummary;
-  hourlySales: HomeHourlyData[];
-  topMenus: any[];
-  stockWarnings: HomeStockWarning[];
-  marginWarnings: HomeMarginWarning[];
-  openHour: number;
-  closeHour: number;
-  updatedAt: string;
-}
-
-export const homeApi = {
-  get: () => api.get<HomeDataResponse>('/home'),
 };
 
 // ==================== Recipes API ====================
@@ -424,9 +479,45 @@ export const stockMovesApi = {
 
 // ==================== Daily Sales API ====================
 
-// DailySalesMenuItem, DailySales, OCRSalesResponse are now imported from types.ts
+export interface DailySalesMenuItem {
+  menu: string;
+  quantity: number;
+  sales_amount?: number;
+  matched?: boolean;
+  original_name?: string | null;
+}
+
+export interface DailySales {
+  date: string;
+  sales_by_menu: DailySalesMenuItem[];
+  total_amount: number;
+}
+
+export interface OCRSalesResponse {
+  success: boolean;
+  date: string;
+  sales_by_menu: DailySalesMenuItem[];
+  warnings: string[];
+  error: string | null;
+}
 
 export const dailySalesApi = {
+  create: (data: { date: string; sales_by_menu: DailySalesMenuItem[] }) =>
+    api.post<DailySales>('/daily-sales', data),
+
+  getAll: () => dedupeGet<DailySales[]>('/daily-sales'),
+
+  getByDate: (date: string) => api.get<DailySales>(`/daily-sales/${date}`),
+
+  addMenu: (date: string, menu: DailySalesMenuItem) =>
+    api.post<DailySales>(`/daily-sales/${date}/menu`, menu),
+
+  deleteMenu: (date: string, menuName: string) =>
+    api.delete<DailySales>(`/daily-sales/${date}/menu/${encodeURIComponent(menuName)}`),
+
+  deleteDate: (date: string) =>
+    api.delete(`/daily-sales/${date}`),
+
   ocr: (files: FileList | File[]) => {
     const formData = new FormData();
     if (files instanceof FileList) {
@@ -444,22 +535,14 @@ export const dailySalesApi = {
   }
 };
 
-// ==================== Manual Sales API ====================
-
-export const manualSalesApi = {
-  create: (data: ManualSaleRequest) =>
-    api.post<ManualSaleResponse>('/sales/manual', data),
-};
-
 // ==================== User API ====================
 
 export interface UserRegistration {
   email: string;
   store_name: string;
-  name: string;
+  owner_name: string;
   phone?: string;
   address?: string;
-  established_year?: number;
 }
 
 export interface UserProfile {
@@ -467,12 +550,25 @@ export interface UserProfile {
   email: string;
   store_id: string;
   store_name: string;
-  name: string;
+  owner_name: string;
   phone?: string;
   address?: string;
-  role?: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface UserProfileUpdate {
+  store_name?: string;
+  owner_name?: string;
+  phone?: string;
+  address?: string;
+}
+
+export interface RegistrationStatus {
+  is_registered: boolean;
+  email: string;
+  uid: string;
+  profile: UserProfile | null;
 }
 
 export interface MemberResponse {
@@ -484,24 +580,19 @@ export interface MemberResponse {
   created_at?: string;
 }
 
-export interface UserProfileUpdate {
-  store_name?: string;
-  name?: string;
-  phone?: string;
-}
-
-export interface RegistrationStatus {
-  is_registered: boolean;
-  email: string;
+export interface StoreMemberData {
   uid: string;
-  profile: UserProfile | null;
+  name: string;
+  role: string;
+  phone?: string;
+  email: string;
 }
 
 export const userApi = {
   register: (data: UserRegistration) => api.post<UserProfile>('/users/register', data),
   getProfile: () => api.get<UserProfile>('/users/profile'),
   updateProfile: (data: UserProfileUpdate) => api.put<UserProfile>('/users/profile', data),
-  checkRegistration: () => api.get<RegistrationStatus>('/users/check-registration'),
+  checkRegistration: () => dedupeGet<RegistrationStatus>('/users/check-registration'),
   getStoreProfile: () => api.get<StoreProfileData>('/users/store-profile'),
   updateStoreProfile: (data: StoreProfileUpdateData) => api.put<StoreProfileData>('/users/store-profile', data),
   getStoreMembers: () => api.get<StoreMemberData[]>('/users/store-members'),
@@ -515,6 +606,57 @@ export const userApi = {
     api.get<{ code: string; used_by: string | null; created_at: string; status: string }[]>('/users/invitations'),
   expireInvitation: (code: string) =>
     api.put<{ success: boolean; code: string }>(`/users/invitations/${code}/expire`),
+};
+
+// ==================== Auth API ====================
+
+export const authApi = {
+  verifyPasscode: (passcode: string) => api.post<{ valid: boolean }>('/auth/verify-passcode', { passcode }),
+};
+
+// ==================== Home API ====================
+
+export interface HomeSummary {
+  todayRevenue: number;
+  todayOrders: number;
+  todayProfit: number;
+  previousRevenue: number;
+  previousOrders: number;
+  previousProfit: number;
+}
+
+export interface HomeHourlyData {
+  hour: number;
+  revenue: number;
+}
+
+export interface HomeStockWarning {
+  name: string;
+  currentStock: number;
+  safetyStock: number;
+  unit: string;
+}
+
+export interface HomeMarginWarning {
+  name: string;
+  marginRate: number;
+  sellingPrice: number;
+  costPrice: number;
+}
+
+export interface HomeDataResponse {
+  summary: HomeSummary;
+  hourlySales: HomeHourlyData[];
+  topMenus: any[];
+  stockWarnings: HomeStockWarning[];
+  marginWarnings: HomeMarginWarning[];
+  openHour: number;
+  closeHour: number;
+  updatedAt: string;
+}
+
+export const homeApi = {
+  get: () => api.get<HomeDataResponse>('/home'),
 };
 
 // ==================== Expenses API ====================
@@ -553,15 +695,7 @@ export const expensesApi = {
     api.delete(`/v1/expenses/${storeId}/${yearMonth}/items/${itemId}`),
 };
 
-// ==================== Store Profile API (YJ_1 Style) ====================
-export const storeProfileApi = {
-  get: () => api.get<StoreProfileData>('/store-profile'),
-  update: (data: Partial<StoreProfileUpdateData>) => api.put<StoreProfileData>('/store-profile', data),
-  getMembers: () => api.get<StoreMemberData[]>('/store-profile/members'),
-  removeMember: (userId: string) => api.delete<{ status: string; message: string }>(`/store-profile/members/${userId}`),
-};
-
-// ==================== TOSS 가맹점 API ====================
+// ==================== TOSS API ====================
 
 export interface TossMerchantSetup {
   merchant_id: string;
@@ -571,7 +705,102 @@ export const tossApi = {
   setup: (data: TossMerchantSetup) => api.post('/toss/setup', data),
 };
 
-// ==================== 매장 운영시간 API ====================
+// ==================== Invitations API ====================
+
+export interface InvitationResponse {
+  code: string;
+  store_id: string;
+  role: string;
+  expires_at: string;
+  status: string;
+}
+
+export interface InvitationConsumeResponse {
+  store_id: string;
+  role: string;
+  message: string;
+}
+
+export const invitationApi = {
+  create: () => api.post<InvitationResponse>('/invitations'),
+  consume: (code: string) => api.post<InvitationConsumeResponse>('/invitations/consume', { code }),
+};
+
+// ==================== Analytics Types ====================
+
+export interface WeekdaySales { weekday: string; weekdayEn: string; sales: number; }
+export interface HourlySales { hour: string; sales: number; }
+export interface MenuTreemapItem { name: string; category: string; qty: number; revenue: number; cost: number; percentage: number; }
+export interface CategorySales { category: string; revenue: number; percentage: number; }
+export interface DailySalesItem { date: string; sales: number; }
+
+export interface SalesAnalyticsResponse {
+  totalRevenue: number;
+  previousTotalRevenue: number;
+  changeRate: number;
+  openHour: number;
+  closeHour: number;
+  dailySales: DailySalesItem[];
+  salesByWeekday: WeekdaySales[];
+  salesByHour: HourlySales[];
+  menuTreemap: MenuTreemapItem[];
+  menuTop5: MenuTreemapItem[];
+  salesByCategory: CategorySales[];
+}
+
+export interface ComparisonMetric { periodA: number; periodB: number; variance: number; diff: number; }
+export interface ComparisonSummary { revenue: ComparisonMetric; orderCount: ComparisonMetric; aov: ComparisonMetric; }
+export interface CompareCategoryShare { category: string; periodA: number; periodB: number; variance: number; }
+export interface RankingItem { rank: number; name: string; qty: number; revenue: number; status?: 'up' | 'down' | 'new' | 'unchanged' | '-'; rankChange?: number; }
+export interface CompareRankings { periodA: RankingItem[]; periodB: RankingItem[]; }
+export interface SalesComparisonResponse {
+  summary: ComparisonSummary;
+  categoryShare: CompareCategoryShare[];
+  rankings: CompareRankings;
+}
+
+export const analyticsApi = {
+  getSales: (startDate: string, endDate: string) =>
+    api.get<SalesAnalyticsResponse>('/analytics/sales', { params: { start_date: startDate, end_date: endDate } }),
+  getAvailableDates: () =>
+    api.get<{ min_date: string; max_date: string }>('/analytics/available-dates'),
+  getCompareSales: (period_a_start: string, period_a_end: string, period_b_start: string, period_b_end: string, category?: string) =>
+    api.get<SalesComparisonResponse>('/analytics/compare', { params: { period_a_start, period_a_end, period_b_start, period_b_end, category } }),
+};
+
+// ==================== Profit Dashboard API ====================
+
+export interface ProfitDashboardSummary {
+  accumulated_sales: number;
+  accumulated_cogs: number;
+  accumulated_gross_profit: number;
+}
+
+export interface ProfitDashboardExpenses {
+  total_expenses: number;
+  fixed_expenses: number;
+  variable_expenses: number;
+}
+
+export interface ProfitDailyStats {
+  date: string;
+  sales: number;
+  cogs: number;
+  gross_profit: number;
+}
+
+export interface ProfitDashboardResponse {
+  period: { start_date: string; end_date: string };
+  summary: ProfitDashboardSummary;
+  monthly_expenses: ProfitDashboardExpenses;
+  daily_stats: ProfitDailyStats[];
+}
+
+export const profitDashboardApi = {
+  get: (yearMonth: string) => api.get<ProfitDashboardResponse>(`/dashboard/profit/${yearMonth}`),
+};
+
+// ==================== Store Hours API ====================
 
 export interface StoreHoursData {
   [day: string]: { open: string; close: string };
@@ -605,42 +834,19 @@ export interface StoreProfileUpdateData {
   established_year?: number;
 }
 
-export interface StoreMemberData {
-  uid: string;
-  name: string;
-  role: string;
-  phone?: string;
-  email: string;
-}
-
-// ==================== Auth API ====================
-
-export const authApi = {
-  verifyPasscode: (passcode: string) => api.post<{ valid: boolean }>('/auth/verify-passcode', { passcode }),
+export const storeProfileApi = {
+  get: () => api.get<StoreProfileData>('/toss/profile'),
+  update: (data: StoreProfileUpdateData) => api.put<StoreProfileData>('/toss/profile', data),
 };
 
-// ==================== Invitations API ====================
+// ==================== Manual Sales API ====================
 
-export interface InvitationResponse {
-  code: string;
-  store_id: string;
-  role: string;
-  expires_at: string;
-  status: string;
-}
-
-export interface InvitationConsumeResponse {
-  store_id: string;
-  role: string;
-  message: string;
-}
-
-export const invitationApi = {
-  create: () => api.post<InvitationResponse>('/invitations'),
-  consume: (code: string) => api.post<InvitationConsumeResponse>('/invitations/consume', { code }),
+export const manualSalesApi = {
+  create: (data: any) => api.post('/sales/manual', data),
 };
 
 // ==================== Transactions API ====================
+
 export const transactionsApi = {
   getAll: (params: {
     start_date?: string;
@@ -650,7 +856,7 @@ export const transactionsApi = {
     category?: string;
     menu_name?: string;
     order_state?: string;
-  }) => api.get<SaleItem[]>('/transactions', { params }),
+  }) => api.get('/transactions', { params }),
 };
 
 export default api;

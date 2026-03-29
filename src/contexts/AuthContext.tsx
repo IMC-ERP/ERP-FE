@@ -42,16 +42,18 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     const [needsRegistration, setNeedsRegistration] = useState(false);
 
     // 사용자 프로필 로드
-    const loadUserProfile = async () => {
+    const loadUserProfile = async (): Promise<'registered' | 'unregistered' | 'signed_out' | 'error'> => {
         try {
             const response = await userApi.checkRegistration();
 
             if (response.data.is_registered && response.data.profile) {
                 setUserProfile(response.data.profile);
                 setNeedsRegistration(false);
+                return 'registered';
             } else {
                 setNeedsRegistration(true);
                 setUserProfile(null);
+                return 'unregistered';
             }
         } catch (error: any) {
             console.error('[AUTH] Failed to check registration:', error);
@@ -66,11 +68,12 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
                 setAuthToken(null);
                 setUserProfile(null);
                 setNeedsRegistration(false);
-                return;
+                return 'signed_out';
             }
 
-            setNeedsRegistration(true);
-            setUserProfile(null);
+            console.warn('[AUTH] Registration check failed; preserving current access state');
+            setNeedsRegistration(false);
+            return 'error';
         }
     };
 
@@ -137,7 +140,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
                 setAuthToken(refreshed.access_token || null);
                 setUser(refreshed.user);
                 // 프로필은 비동기로 로드 (loading 블로킹 안 함)
-                loadUserProfile();
+                await loadUserProfile();
             } else {
                 setSession(null);
                 setAuthToken(null);
@@ -152,14 +155,17 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
         // 상태 변화 리스너
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
-            async (_event, currentSession) => {
+            async (event, currentSession) => {
                 setSession(currentSession);
                 setAuthToken(currentSession?.access_token || null);
                 setUser(currentSession?.user ?? null);
 
-                if (currentSession?.user) {
+                const shouldRefreshProfile = currentSession?.user
+                    && ['INITIAL_SESSION', 'SIGNED_IN', 'USER_UPDATED'].includes(event);
+
+                if (shouldRefreshProfile) {
                     // 프로필은 비동기로 로드 (loading 블로킹 안 함)
-                    loadUserProfile();
+                    await loadUserProfile();
                 } else {
                     setUserProfile(null);
                     setNeedsRegistration(false);
