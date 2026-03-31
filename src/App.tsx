@@ -3,11 +3,13 @@
  * GCP-ERP 스타일 적용 + Google 로그인 + 멀티유저 대응
  */
 
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { DataProvider } from './contexts/DataContext';
 import { AuthProvider } from './contexts/AuthContext';
 import Layout from './components/Layout/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
+import OnboardingGuard from './components/OnboardingGuard';
+import OnboardingLayout from './pages/onboarding/OnboardingLayout';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import Dashboard from './pages/Dashboard';
@@ -52,12 +54,22 @@ function App() {
               </ProtectedRoute>
             } />
 
-            {/* 보호된 라우트들 */}
+            {/* 초대 페이지 */}
             <Route path="/invite" element={<InvitePage />} />
 
+            {/* 온보딩 (회원가입 후 초기 설정) */}
+            <Route path="/onboarding" element={
+              <ProtectedRoute>
+                <OnboardingLayout />
+              </ProtectedRoute>
+            } />
+
+            {/* 메인 앱 (온보딩 미완료 시 자동 리다이렉트) */}
             <Route path="/" element={
               <ProtectedRoute>
-                <Layout />
+                <OnboardingGuard>
+                  <Layout />
+                </OnboardingGuard>
               </ProtectedRoute>
             }>
               <Route index element={<Home />} />
@@ -72,6 +84,9 @@ function App() {
               <Route path="settings" element={<SettingsPage />} />
               <Route path="ai" element={<AIAssistant />} />
             </Route>
+
+            {/* 404 → 로그인으로 */}
+            <Route path="*" element={<Navigate to="/login" replace />} />
           </Routes>
         </BrowserRouter>
       </DataProvider>
