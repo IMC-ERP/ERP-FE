@@ -61,7 +61,7 @@ export default function RegisterPage() {
             await userApi.register({
                 email: user.email,
                 store_name: formData.storeName,
-                name: formData.ownerName,
+                owner_name: formData.ownerName,
                 phone: formData.phone,
                 address: formData.address,
                 established_year: formData.establishedYear ? parseInt(formData.establishedYear) : undefined,
@@ -86,10 +86,10 @@ export default function RegisterPage() {
         }));
     };
 
-    // 매장명/대표자명: 특수문자 입력 차단 (한글, 영문, 숫자, 공백만 허용)
+    // 매장명/대표자명: 특수문자 입력 차단 (한글 자모+완성형, 영문, 숫자, 공백 허용)
     const handleNameChange = (field: 'storeName' | 'ownerName') =>
         (e: React.ChangeEvent<HTMLInputElement>) => {
-            const value = e.target.value.replace(/[^가-힣a-zA-Z0-9\s]/g, '');
+            const value = e.target.value.replace(/[^ㄱ-ㅎㅏ-ㅣ가-힣a-zA-Z0-9\s]/g, '');
             setFormData(prev => ({ ...prev, [field]: value }));
         };
 
@@ -201,23 +201,6 @@ export default function RegisterPage() {
                             placeholder="예: 서울시 강남구 테헤란로 123"
                             rows={3}
                             className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all resize-none"
-                        />
-                    </div>
-
-                    <div>
-                        <label htmlFor="establishedYear" className="block text-sm font-medium text-slate-700 mb-2">
-                            설립 연도
-                        </label>
-                        <input
-                            type="number"
-                            id="establishedYear"
-                            name="establishedYear"
-                            value={formData.establishedYear}
-                            onChange={handleChange}
-                            placeholder="예: 2024"
-                            min="1900"
-                            max="2100"
-                            className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all"
                         />
                     </div>
 

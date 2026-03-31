@@ -29,16 +29,15 @@ const ProtectedRoute = ({ children, checkRegistration = true }: ProtectedRoutePr
     }
 
     // 로그인 안 된 경우 로그인 페이지로 리다이렉트
-    // if (!user) {
-    //     return <Navigate to="/login" replace />;
-    // }
+    if (!user) {
+        return <Navigate to="/login" replace />;
+    }
 
     // 회원가입 필요한 경우 등록 페이지로 리다이렉트
-    // if (checkRegistration && needsRegistration && location.pathname !== '/register') {
-    //     return <Navigate to="/register" replace />;
-    // }
+    if (checkRegistration && needsRegistration && location.pathname !== '/register') {
+        return <Navigate to="/register" replace />;
+    }
 
-    // 기능성 테스트를 위해 로그인/회원가입 강제 패스
     return <>{children}</>;
 };
 

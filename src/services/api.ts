@@ -543,6 +543,7 @@ export interface UserRegistration {
   owner_name: string;
   phone?: string;
   address?: string;
+  established_year?: number;
 }
 
 export interface UserProfile {
