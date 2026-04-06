@@ -6,10 +6,9 @@
 
 import axios from 'axios';
 import { supabase } from '../supabase';
-import axiosRetry from 'axios-retry';
+import { runtimeConfig } from '../config/runtimeConfig';
 import type {
   InventoryItem,
-  StoreProfile,
   OCRSalesResponse,
   StockIntake,
   RecipeCost,
@@ -18,11 +17,7 @@ import type {
   ManualSaleResponse
 } from '../types';
 
-// 개발 환경에서는 localhost, 프로덕션에서는 Cloud Run 백엔드 사용
-const API_BASE_URL = import.meta.env.VITE_API_URL
-  || (import.meta.env.DEV
-    ? 'http://localhost:8000/api'
-    : 'https://coffee-erp-backend-427178764915.asia-northeast3.run.app/api');
+const API_BASE_URL = runtimeConfig.apiBaseUrl;
 
 let currentToken: string | null = null;
 
@@ -323,10 +318,16 @@ export interface HomeMarginWarning {
   price: number;
 }
 
+export interface HomeTopMenuItem {
+  name: string;
+  qty: number;
+  revenue: number;
+}
+
 export interface HomeDataResponse {
   summary: HomeSummary;
   hourlySales: HomeHourlyData[];
-  topMenus: any[];
+  topMenus: HomeTopMenuItem[];
   stockWarnings: HomeStockWarning[];
   marginWarnings: HomeMarginWarning[];
   openHour: number;
@@ -490,6 +491,19 @@ export interface UserProfileUpdate {
   phone?: string;
 }
 
+export interface AccountDeletionRequestCreate {
+  email?: string;
+  store_name?: string;
+  reason?: string;
+}
+
+export interface AccountDeletionRequestResponse {
+  request_id: string;
+  status: string;
+  message: string;
+  requested_at: string;
+}
+
 export interface RegistrationStatus {
   is_registered: boolean;
   email: string;
@@ -502,6 +516,8 @@ export const userApi = {
   getProfile: () => api.get<UserProfile>('/users/profile'),
   updateProfile: (data: UserProfileUpdate) => api.put<UserProfile>('/users/profile', data),
   checkRegistration: () => api.get<RegistrationStatus>('/users/check-registration'),
+  requestAccountDeletion: (data: AccountDeletionRequestCreate) =>
+    api.post<AccountDeletionRequestResponse>('/users/account-deletion-request', data),
   getStoreProfile: () => api.get<StoreProfileData>('/users/store-profile'),
   updateStoreProfile: (data: StoreProfileUpdateData) => api.put<StoreProfileData>('/users/store-profile', data),
   getStoreMembers: () => api.get<StoreMemberData[]>('/users/store-members'),

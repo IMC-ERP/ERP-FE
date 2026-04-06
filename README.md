@@ -9,6 +9,7 @@ React + TypeScript + Vite 기반의 커피 ERP 시스템 프론트엔드
 - **Vite** - 빠른 개발 서버 및 빌드 도구
 - **React Router** - 클라이언트 사이드 라우팅
 - **Axios** - HTTP 클라이언트
+- **Supabase Auth** - Google OAuth 및 세션 관리
 - **Recharts** - 데이터 시각화
 - **Lucide React** - 아이콘 라이브러리
 
@@ -114,9 +115,17 @@ const fetchData = async () => {
 
 ```bash
 VITE_API_URL=http://localhost:8000
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
+VITE_COMPANY_NAME=Coffee ERP
+VITE_SUPPORT_EMAIL=support@example.com
+VITE_SUPPORT_PHONE=02-1234-5678
+VITE_SUPPORT_RESPONSE_WINDOW=영업일 기준 1~2일 이내
 ```
 
-환경 변수는 코드에서 `import.meta.env.VITE_API_URL`로 접근할 수 있습니다.
+환경 변수는 코드에서 `import.meta.env.VITE_API_URL`로 접근할 수 있습니다. 인증 연동에는 `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`가 추가로 필요합니다.
+
+제출 관련 문서는 `docs/mobile-release/README.md`를 참고합니다.
 
 ## 트러블슈팅
 
@@ -145,4 +154,3 @@ TypeScript errors
   ```bash
   npx tsc --noEmit
   ```
-

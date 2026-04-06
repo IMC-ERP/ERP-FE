@@ -21,6 +21,10 @@ import CostRecipeManager from './pages/CostRecipeManager';
 import Home from './pages/Home';
 import SettingsPage from './pages/SettingsPage';
 import InvitePage from './pages/InvitePage';
+import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
+import SupportPage from './pages/SupportPage';
+import AccountDeletionPage from './pages/AccountDeletionPage';
+import AuthCallbackPage from './pages/AuthCallbackPage';
 import './index.css';
 
 // HomePage 삭제됨 (Home.tsx로 대체)
@@ -44,6 +48,10 @@ function App() {
           <Routes>
             {/* 로그인 페이지 (보호 안 함) */}
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/auth/callback" element={<AuthCallbackPage />} />
+            <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+            <Route path="/support" element={<SupportPage />} />
+            <Route path="/account-deletion" element={<AccountDeletionPage />} />
 
             {/* 회원가입 페이지 (인증된 상태에서만 접근) */}
             <Route path="/register" element={

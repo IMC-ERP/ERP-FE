@@ -3,25 +3,34 @@
  * 구글 로그인 페이지 - 로그인/회원가입 선택
  */
 
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { runtimeConfig } from '../config/runtimeConfig';
 import { useAuth } from '../contexts/AuthContext';
+import { APP_INFO } from '../config/appInfo';
 
 const LoginPage = () => {
-    const { signInWithGoogle } = useAuth();
+    const { signInWithGoogle, user, loading, needsRegistration, authIssue } = useAuth();
     const navigate = useNavigate();
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [mode, setMode] = useState<'select' | 'login' | 'signup'>('select');
+    const visibleError = error ?? authIssue;
 
-    const handleGoogleAuth = async (_intent: 'login' | 'signup') => {
+    useEffect(() => {
+        if (loading || !user || authIssue) {
+            return;
+        }
+
+        navigate(needsRegistration ? '/register' : '/', { replace: true });
+    }, [authIssue, loading, navigate, needsRegistration, user]);
+
+    const handleGoogleAuth = async () => {
         setIsLoading(true);
         setError(null);
 
         try {
             await signInWithGoogle();
-            // 로그인 후 AuthContext가 자동으로 등록 여부를 확인하고 리다이렉트
-            navigate('/');
         } catch (err) {
             setError('인증에 실패했습니다. 다시 시도해주세요.');
             console.error(err);
@@ -64,6 +73,17 @@ const LoginPage = () => {
                     <p className="text-center text-xs text-slate-400 mt-6">
                         Google 계정으로 간편하게 시작하세요
                     </p>
+                    <div className="mt-5 flex flex-wrap justify-center gap-3 text-xs text-slate-500">
+                        <Link to={APP_INFO.privacyPolicyPath} className="hover:text-slate-700">
+                            개인정보처리방침
+                        </Link>
+                        <Link to={APP_INFO.supportPath} className="hover:text-slate-700">
+                            고객지원
+                        </Link>
+                        <Link to={APP_INFO.accountDeletionPath} className="hover:text-slate-700">
+                            계정 삭제
+                        </Link>
+                    </div>
                 </div>
             </div>
         );
@@ -87,9 +107,9 @@ const LoginPage = () => {
                 </div>
 
                 {/* 에러 메시지 */}
-                {error && (
+                {visibleError && (
                     <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
-                        {error}
+                        {visibleError}
                     </div>
                 )}
 
@@ -100,10 +120,24 @@ const LoginPage = () => {
                     </div>
                 )}
 
+                {runtimeConfig.hasBlockingIssues && (
+                    <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                        <p className="font-semibold">운영 설정 확인 필요</p>
+                        <p className="mt-1 leading-6">{runtimeConfig.blockingIssues.join(' ')}</p>
+                    </div>
+                )}
+
+                {!runtimeConfig.hasBlockingIssues && runtimeConfig.warningIssues.length > 0 && (
+                    <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+                        <p className="font-semibold">배포 전 확인 권장</p>
+                        <p className="mt-1 leading-6">{runtimeConfig.warningIssues.join(' ')}</p>
+                    </div>
+                )}
+
                 {/* 구글 로그인 버튼 */}
                 <button
-                    onClick={() => handleGoogleAuth(mode)}
-                    disabled={isLoading}
+                    onClick={handleGoogleAuth}
+                    disabled={isLoading || runtimeConfig.hasBlockingIssues}
                     className="w-full flex items-center justify-center gap-3 bg-white border-2 border-slate-200 
                      hover:border-slate-300 hover:bg-slate-50 text-slate-700 font-medium py-3 px-4 
                      rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed
@@ -143,6 +177,18 @@ const LoginPage = () => {
                     className="w-full mt-4 text-sm text-slate-500 hover:text-slate-700 py-2">
                     ← 뒤로 가기
                 </button>
+
+                <div className="mt-5 flex flex-wrap justify-center gap-3 text-xs text-slate-500">
+                    <Link to={APP_INFO.privacyPolicyPath} className="hover:text-slate-700">
+                        개인정보처리방침
+                    </Link>
+                    <Link to={APP_INFO.supportPath} className="hover:text-slate-700">
+                        고객지원
+                    </Link>
+                    <Link to={APP_INFO.accountDeletionPath} className="hover:text-slate-700">
+                        계정 삭제
+                    </Link>
+                </div>
             </div>
         </div>
     );

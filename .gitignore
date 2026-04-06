@@ -36,3 +36,8 @@ Thumbs.db
 
 # Local configuration
 *.local
+.gradle-home
+android/local.properties
+android/keystore.properties
+android/*.jks
+android/*.keystore

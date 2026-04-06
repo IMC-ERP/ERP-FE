@@ -3,21 +3,41 @@
  * Supabase Google 인증 상태 관리 + 사용자 프로필 관리
  */
 
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
+import axios from 'axios';
+import { Capacitor } from '@capacitor/core';
+import { App as CapacitorApp } from '@capacitor/app';
+import { Browser } from '@capacitor/browser';
 import type { User, Session } from '@supabase/supabase-js';
-import { supabase } from '../supabase';
+import {
+    assertSupabaseConfigured,
+    getSupabaseRedirectUrl,
+    supabase,
+    SUPABASE_NATIVE_REDIRECT_URL,
+    SUPABASE_WEB_CALLBACK_PATH,
+} from '../supabase';
 import { userApi, setAuthToken, type UserProfile } from '../services/api';
 
+export interface AppAuthUser {
+    id: string;
+    uid: string;
+    email: string | null;
+    displayName: string | null;
+    photoURL: string | null;
+}
+
 interface AuthContextType {
-    user: User | null;
+    user: AppAuthUser | null;
     session: Session | null;
     userProfile: UserProfile | null;
     loading: boolean;
     needsRegistration: boolean;
+    authIssue: string | null;
     signInWithGoogle: (redirectPath?: string) => Promise<void>;
     logout: () => Promise<void>;
     refreshProfile: () => Promise<void>;
+    retryProfileCheck: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -35,64 +55,219 @@ interface AuthProviderProps {
 }
 
 export const AuthProvider = ({ children }: AuthProviderProps) => {
-    const [user, setUser] = useState<User | null>(null);
+    const [user, setUser] = useState<AppAuthUser | null>(null);
     const [session, setSession] = useState<Session | null>(null);
     const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
     const [loading, setLoading] = useState(true);
     const [needsRegistration, setNeedsRegistration] = useState(false);
+    const [authIssue, setAuthIssue] = useState<string | null>(null);
+    const lastHandledAuthUrlRef = useRef<string | null>(null);
+
+    const mapSupabaseUser = (supabaseUser: User): AppAuthUser => ({
+        id: supabaseUser.id,
+        uid: supabaseUser.id,
+        email: supabaseUser.email ?? null,
+        displayName:
+            supabaseUser.user_metadata?.full_name
+            ?? supabaseUser.user_metadata?.name
+            ?? supabaseUser.user_metadata?.display_name
+            ?? null,
+        photoURL:
+            supabaseUser.user_metadata?.avatar_url
+            ?? supabaseUser.user_metadata?.picture
+            ?? null,
+    });
+
+    const getErrorMessage = (error: unknown, fallback: string) => {
+        if (axios.isAxiosError(error)) {
+            const detail = error.response?.data?.detail;
+            if (typeof detail === 'string') {
+                return detail;
+            }
+        }
+
+        if (error instanceof Error && error.message) {
+            return error.message;
+        }
+
+        return fallback;
+    };
+
+    const clearAuthState = useCallback(() => {
+        setUser(null);
+        setSession(null);
+        setUserProfile(null);
+        setNeedsRegistration(false);
+        setAuthIssue(null);
+        setAuthToken(null);
+        lastHandledAuthUrlRef.current = null;
+    }, []);
+
+    const readParamFromUrl = (url: URL, key: string) => {
+        const searchValue = url.searchParams.get(key);
+        if (searchValue) {
+            return searchValue;
+        }
+
+        const hashValue = url.hash.startsWith('#') ? url.hash.slice(1) : url.hash;
+        return new URLSearchParams(hashValue).get(key);
+    };
+
+    const shouldHandleAuthCallback = (url: URL) => {
+        const isNativeCallback =
+            url.protocol === 'com.imcerp.coffeeerp:' &&
+            url.hostname === 'auth' &&
+            url.pathname === '/callback';
+
+        const isWebCallback = url.pathname === SUPABASE_WEB_CALLBACK_PATH;
+
+        return isNativeCallback || isWebCallback;
+    };
+
+    const completeAuthFromUrl = useCallback(async (rawUrl: string) => {
+        const callbackUrl = new URL(rawUrl);
+
+        if (!shouldHandleAuthCallback(callbackUrl)) {
+            return false;
+        }
+
+        if (lastHandledAuthUrlRef.current === rawUrl) {
+            return true;
+        }
+
+        const providerError =
+            readParamFromUrl(callbackUrl, 'error_description')
+            ?? readParamFromUrl(callbackUrl, 'error');
+
+        if (providerError) {
+            throw new Error(providerError);
+        }
+
+        const authCode = readParamFromUrl(callbackUrl, 'code');
+        if (authCode) {
+            const { error } = await supabase.auth.exchangeCodeForSession(authCode);
+            if (error) {
+                throw error;
+            }
+
+            lastHandledAuthUrlRef.current = rawUrl;
+            return true;
+        }
+
+        const accessToken = readParamFromUrl(callbackUrl, 'access_token');
+        const refreshToken = readParamFromUrl(callbackUrl, 'refresh_token');
+
+        if (accessToken && refreshToken) {
+            const { error } = await supabase.auth.setSession({
+                access_token: accessToken,
+                refresh_token: refreshToken,
+            });
+
+            if (error) {
+                throw error;
+            }
+
+            lastHandledAuthUrlRef.current = rawUrl;
+            return true;
+        }
+
+        return false;
+    }, []);
 
     // 사용자 프로필 로드
-    const loadUserProfile = async () => {
+    const loadUserProfile = useCallback(async () => {
         try {
             const response = await userApi.checkRegistration();
 
             if (response.data.is_registered && response.data.profile) {
                 setUserProfile(response.data.profile);
                 setNeedsRegistration(false);
+                setAuthIssue(null);
             } else {
                 setNeedsRegistration(true);
                 setUserProfile(null);
+                setAuthIssue(null);
             }
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('[AUTH] Failed to check registration:', error);
 
-            // 401/403 에러 시 세션 만료 → 로그아웃하여 stale 세션 정리
-            const status = error?.response?.status;
+            const status = axios.isAxiosError(error) ? error.response?.status : undefined;
             if (status === 401 || status === 403) {
                 console.warn('[AUTH] Stale session detected, signing out...');
                 await supabase.auth.signOut();
-                setUser(null);
-                setSession(null);
-                setAuthToken(null);
-                setUserProfile(null);
-                setNeedsRegistration(false);
+                clearAuthState();
                 return;
             }
 
-            setNeedsRegistration(true);
-            setUserProfile(null);
+            setNeedsRegistration(false);
+            setAuthIssue(getErrorMessage(error, '계정 상태를 확인하지 못했습니다. 네트워크 또는 서버 상태를 확인해주세요.'));
         }
-    };
+    }, [clearAuthState]);
+
+    const applySession = useCallback(async (currentSession: Session | null) => {
+        setSession(currentSession);
+        setAuthToken(currentSession?.access_token || null);
+
+        if (currentSession?.user) {
+            setUser(mapSupabaseUser(currentSession.user));
+            await loadUserProfile();
+            return;
+        }
+
+        clearAuthState();
+    }, [clearAuthState, loadUserProfile]);
 
     // 프로필 새로고침 (등록 후 호출)
-    const refreshProfile = async () => {
+    const refreshProfile = useCallback(async () => {
         if (!user) return;
         await loadUserProfile();
-    };
+    }, [loadUserProfile, user]);
+
+    const retryProfileCheck = useCallback(async () => {
+        if (!user) {
+            clearAuthState();
+            return;
+        }
+
+        setLoading(true);
+        try {
+            await loadUserProfile();
+        } finally {
+            setLoading(false);
+        }
+    }, [clearAuthState, loadUserProfile, user]);
 
     // Google 로그인
     const signInWithGoogle = async (redirectPath?: string) => {
         try {
-            const redirectTo = redirectPath
-                ? `${window.location.origin}${redirectPath}`
-                : window.location.origin;
-            const { error } = await supabase.auth.signInWithOAuth({
+            assertSupabaseConfigured();
+            setAuthIssue(null);
+
+            const { data, error } = await supabase.auth.signInWithOAuth({
                 provider: 'google',
                 options: {
-                    redirectTo,
+                    redirectTo: getSupabaseRedirectUrl(redirectPath),
+                    skipBrowserRedirect: true,
                 },
             });
-            if (error) throw error;
+
+            if (error) {
+                throw error;
+            }
+
+            if (!data.url) {
+                throw new Error('Supabase OAuth URL을 생성하지 못했습니다.');
+            }
+
+            if (Capacitor.isNativePlatform()) {
+                await Browser.open({
+                    url: data.url,
+                    presentationStyle: 'fullscreen',
+                });
+                return;
+            }
+
+            window.location.assign(data.url);
         } catch (error) {
             console.error('Google 로그인 실패:', error);
             throw error;
@@ -104,9 +279,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         try {
             const { error } = await supabase.auth.signOut();
             if (error) throw error;
-            setUserProfile(null);
-            setAuthToken(null);
-            setNeedsRegistration(false);
+            clearAuthState();
         } catch (error) {
             console.error('로그아웃 실패:', error);
             throw error;
@@ -115,66 +288,119 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
     // 인증 상태 감시
     useEffect(() => {
-        let initialLoadDone = false;
+        let isMounted = true;
+        let appListenerCleanup: (() => Promise<void>) | null = null;
 
-        // 현재 세션 확인 (캐시된 세션이 있으면 refresh하여 유효성 검증)
-        supabase.auth.getSession().then(async ({ data: { session: currentSession } }) => {
-            if (currentSession) {
-                // 캐시된 세션이 있으면 서버에 refresh하여 유효성 확인
-                const { data: { session: refreshed }, error } = await supabase.auth.refreshSession();
-                if (error || !refreshed) {
-                    // refresh 실패 → stale 세션 정리
-                    console.warn('[AUTH] Session refresh failed, clearing stale session');
-                    await supabase.auth.signOut();
-                    setSession(null);
-                    setAuthToken(null);
-                    setUser(null);
-                    setLoading(false);
-                    initialLoadDone = true;
+        const initializeAuth = async () => {
+            try {
+                if (!Capacitor.isNativePlatform() && typeof window !== 'undefined') {
+                    try {
+                        await completeAuthFromUrl(window.location.href);
+                    } catch (error) {
+                        console.error('웹 OAuth 콜백 처리 실패:', error);
+                        setAuthIssue(getErrorMessage(error, '로그인 응답을 처리하지 못했습니다. 다시 시도해주세요.'));
+                    }
+                }
+
+                if (Capacitor.isNativePlatform()) {
+                    try {
+                        const launchUrl = (await CapacitorApp.getLaunchUrl())?.url;
+                        if (launchUrl) {
+                            const handled = await completeAuthFromUrl(launchUrl);
+                            if (handled) {
+                                await Browser.close().catch(() => undefined);
+                            }
+                        }
+                    } catch (error) {
+                        console.error('초기 네이티브 OAuth 콜백 처리 실패:', error);
+                        setAuthIssue(getErrorMessage(error, '로그인 응답을 처리하지 못했습니다. 다시 시도해주세요.'));
+                    }
+                }
+
+                const {
+                    data: { session: currentSession },
+                } = await supabase.auth.getSession();
+
+                if (!isMounted) {
                     return;
                 }
-                setSession(refreshed);
-                setAuthToken(refreshed.access_token || null);
-                setUser(refreshed.user);
-                // 프로필은 비동기로 로드 (loading 블로킹 안 함)
-                loadUserProfile();
-            } else {
-                setSession(null);
-                setAuthToken(null);
-                setUser(null);
-            }
-            setLoading(false);
-            initialLoadDone = true;
-        }).catch(() => {
-            setLoading(false);
-            initialLoadDone = true;
-        });
 
-        // 상태 변화 리스너
+                if (currentSession) {
+                    const { data: { session: refreshed }, error } = await supabase.auth.refreshSession();
+                    if (error || !refreshed) {
+                        console.warn('[AUTH] Session refresh failed, clearing stale session');
+                        await supabase.auth.signOut();
+                        if (isMounted) {
+                            clearAuthState();
+                        }
+                        return;
+                    }
+
+                    await applySession(refreshed);
+                    return;
+                }
+
+                clearAuthState();
+            } catch (error) {
+                console.error('초기 인증 상태 확인 실패:', error);
+                if (isMounted) {
+                    clearAuthState();
+                }
+            } finally {
+                if (isMounted) {
+                    setLoading(false);
+                }
+            }
+        };
+
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
             async (_event, currentSession) => {
-                setSession(currentSession);
-                setAuthToken(currentSession?.access_token || null);
-                setUser(currentSession?.user ?? null);
-
-                if (currentSession?.user) {
-                    // 프로필은 비동기로 로드 (loading 블로킹 안 함)
-                    loadUserProfile();
-                } else {
-                    setUserProfile(null);
-                    setNeedsRegistration(false);
+                if (!isMounted) {
+                    return;
                 }
 
-                // 초기 로드가 아직 안 끝났으면 여기서 풀어줌
-                if (!initialLoadDone) {
-                    setLoading(false);
-                    initialLoadDone = true;
-                }
+                setLoading(true);
+                void applySession(currentSession)
+                    .catch((error) => {
+                        console.error('Supabase 인증 상태 반영 실패:', error);
+                        clearAuthState();
+                    })
+                    .finally(() => {
+                        if (isMounted) {
+                            setLoading(false);
+                        }
+                    });
             }
         );
 
-        return () => subscription.unsubscribe();
-    }, []);
+        if (Capacitor.isNativePlatform()) {
+            void CapacitorApp.addListener('appUrlOpen', async ({ url }) => {
+                try {
+                    const handled = await completeAuthFromUrl(url);
+                    if (!handled) {
+                        return;
+                    }
+
+                    await Browser.close().catch(() => undefined);
+                } catch (error) {
+                    console.error(`네이티브 OAuth 콜백 처리 실패 (${SUPABASE_NATIVE_REDIRECT_URL}):`, error);
+                    setAuthIssue(getErrorMessage(error, '로그인 응답을 처리하지 못했습니다. 다시 시도해주세요.'));
+                }
+            }).then((listener) => {
+                appListenerCleanup = () => listener.remove();
+            });
+        }
+
+        void initializeAuth();
+
+        return () => {
+            isMounted = false;
+            subscription.unsubscribe();
+            if (appListenerCleanup) {
+                void appListenerCleanup();
+            }
+        };
+    }, [applySession, clearAuthState, completeAuthFromUrl]);
 
     const value: AuthContextType = {
         user,
@@ -182,9 +408,11 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         userProfile,
         loading,
         needsRegistration,
+        authIssue,
         signInWithGoogle,
         logout,
-        refreshProfile
+        refreshProfile,
+        retryProfileCheck,
     };
 
     return (
