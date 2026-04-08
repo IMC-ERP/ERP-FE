@@ -10,12 +10,14 @@ import {
   profitDashboardApi,
   expensesApi,
   type ProfitDashboardResponse,
+  type ProfitDashboardSummary,
   type MonthlyExpensesResponse,
 } from '../services/api';
 import { ChevronDown, ChevronRight, Info, Calendar, Plus, Trash2, Tag, TrendingUp, Loader2 } from 'lucide-react';
 import {
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
 } from 'recharts';
+import { getApiErrorMessage } from '../utils/apiErrors';
 
 // ==================== 상수 ====================
 
@@ -31,6 +33,33 @@ const DEFAULT_CATEGORIES = [
   { value: 'marketing', label: '마케팅' },
   { value: 'other', label: '기타' },
 ];
+
+interface ChartLabelPayload {
+  name: string;
+}
+
+interface OutsideLabelProps {
+  cx?: number;
+  cy?: number;
+  midAngle?: number;
+  innerRadius?: number;
+  outerRadius?: number;
+  payload?: ChartLabelPayload;
+  percent?: number;
+}
+
+interface TooltipPayloadEntry {
+  payload: {
+    name: string;
+    value: number;
+    pct?: string | number;
+  };
+}
+
+interface CustomTooltipProps {
+  active?: boolean;
+  payload?: TooltipPayloadEntry[];
+}
 
 // ==================== 컴포넌트 ====================
 
@@ -81,14 +110,20 @@ export default function Dashboard() {
     } finally {
       setProfitLoading(false);
     }
-  }, [storeId, selectedMonth]);
+  }, [selectedMonth]);
 
   const fetchExpenses = useCallback(async () => {
-    // if (!storeId) return; // 주석 처리하여 더미 상점 ID로 진행할 수 있도록 함
+    if (!storeId) {
+      setExpensesData(null);
+      setExpensesLoading(false);
+      setExpensesError('매장 정보가 확인되면 운영비 데이터를 불러옵니다.');
+      return;
+    }
+
     try {
       setExpensesLoading(true);
       setExpensesError('');
-      const res = await expensesApi.getMonthly(storeId || 'dummy-store-id', selectedMonth);
+      const res = await expensesApi.getMonthly(storeId, selectedMonth);
       setExpensesData(res.data);
       // 커스텀 카테고리 추출
       const existing = new Set(DEFAULT_CATEGORIES.map(c => c.value));
@@ -100,9 +135,10 @@ export default function Dashboard() {
           }
         });
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('운영비 데이터 로드 실패:', err);
       setExpensesData(null);
+      setExpensesError(getApiErrorMessage(err, '운영비 데이터를 불러오지 못했습니다.'));
     } finally {
       setExpensesLoading(false);
     }
@@ -131,8 +167,8 @@ export default function Dashboard() {
       setNewName(''); setNewAmount(''); setNewDescription(''); setNewPaymentDate('');
       await fetchExpenses();
       await fetchProfitData(); // 수익성 데이터 항상 갱신
-    } catch (err: any) {
-      setExpensesError(err.response?.data?.detail || '항목 추가에 실패했습니다.');
+    } catch (err: unknown) {
+      setExpensesError(getApiErrorMessage(err, '항목 추가에 실패했습니다.'));
     } finally { setAddingItem(false); }
   };
 
@@ -143,7 +179,7 @@ export default function Dashboard() {
       setDeleteConfirmId(null);
       await fetchExpenses();
       await fetchProfitData();
-    } catch (err: any) { setExpensesError(err.response?.data?.detail || '삭제에 실패했습니다.'); }
+    } catch (err: unknown) { setExpensesError(getApiErrorMessage(err, '삭제에 실패했습니다.')); }
   };
 
   const toggleItemType = async (itemId: string, currentType: string) => {
@@ -151,7 +187,7 @@ export default function Dashboard() {
     try {
       await expensesApi.updateItem(storeId, selectedMonth, itemId, { type: currentType === 'fixed' ? 'variable' : 'fixed' });
       await fetchExpenses();
-    } catch (err: any) { setExpensesError(err.response?.data?.detail || '수정에 실패했습니다.'); }
+    } catch (err: unknown) { setExpensesError(getApiErrorMessage(err, '수정에 실패했습니다.')); }
   };
 
   const addCustomCategory = () => {
@@ -196,7 +232,10 @@ export default function Dashboard() {
   const costRatio = totalSales > 0 ? (totalCost / totalSales) * 100 : 0;
 
   // 전월 대비 수익률 지표 (백엔드에서 null 반환 가능)
-  const momProfitTrend = (summary as any)?.profitTrend;
+  const momProfitTrend =
+    summary && 'profitTrend' in summary
+      ? (summary as ProfitDashboardSummary & { profitTrend?: number }).profitTrend
+      : undefined;
 
   const isPositive = netProfit >= 0;
   const theme = {
@@ -256,7 +295,16 @@ export default function Dashboard() {
   const getCategoryLabel = (val: string) => categories.find(c => c.value === val)?.label || val;
 
   // 커스텀 외부 라벨 렌더러 (Direct Labeling — 긴 텍스트 자르기 및 위치 최적화)
-  const renderOutsideLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, payload, percent }: any) => {
+  const renderOutsideLabel = ({
+    cx = 0,
+    cy = 0,
+    midAngle = 0,
+    innerRadius = 0,
+    outerRadius = 0,
+    payload,
+    percent = 0,
+  }: OutsideLabelProps) => {
+    if (!payload?.name) return null;
     const RADIAN = Math.PI / 180;
     // 반지름을 약간 더 넓게 설정하여 그래프와 겹침 방지 (기존 1.5 -> 1.7)
     const radius = innerRadius + (outerRadius - innerRadius) * 1.7;
@@ -270,7 +318,7 @@ export default function Dashboard() {
       : payload.name;
 
     // 퍼센트 값이 유효하지 않을 경우(NaN 등) 대비 안전 장치
-    const safePercent = (percent && isFinite(percent)) ? (percent * 100).toFixed(1) : '0.0';
+    const safePercent = isFinite(percent) ? (percent * 100).toFixed(1) : '0.0';
 
     return (
       <text
@@ -289,7 +337,7 @@ export default function Dashboard() {
   };
 
   // 커스텀 툴팁 — 소액 지출 시 세부 항목 리스트 표시
-  const CustomTooltip = ({ active, payload }: any) => {
+  const CustomTooltip = ({ active, payload }: CustomTooltipProps) => {
     if (active && payload && payload.length) {
       const d = payload[0].payload;
       if (d.name === '소액 지출' && smallExpenseDetails.length > 0) {

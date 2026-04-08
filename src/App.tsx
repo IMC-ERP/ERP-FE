@@ -1,6 +1,6 @@
 /**
  * App.tsx - Main Application with React Router
- * GCP-ERP 스타일 적용 + Google 로그인 + 멀티유저 대응
+ * GCP-ERP 스타일 적용 + Apple/Google 로그인 + 멀티유저 대응
  */
 
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
@@ -8,6 +8,7 @@ import { DataProvider } from './contexts/DataContext';
 import { AuthProvider } from './contexts/AuthContext';
 import Layout from './components/Layout/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
+import OnboardingGuard from './components/OnboardingGuard';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import Dashboard from './pages/Dashboard';
@@ -25,6 +26,8 @@ import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
 import SupportPage from './pages/SupportPage';
 import AccountDeletionPage from './pages/AccountDeletionPage';
 import AuthCallbackPage from './pages/AuthCallbackPage';
+import PricingPage from './pages/PricingPage';
+import OnboardingLayout from './pages/onboarding/OnboardingLayout';
 import './index.css';
 
 // HomePage 삭제됨 (Home.tsx로 대체)
@@ -49,6 +52,7 @@ function App() {
             {/* 로그인 페이지 (보호 안 함) */}
             <Route path="/login" element={<LoginPage />} />
             <Route path="/auth/callback" element={<AuthCallbackPage />} />
+            <Route path="/pricing" element={<PricingPage />} />
             <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
             <Route path="/support" element={<SupportPage />} />
             <Route path="/account-deletion" element={<AccountDeletionPage />} />
@@ -60,12 +64,20 @@ function App() {
               </ProtectedRoute>
             } />
 
+            <Route path="/onboarding" element={
+              <ProtectedRoute>
+                <OnboardingLayout />
+              </ProtectedRoute>
+            } />
+
             {/* 보호된 라우트들 */}
             <Route path="/invite" element={<InvitePage />} />
 
             <Route path="/" element={
               <ProtectedRoute>
-                <Layout />
+                <OnboardingGuard>
+                  <Layout />
+                </OnboardingGuard>
               </ProtectedRoute>
             }>
               <Route index element={<Home />} />

@@ -8,11 +8,37 @@ interface InventorySetupStepProps {
   onNext: () => void;
 }
 
+type InventorySheetCell = string | number | null | undefined;
+
+interface InventoryPreviewRow {
+  item_type: 'raw' | 'prep';
+  typeVal_ko: '원재료' | '중간재';
+  category: string;
+  name: string;
+  slug: string;
+  uom: string;
+  quantity_on_hand: number;
+  safety_stock: number;
+  max_stock_level: number;
+  unit_cost: number;
+  prep_yield: number | null;
+  purchasePrice: number;
+  purchaseVolume: number;
+}
+
+const getErrorMessage = (error: unknown, fallback: string) => {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  return fallback;
+};
+
 export default function InventorySetupStep({ onNext }: InventorySetupStepProps) {
   const [showGuide, setShowGuide] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
-  const [previewData, setPreviewData] = useState<any[]>([]);
+  const [previewData, setPreviewData] = useState<InventoryPreviewRow[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -24,8 +50,8 @@ export default function InventorySetupStep({ onNext }: InventorySetupStepProps) 
       .toLowerCase()
       .trim()
       .replace(/\s+/g, '-')     // 공백을 -로 치환
-      .replace(/[^\wㄱ-ㅎ가-힣\-]+/g, '') // 특수문자 제거 (한글 허용)
-      .replace(/\-\-+/g, '-');  // 중복 - 제거
+      .replace(/[^\wㄱ-ㅎ가-힣-]+/g, '') // 특수문자 제거 (한글 허용)
+      .replace(/--+/g, '-');  // 중복 - 제거
   };
 
   // 1. 템플릿 다운로드 핸들러
@@ -62,7 +88,7 @@ export default function InventorySetupStep({ onNext }: InventorySetupStepProps) 
   };
 
   // 3. 파일 파싱 및 Validation
-  const processFile = async (file: File) => {
+  const processFile = (file: File) => {
     setUploadedFile(file);
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -73,14 +99,14 @@ export default function InventorySetupStep({ onNext }: InventorySetupStepProps) 
         const worksheet = workbook.Sheets[firstSheetName];
         
         // 엑셀 헤더는 첫 행(header: 1), 데이터 매핑
-        const jsonData: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+        const jsonData = XLSX.utils.sheet_to_json<InventorySheetCell[]>(worksheet, { header: 1 });
         if (jsonData.length < 2) {
           throw new Error('데이터가 비어있습니다. 양식 2행부터 정보를 입력해 주세요.');
         }
 
         const rows = jsonData.slice(1);
         
-        const parsedRows = [];
+        const parsedRows: InventoryPreviewRow[] = [];
         for (let i = 0; i < rows.length; i++) {
           const row = rows[i];
           if (!row || row.length === 0) continue; // 빈 줄 건너뛰기
@@ -131,10 +157,10 @@ export default function InventorySetupStep({ onNext }: InventorySetupStepProps) 
           });
         }
         setPreviewData(parsedRows);
-      } catch (err: any) {
+      } catch (error: unknown) {
         setUploadedFile(null);
         setPreviewData([]);
-        setErrorMsg(err.message || '엑셀 파싱 중 오류가 발생했습니다.');
+        setErrorMsg(getErrorMessage(error, '엑셀 파싱 중 오류가 발생했습니다.'));
       }
     };
     reader.readAsArrayBuffer(file);
@@ -162,7 +188,7 @@ export default function InventorySetupStep({ onNext }: InventorySetupStepProps) 
           safety_stock: item.safety_stock,
           needs_reorder: item.quantity_on_hand < item.safety_stock,
           unit_cost: item.unit_cost,
-          prep_yield: item.prep_yield,
+          prep_yield: item.prep_yield ?? 0,
           uom: item.uom
         };
         return inventoryApi.create(payload);
@@ -170,8 +196,8 @@ export default function InventorySetupStep({ onNext }: InventorySetupStepProps) 
 
       await Promise.all(promises);
       onNext();
-    } catch (err: any) {
-      console.error(err);
+    } catch (error: unknown) {
+      console.error(error);
       setErrorMsg('재고 등록 중 서버 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.');
     } finally {
       setIsProcessing(false);
@@ -182,10 +208,10 @@ export default function InventorySetupStep({ onNext }: InventorySetupStepProps) 
     <div className="animate-fade-in space-y-8">
       <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-slate-800 mb-2">1단계: 매장의 재고를 등록해 주세요</h2>
-          <p className="text-slate-500 mb-2">원재료(원두, 우유 등)와 중간재(시럽, 베이스 등)를 한 번에 등록할 수 있습니다. 수기 입력 대신 엑셀 업로드를 권장합니다.</p>
+          <h2 className="text-2xl font-bold text-slate-800 mb-2">1단계: 자주 쓰는 재료부터 올려주세요</h2>
+          <p className="text-slate-500 mb-2">원두, 우유, 시럽처럼 매일 쓰는 재료부터 시작하면 부족 재고와 발주 필요 품목을 바로 보여줄 수 있습니다.</p>
           <div className="bg-blue-50 border-l-4 border-blue-500 p-3 rounded-md shadow-sm inline-block">
-             <p className="text-sm text-blue-800 font-medium">💡 지금 당장 모든 항목을 완벽하게 등록하지 않아도 괜찮습니다. 서비스 이용 중에도 언제든지 새로운 항목을 추가하거나 수정할 수 있습니다.</p>
+             <p className="text-sm text-blue-800 font-medium">💡 처음부터 완벽할 필요는 없습니다. 자주 쓰는 품목 10개 정도만 먼저 올리고, 나머지는 운영하면서 천천히 추가해도 됩니다.</p>
           </div>
         </div>
         <button 
@@ -292,7 +318,7 @@ export default function InventorySetupStep({ onNext }: InventorySetupStepProps) 
           disabled={previewData.length === 0 || isProcessing}
           className="px-8 py-3 bg-orange-600 text-white rounded-lg font-bold hover:bg-orange-700 transition shadow-md disabled:bg-slate-300 disabled:shadow-none"
         >
-          {isProcessing ? '처리 중...' : '재고 등록 완료 및 다음 ➔'}
+          {isProcessing ? '처리 중...' : '재료 등록 완료하고 다음 ➔'}
         </button>
       </div>
 

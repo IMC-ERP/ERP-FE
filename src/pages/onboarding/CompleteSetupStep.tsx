@@ -15,10 +15,10 @@ export default function CompleteSetupStep({ onComplete, onPrev }: CompleteSetupS
         </div>
       </div>
       
-      <h2 className="text-3xl md:text-4xl font-extrabold text-slate-800 mb-4 tracking-tight">정말 수고 많으셨습니다!</h2>
+      <h2 className="text-3xl md:text-4xl font-extrabold text-slate-800 mb-4 tracking-tight">첫 사용 준비가 끝났습니다</h2>
       <p className="text-lg text-slate-500 max-w-md mx-auto mb-10 leading-relaxed">
-        이제 모든 준비가 끝났습니다.<br/>
-        본격적으로 사장님의 매장 현황을 보러 가실까요?
+        이제 홈에서 오늘 매출, 부족 재고, 원가 점검 포인트를 바로 확인할 수 있습니다.<br/>
+        본격적으로 오늘 운영 상태를 점검해볼까요?
       </p>
       
       <div className="space-y-4 w-full max-w-xs">
@@ -26,7 +26,7 @@ export default function CompleteSetupStep({ onComplete, onPrev }: CompleteSetupS
           onClick={onComplete}
           className="w-full px-6 py-4 bg-blue-600 text-white text-lg font-bold rounded-xl shadow-lg shadow-blue-600/30 hover:bg-blue-700 hover:shadow-blue-600/50 hover:-translate-y-1 transition transform"
         >
-          본격적으로 매장 현황 보러가기 ➔
+          홈으로 가서 오늘 운영 보기 ➔
         </button>
         <button 
           onClick={onPrev}
@@ -37,7 +37,7 @@ export default function CompleteSetupStep({ onComplete, onPrev }: CompleteSetupS
       </div>
       
       <div className="mt-16 text-xs text-slate-400">
-        © 2026 가게 살림 재고 관리 시스템. All rights reserved.
+        © 2026 Coffee ERP. All rights reserved.
       </div>
     </div>
   );

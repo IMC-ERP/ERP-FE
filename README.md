@@ -9,7 +9,7 @@ React + TypeScript + Vite 기반의 커피 ERP 시스템 프론트엔드
 - **Vite** - 빠른 개발 서버 및 빌드 도구
 - **React Router** - 클라이언트 사이드 라우팅
 - **Axios** - HTTP 클라이언트
-- **Supabase Auth** - Google OAuth 및 세션 관리
+- **Supabase Auth** - Apple/Google OAuth 및 세션 관리
 - **Recharts** - 데이터 시각화
 - **Lucide React** - 아이콘 라이브러리
 

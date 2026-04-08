@@ -1,64 +1,209 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Link } from 'react-router-dom';
+import {
+    AlertTriangle,
+    ArrowRight,
+    ChefHat,
+    DollarSign,
+    Loader2,
+    Package,
+    ReceiptText,
+    RefreshCcw,
+    ShoppingCart,
+} from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useData } from '../contexts/DataContext';
 import { homeApi, type HomeDataResponse } from '../services/api';
-import {
-    TrendingUp, TrendingDown, Package, AlertTriangle,
-    ShoppingCart, DollarSign, Clock,
-    Loader2, RefreshCcw, Eye, EyeOff, Hash
-} from 'lucide-react';
-import {
-    AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
-} from 'recharts';
+
+const formatCurrency = (value: number) => `${Math.round(value).toLocaleString()}원`;
+const formatTrend = (value: number) => `${value > 0 ? '+' : ''}${value.toFixed(1)}%`;
+
+interface MetricCardProps {
+    title: string;
+    value: string;
+    helper: string;
+    icon: React.ComponentType<{ size?: number }>;
+    tone: 'amber' | 'blue' | 'emerald' | 'rose';
+}
+
+interface ActionItem {
+    id: string;
+    title: string;
+    description: string;
+    to: string;
+    ctaLabel: string;
+}
+
+const toneClasses: Record<MetricCardProps['tone'], string> = {
+    amber: 'bg-amber-50 text-amber-700 border-amber-100',
+    blue: 'bg-blue-50 text-blue-700 border-blue-100',
+    emerald: 'bg-emerald-50 text-emerald-700 border-emerald-100',
+    rose: 'bg-rose-50 text-rose-700 border-rose-100',
+};
+
+function MetricCard({ title, value, helper, icon: Icon, tone }: MetricCardProps) {
+    return (
+        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="flex items-start justify-between gap-4">
+                <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">{title}</p>
+                    <p className="mt-3 text-3xl font-black tracking-tight text-slate-900">{value}</p>
+                    <p className="mt-2 text-sm text-slate-500">{helper}</p>
+                </div>
+                <div className={`rounded-2xl border px-3 py-3 ${toneClasses[tone]}`}>
+                    <Icon size={20} />
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function SectionCard({
+    title,
+    description,
+    emptyMessage,
+    children,
+}: {
+    title: string;
+    description: string;
+    emptyMessage?: string;
+    children?: ReactNode;
+}) {
+    return (
+        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="mb-5">
+                <h2 className="text-lg font-bold text-slate-900">{title}</h2>
+                <p className="mt-1 text-sm text-slate-500">{description}</p>
+            </div>
+            {children ?? (
+                <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">
+                    {emptyMessage}
+                </div>
+            )}
+        </section>
+    );
+}
 
 export default function Home() {
     const { userProfile } = useAuth();
     const { storeProfile } = useData();
     const [data, setData] = useState<HomeDataResponse | null>(null);
     const [loading, setLoading] = useState(true);
-    const [updated_at, setLastUpdated] = useState<Date | null>(null);
-    const [showRevenue, setShowRevenue] = useState(false);
 
     const fetchHomeData = useCallback(async (isSilent = false) => {
         try {
-            if (!isSilent) setLoading(true);
-            const res = await homeApi.get();
-            setData(res.data);
-            setLastUpdated(new Date());
-        } catch (err) {
-            console.error('Home 데이터 로드 실패:', err);
-            setData(null);
-            setLastUpdated(new Date());
+            if (!isSilent) {
+                setLoading(true);
+            }
+
+            const response = await homeApi.get();
+            setData(response.data);
+        } catch (error) {
+            console.error('Home 데이터 로드 실패:', error);
+            if (!isSilent) {
+                setData(null);
+            }
         } finally {
-            if (!isSilent) setLoading(false);
+            if (!isSilent) {
+                setLoading(false);
+            }
         }
     }, []);
 
     useEffect(() => {
-        fetchHomeData();
-        const interval = setInterval(() => {
-            fetchHomeData(true);
-        }, 60000);
-        return () => clearInterval(interval);
+        void fetchHomeData();
+        const interval = window.setInterval(() => {
+            void fetchHomeData(true);
+        }, 120000);
+
+        return () => window.clearInterval(interval);
     }, [fetchHomeData]);
+
+    const quickActions = useMemo<ActionItem[]>(() => {
+        if (!data) {
+            return [];
+        }
+
+        const actions: ActionItem[] = [];
+        const { summary, stockWarnings, marginWarnings, topMenus } = data;
+
+        if (stockWarnings.length > 0) {
+            actions.push({
+                id: 'restock',
+                title: `발주가 필요한 품목이 ${stockWarnings.length}개 있습니다`,
+                description: `가장 급한 품목은 ${stockWarnings[0].name}입니다. 오늘 입고 내역을 먼저 반영해보세요.`,
+                to: '/inventory?tab=receiving',
+                ctaLabel: '입고 정리하기',
+            });
+        } else {
+            actions.push({
+                id: 'upload-receipt',
+                title: '오늘 들어온 영수증부터 올려보세요',
+                description: '입고 영수증을 올리면 재고와 평균 단가를 한 번에 정리할 수 있습니다.',
+                to: '/inventory?tab=receiving',
+                ctaLabel: '영수증 올리기',
+            });
+        }
+
+        if (marginWarnings.length > 0) {
+            actions.push({
+                id: 'margin-warning',
+                title: '원가 점검이 필요한 메뉴가 있습니다',
+                description: `${marginWarnings[0].name} 메뉴의 원가율을 먼저 확인해보세요.`,
+                to: '/cost-recipe',
+                ctaLabel: '원가 확인하기',
+            });
+        } else if (topMenus.length > 0) {
+            actions.push({
+                id: 'top-menu',
+                title: `오늘 가장 잘 나가는 메뉴는 ${topMenus[0].name}입니다`,
+                description: '잘 팔리는 메뉴 흐름을 확인하고 누락된 매출이 없는지 점검해보세요.',
+                to: '/sales',
+                ctaLabel: '매출 확인하기',
+            });
+        }
+
+        if (summary.todayOrders > 0) {
+            actions.push({
+                id: 'sales-check',
+                title: `오늘 판매 ${summary.todayOrders}건이 기록되었습니다`,
+                description: `어제 대비 ${formatTrend(summary.orderTrend)} 흐름입니다. 마감 전에 누락된 판매가 없는지 확인하세요.`,
+                to: '/sales',
+                ctaLabel: '판매 기록 보기',
+            });
+        } else {
+            actions.push({
+                id: 'first-sale',
+                title: '오늘 첫 판매 또는 수기 기록을 남겨보세요',
+                description: '매출 기록이 쌓여야 오늘 운영 상태와 잘 팔린 메뉴를 더 정확하게 보여줄 수 있습니다.',
+                to: '/sales',
+                ctaLabel: '판매 입력하기',
+            });
+        }
+
+        return actions.slice(0, 3);
+    }, [data]);
 
     if (loading && !data) {
         return (
-            <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
-                <Loader2 className="animate-spin text-blue-600" size={48} />
-                <p className="text-slate-500 font-medium">오늘의 매장 정보를 분석 중입니다...</p>
+            <div className="flex min-h-[60vh] flex-col items-center justify-center space-y-4">
+                <Loader2 className="animate-spin text-amber-600" size={40} />
+                <p className="text-slate-500 font-medium">오늘 운영 현황을 불러오는 중입니다...</p>
             </div>
         );
     }
 
     if (!data) {
         return (
-            <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
-                <AlertTriangle className="text-amber-500" size={48} />
-                <p className="text-slate-500 font-medium">데이터를 불러오는데 실패했습니다. (백엔드 미연결)</p>
+            <div className="flex min-h-[60vh] flex-col items-center justify-center space-y-4 rounded-3xl border border-amber-200 bg-amber-50 p-8 text-center">
+                <AlertTriangle className="text-amber-600" size={40} />
+                <div>
+                    <h1 className="text-xl font-bold text-slate-900">홈 데이터를 불러오지 못했습니다</h1>
+                    <p className="mt-2 text-sm text-slate-600">백엔드 연결이나 운영 설정을 먼저 확인한 뒤 다시 시도해주세요.</p>
+                </div>
                 <button
-                    onClick={() => fetchHomeData()}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition"
+                    onClick={() => void fetchHomeData()}
+                    className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
                 >
                     다시 시도
                 </button>
@@ -66,267 +211,181 @@ export default function Home() {
         );
     }
 
-    const { summary, hourlySales, topMenus, stockWarnings, openHour, closeHour } = data;
-
-    const filteredHourly = hourlySales.filter(h => {
-        const hr = parseInt(h.hour);
-        return hr >= openHour && hr <= closeHour;
-    });
-
-    // Calculate total items sold today
-    const itemsSold = topMenus.reduce((acc, menu) => acc + menu.qty, 0) + 120; // 120 is dummy padding for non-top menus
+    const { summary, topMenus, stockWarnings, marginWarnings, updatedAt } = data;
+    const greetingName = userProfile?.name ?? userProfile?.owner_name ?? '사장님';
 
     return (
-        <div className="flex flex-col space-y-8 animate-fade-in pb-12 w-full max-w-full overflow-hidden">
-            {/* 🔹 헤더 인삿말 */}
-            <div className="flex items-end justify-between w-full">
-                <div>
-                    <h1 className="text-2xl font-bold text-slate-800">
-                        {userProfile?.name} 사장님, {storeProfile.store_name}의 오늘 현황입니다.
-                    </h1>
-                    <p className="text-slate-500 mt-1">오늘 하루도 힘내세요! 실시간으로 매장을 모니터링 중입니다.</p>
-                </div>
-                <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-2 text-xs text-slate-400 bg-white px-3 py-1.5 rounded-full border border-slate-200 shadow-sm whitespace-nowrap">
-                        <RefreshCcw size={12} className={loading ? 'animate-spin' : ''} />
-                        <span>최종 업데이트: {updated_at?.toLocaleTimeString()}</span>
+        <div className="space-y-8 animate-fade-in">
+            <header className="rounded-[32px] bg-gradient-to-br from-slate-900 via-slate-800 to-amber-800 px-8 py-8 text-white shadow-lg">
+                <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+                    <div>
+                        <p className="text-sm font-semibold uppercase tracking-[0.28em] text-amber-200">Daily Cafe Ops</p>
+                        <h1 className="mt-3 text-3xl font-black leading-tight">
+                            {greetingName} 사장님,
+                            <br />
+                            오늘 운영에서 먼저 볼 건 이 3가지예요.
+                        </h1>
+                        <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-200">
+                            {storeProfile.store_name}의 매출, 부족 재고, 원가 점검 포인트를 한 화면에 모았습니다.
+                            지금 가장 급한 일부터 처리할 수 있게 구성했습니다.
+                        </p>
                     </div>
-                    <button
-                        onClick={() => setShowRevenue(!showRevenue)}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 font-medium text-xs rounded-full transition-colors border shadow-sm ${showRevenue
-                            ? 'bg-rose-50 text-rose-600 border-rose-200 hover:bg-rose-100'
-                            : 'bg-indigo-50 text-indigo-600 border-indigo-200 hover:bg-indigo-100'
-                            }`}
-                        title={showRevenue ? "총매출/순수익을 숨깁니다" : "총매출/순수익을 숨김 해제합니다"}
-                    >
-                        {showRevenue ? <EyeOff size={14} /> : <Eye size={14} />}
-                        {showRevenue ? "금액 숨기기" : "금액 보기"}
-                    </button>
+
+                    <div className="flex flex-wrap gap-3">
+                        <Link
+                            to="/inventory?tab=receiving"
+                            className="inline-flex items-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-slate-900 transition hover:bg-amber-50"
+                        >
+                            <ReceiptText size={16} />
+                            입고 영수증 올리기
+                        </Link>
+                        <Link
+                            to="/sales"
+                            className="inline-flex items-center gap-2 rounded-2xl border border-white/20 bg-white/10 px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/15"
+                        >
+                            <ShoppingCart size={16} />
+                            오늘 매출 보기
+                        </Link>
+                    </div>
                 </div>
+
+                <div className="mt-6 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-1.5 text-xs text-slate-100">
+                    <RefreshCcw size={12} />
+                    <span>마지막 업데이트 {new Date(updatedAt).toLocaleString('ko-KR')}</span>
+                </div>
+            </header>
+
+            <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <MetricCard
+                    title="오늘 매출"
+                    value={formatCurrency(summary.todaySales)}
+                    helper={`어제 대비 ${formatTrend(summary.salesTrend)}`}
+                    icon={DollarSign}
+                    tone="amber"
+                />
+                <MetricCard
+                    title="오늘 판매 건수"
+                    value={`${summary.todayOrders.toLocaleString()}건`}
+                    helper={`어제 대비 ${formatTrend(summary.orderTrend)}`}
+                    icon={ShoppingCart}
+                    tone="blue"
+                />
+                <MetricCard
+                    title="발주 필요 품목"
+                    value={`${summary.lowStockCount.toLocaleString()}개`}
+                    helper={summary.lowStockCount > 0 ? '입고 또는 발주 확인이 필요합니다' : '현재는 급한 발주 품목이 없습니다'}
+                    icon={Package}
+                    tone="rose"
+                />
+                <MetricCard
+                    title="원가 점검 메뉴"
+                    value={`${summary.marginWarningCount.toLocaleString()}개`}
+                    helper={summary.marginWarningCount > 0 ? '원가율이 높거나 다시 점검할 메뉴가 있습니다' : '현재 점검이 필요한 메뉴가 없습니다'}
+                    icon={ChefHat}
+                    tone="emerald"
+                />
+            </section>
+
+            <SectionCard
+                title="오늘 바로 할 일"
+                description="앱을 열었을 때 가장 먼저 해야 하는 일만 정리했습니다."
+            >
+                <div className="grid gap-4 lg:grid-cols-3">
+                    {quickActions.map((action) => (
+                        <div key={action.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                            <h3 className="text-base font-semibold text-slate-900">{action.title}</h3>
+                            <p className="mt-2 text-sm leading-6 text-slate-600">{action.description}</p>
+                            <Link
+                                to={action.to}
+                                className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-amber-700 transition hover:text-amber-800"
+                            >
+                                {action.ctaLabel}
+                                <ArrowRight size={14} />
+                            </Link>
+                        </div>
+                    ))}
+                </div>
+            </SectionCard>
+
+            <div className="grid gap-6 xl:grid-cols-2">
+                <SectionCard
+                    title="부족 재고"
+                    description="오늘 바로 발주하거나 입고를 확인해야 하는 품목입니다."
+                    emptyMessage="현재는 급하게 발주할 품목이 없습니다."
+                >
+                    {stockWarnings.length > 0 && (
+                        <div className="space-y-3">
+                            {stockWarnings.slice(0, 5).map((item) => (
+                                <div key={item.id} className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                                    <div>
+                                        <p className="font-semibold text-slate-900">{item.name}</p>
+                                        <p className="mt-1 text-sm text-slate-500">
+                                            현재 {item.current.toLocaleString()}
+                                            {item.unit} / 안전재고 {item.safety.toLocaleString()}
+                                            {item.unit}
+                                        </p>
+                                    </div>
+                                    <span className="rounded-full bg-rose-100 px-3 py-1 text-xs font-semibold text-rose-700">
+                                        발주 필요
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </SectionCard>
+
+                <SectionCard
+                    title="원가 점검 메뉴"
+                    description="판매는 되고 있지만 원가율이 높아 먼저 봐야 하는 메뉴입니다."
+                    emptyMessage="지금은 특별히 점검할 원가 경고가 없습니다."
+                >
+                    {marginWarnings.length > 0 && (
+                        <div className="space-y-3">
+                            {marginWarnings.slice(0, 5).map((item) => (
+                                <div key={item.id} className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                                    <div>
+                                        <p className="font-semibold text-slate-900">{item.name}</p>
+                                        <p className="mt-1 text-sm text-slate-500">
+                                            원가율 {item.costRatio.toFixed(1)}% / 판매가 {formatCurrency(item.sellingPrice)}
+                                        </p>
+                                    </div>
+                                    <span
+                                        className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                                            item.status === 'danger'
+                                                ? 'bg-rose-100 text-rose-700'
+                                                : 'bg-amber-100 text-amber-700'
+                                        }`}
+                                    >
+                                        {item.status === 'danger' ? '우선 점검' : '점검 권장'}
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </SectionCard>
             </div>
 
-            {/* 🔹 최상단 KPI & 숨김 패널 그룹 (공백 최적화) */}
-            <div className="flex flex-col w-full">
-                {/* 🔹 상단 요약 칩 */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full">
-                    <SummaryCard
-                        title="오늘 방문(주문) 건수"
-                        value={summary.todayOrders}
-                        trend={summary.orderTrend}
-                        icon={ShoppingCart}
-                        color="amber"
-                        unit="건"
-                    />
-                    <SummaryCard
-                        title="오늘 판매한 수"
-                        value={itemsSold}
-                        trend={0}
-                        icon={Hash}
-                        color="indigo"
-                        unit="개"
-                    />
-                    <SummaryCard
-                        title="매출 상승률"
-                        value={summary.salesTrend}
-                        trend={summary.salesTrend}
-                        icon={TrendingUp}
-                        color="emerald"
-                        unit="%"
-                    />
-                </div>
-
-                {/* 🔹 매출/수익 확인 패널 (토글로 제어) */}
-                <div className={`grid grid-cols-1 md:grid-cols-2 gap-6 transition-all duration-500 origin-top overflow-hidden w-full ${showRevenue ? 'max-h-96 opacity-100 scale-y-100 mt-6' : 'max-h-0 opacity-0 scale-y-0 mt-0'}`}>
-                    <SummaryCard
-                        title="오늘 총매출"
-                        value={summary.todaySales}
-                        trend={summary.salesTrend}
-                        icon={DollarSign}
-                        color="blue"
-                    />
-                    <SummaryCard
-                        title="추정 순이익"
-                        value={summary.todayProfit}
-                        trend={summary.profitTrend}
-                        icon={TrendingUp}
-                        color="indigo"
-                    />
-                </div>
-            </div>
-
-            {/* 🔹 베스트 메뉴 섹션 (위치 상향 조정) */}
-            <div className="w-full">
-                <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm">
-                    <h3 className="font-bold text-slate-800 mb-6 font-mono tracking-tight border-l-4 border-blue-600 pl-3">
-                        오늘의 인기 메뉴
-                    </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        {topMenus.map((menu, idx) => (
-                            <div key={idx} className="flex items-center gap-4 p-5 rounded-xl bg-slate-50 border border-slate-100 transition-all hover:shadow-md hover:-translate-y-1">
-                                <div className="w-12 h-12 min-w-[48px] rounded-lg bg-blue-600 text-white flex items-center justify-center font-black text-xl shadow-sm">
-                                    #{idx + 1}
-                                </div>
-                                <div className="overflow-hidden">
-                                    <h4 className="font-bold text-slate-800 truncate">{menu.name}</h4>
-                                    <p className="text-sm text-slate-500 mt-0.5 underline decoration-slate-200 underline-offset-4">
-                                        {menu.qty}개 판매 <span className="mx-1 text-slate-300">|</span> {showRevenue ? `${menu.revenue.toLocaleString()}원` : `******원`}
-                                    </p>
-                                </div>
+            <SectionCard
+                title="오늘 잘 팔린 메뉴"
+                description="매출 흐름을 빠르게 파악할 수 있도록 오늘 판매 상위 메뉴를 보여드립니다."
+                emptyMessage="아직 오늘 집계된 판매 내역이 없습니다. 첫 판매를 기록해보세요."
+            >
+                {topMenus.length > 0 && (
+                    <div className="grid gap-4 md:grid-cols-3">
+                        {topMenus.slice(0, 3).map((menu, index) => (
+                            <div key={menu.name} className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+                                    Top {index + 1}
+                                </p>
+                                <p className="mt-3 text-xl font-bold text-slate-900">{menu.name}</p>
+                                <p className="mt-2 text-sm text-slate-500">
+                                    {menu.qty.toLocaleString()}개 판매 / {formatCurrency(menu.revenue)}
+                                </p>
                             </div>
                         ))}
-                        {topMenus.length === 0 && <p className="col-span-3 text-center text-slate-400 py-6 italic font-medium">아직 집계된 판매 내역이 없습니다.</p>}
                     </div>
-                </div>
-            </div>
-
-            {/* 🔹 하단 콘텐츠 섹션 */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 w-full items-start">
-                {/* 좌측: 액션 카드 리스트 */}
-                <div className="flex flex-col space-y-6">
-                    <ActionCard
-                        title="긴급 재고 부족"
-                        icon={Package}
-                        count={stockWarnings.length}
-                        type="negative"
-                    >
-                        {stockWarnings.length > 0 ? (
-                            <ul className="divide-y divide-slate-100">
-                                {stockWarnings.map(item => (
-                                    <li key={item.id} className="py-3 flex justify-between items-center">
-                                        <div className="pr-4">
-                                            <span className="font-semibold text-slate-700 block">{item.name}</span>
-                                            <p className="text-xs text-slate-400 mt-0.5">현재: {item.current}{item.unit} / 안전재고: {item.safety}{item.unit}</p>
-                                        </div>
-                                        <span className="text-xs font-bold px-2 py-1 bg-red-50 text-red-600 rounded border border-red-100 whitespace-nowrap">발주 필요</span>
-                                    </li>
-                                ))}
-                            </ul>
-                        ) : (
-                            <EmptyState message="모든 재고가 충분합니다." />
-                        )}
-                    </ActionCard>
-
-                </div>
-
-                {/* 우측: 매출 차트 */}
-                <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm">
-                    <div className="flex items-center justify-between mb-8">
-                        <h3 className="font-bold text-slate-800 flex items-center gap-2">
-                            <Clock className="text-blue-500" size={20} />
-                            실시간 매출 흐름
-                        </h3>
-                        <span className="text-xs text-slate-400">오늘 ({String(openHour).padStart(2, '0')}시 ~ {String(closeHour).padStart(2, '0')}시)</span>
-                    </div>
-                    <div className="h-[300px] w-full">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart data={filteredHourly} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                                <defs>
-                                    <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.1} />
-                                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                                    </linearGradient>
-                                </defs>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                                <XAxis
-                                    dataKey="hour"
-                                    axisLine={false}
-                                    tickLine={false}
-                                    tick={{ fill: '#94a3b8', fontSize: 11 }}
-                                    tickFormatter={(v) => `${v}시`}
-                                />
-                                <YAxis tick={{ fill: '#94a3b8', fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={v => showRevenue ? `${(v / 10000).toFixed(0)}만` : `****`} />
-                                <Tooltip
-                                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-                                    formatter={(value: any) => [showRevenue ? `${Number(value).toLocaleString()}원` : `****원`, '매출']}
-                                    labelFormatter={(h) => `${h}시`}
-                                />
-                                <Area
-                                    type="monotone"
-                                    dataKey="amount"
-                                    stroke="#3b82f6"
-                                    strokeWidth={3}
-                                    fillOpacity={1}
-                                    fill="url(#colorSales)"
-                                    isAnimationActive={true}
-                                    animationDuration={1500}
-                                />
-                            </AreaChart>
-                        </ResponsiveContainer>
-                    </div>
-                </div>
-            </div>
-
-
-        </div>
-    );
-}
-
-// 🔸 내부 컴포넌트: 요약 카드
-function SummaryCard({ title, value, trend, icon: Icon, color, unit = '원' }: any) {
-    const isPositive = trend >= 0;
-    const colorMap: Record<string, string> = {
-        blue: 'bg-blue-50 text-blue-600',
-        indigo: 'bg-indigo-50 text-indigo-600',
-        amber: 'bg-amber-50 text-amber-600',
-        emerald: 'bg-emerald-50 text-emerald-600',
-    };
-
-    return (
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all group">
-            <div className="flex items-center justify-between mb-4">
-                <div className={`p-2 rounded-xl transition-colors ${colorMap[color]}`}>
-                    <Icon size={20} />
-                </div>
-                <div className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black ${isPositive ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'
-                    }`}>
-                    {isPositive ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
-                    {Math.abs(trend)}%
-                </div>
-            </div>
-            <div>
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1.5">{title}</p>
-                <div className="flex items-baseline gap-1">
-                    <span className="text-3xl font-black text-slate-800 group-hover:text-blue-600 transition-colors">{value.toLocaleString()}</span>
-                    <span className="text-sm text-slate-400 font-bold">{unit}</span>
-                </div>
-            </div>
-        </div>
-    );
-}
-
-// 🔸 내부 컴포넌트: 액션 카드 (h-full 제거, 동적 높이 지원)
-function ActionCard({ title, icon: Icon, count, children, type }: any) {
-    const colorClass = type === 'negative' ? 'text-rose-500' : 'text-amber-500';
-    const bgColor = type === 'negative' ? 'bg-rose-50' : 'bg-amber-50';
-
-    return (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col w-full">
-            <div className="p-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                    <Icon className={colorClass} size={18} />
-                    <h4 className="font-bold text-slate-700 text-sm">{title}</h4>
-                </div>
-                {count > 0 && (
-                    <span className={`px-2 py-0.5 ${bgColor} ${colorClass} text-[10px] font-black rounded-full`}>
-                        {count}건
-                    </span>
                 )}
-            </div>
-            {/* 높이를 제한하여 카드가 무한정 길어지는 것을 방지 (스크롤 활성화) */}
-            <div className="p-4 max-h-[200px] overflow-y-auto custom-scrollbar">
-                {children}
-            </div>
-        </div>
-    );
-}
-
-function EmptyState({ message }: { message: string }) {
-    return (
-        <div className="flex flex-col items-center justify-center py-8 text-slate-300">
-            <div className="bg-slate-50 p-4 rounded-full mb-3">
-                <Package size={28} />
-            </div>
-            <p className="text-xs font-semibold">{message}</p>
+            </SectionCard>
         </div>
     );
 }

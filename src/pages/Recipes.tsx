@@ -388,9 +388,9 @@ export default function Recipes() {
                           {recipe.ingredients.map((ingredient, idx) => (
                             <tr key={idx}>
                               <td>{ingredient.name}</td>
-                              <td>{ingredient.quantity}</td>
-                              <td>{ingredient.unit_cost.toFixed(2)}원</td>
-                              <td>{ingredient.total_ingredient_cost.toLocaleString()}원</td>
+                              <td>{ingredient.quantity ?? ingredient.usage ?? 0}</td>
+                              <td>{(ingredient.unit_cost ?? ingredient.cost_per_unit ?? 0).toFixed(2)}원</td>
+                              <td>{(ingredient.total_ingredient_cost ?? ingredient.cost ?? 0).toLocaleString()}원</td>
                             </tr>
                           ))}
                         </tbody>
@@ -519,9 +519,9 @@ export default function Recipes() {
                                 {recipe.ingredients.map((ingredient, idx) => (
                                   <tr key={idx}>
                                     <td>{ingredient.name}</td>
-                                    <td>{ingredient.quantity}</td>
-                                    <td>{ingredient.unit_cost.toFixed(2)}원</td>
-                                    <td>{ingredient.total_ingredient_cost.toLocaleString()}원</td>
+                                    <td>{ingredient.quantity ?? ingredient.usage ?? 0}</td>
+                                    <td>{(ingredient.unit_cost ?? ingredient.cost_per_unit ?? 0).toFixed(2)}원</td>
+                                    <td>{(ingredient.total_ingredient_cost ?? ingredient.cost ?? 0).toLocaleString()}원</td>
                                   </tr>
                                 ))}
                               </tbody>

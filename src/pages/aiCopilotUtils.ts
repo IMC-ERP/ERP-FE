@@ -17,11 +17,17 @@ export interface ProductSummary {
 }
 
 export interface StockRiskItem extends InventoryItem {
+  name_ko: string;
+  safetyStock: number;
   gap: number;
   coverage: number;
 }
 
 export interface RecipeInsight extends RecipeCost {
+  menu_name: string;
+  selling_price: number;
+  total_cost: number;
+  cost_ratio: number;
   recentQty: number;
   contributionMargin: number;
   estimatedContribution: number;
@@ -89,6 +95,12 @@ export const MODE_LABELS: Record<AssistantMode, { title: string; caption: string
 };
 
 export const formatCurrency = (value: number) => `${Math.round(value).toLocaleString()}원`;
+const getRecipeName = (recipe: RecipeCost) => recipe.menu_name ?? recipe.name;
+const getRecipeSellingPrice = (recipe: RecipeCost) => recipe.selling_price ?? recipe.price;
+const getRecipeTotalCost = (recipe: RecipeCost) => recipe.total_cost ?? recipe.totalCost;
+const getRecipeCostRatio = (recipe: RecipeCost) => recipe.cost_ratio ?? recipe.marginRate;
+const getInventorySafetyStock = (item: InventoryItem) => item.safetyStock ?? item.safety_stock;
+const getInventoryDisplayName = (item: InventoryItem) => item.name_ko ?? item.item_name_ko ?? item.name;
 
 // ==================== Snapshot Builders ====================
 
@@ -105,11 +117,19 @@ const getHourLabel = (hour: number) => {
 
 const buildRecipeInsights = (recipes: RecipeCost[], recentMenuQtyMap: Map<string, number>) => {
   const recipeInsights: RecipeInsight[] = recipes.map(recipe => {
-    const recentQty = recentMenuQtyMap.get(recipe.menu_name) || 0;
-    const contributionMargin = recipe.selling_price - recipe.total_cost;
+    const menuName = getRecipeName(recipe);
+    const sellingPrice = getRecipeSellingPrice(recipe);
+    const totalCost = getRecipeTotalCost(recipe);
+    const costRatio = getRecipeCostRatio(recipe);
+    const recentQty = recentMenuQtyMap.get(menuName) || 0;
+    const contributionMargin = sellingPrice - totalCost;
 
     return {
       ...recipe,
+      menu_name: menuName,
+      selling_price: sellingPrice,
+      total_cost: totalCost,
+      cost_ratio: costRatio,
       recentQty,
       contributionMargin,
       estimatedContribution: recentQty * contributionMargin
@@ -150,18 +170,20 @@ const buildRecipeInsights = (recipes: RecipeCost[], recentMenuQtyMap: Map<string
 
 export const buildAnalyticsSnapshot = (sales: SaleItem[], inventory: InventoryItem[], recipes: RecipeCost[]): AnalyticsSnapshot => {
   const lowStockItems = inventory
-    .filter(item => item.safetyStock > 0 && item.quantity_on_hand < item.safetyStock)
+    .filter(item => getInventorySafetyStock(item) > 0 && item.quantity_on_hand < getInventorySafetyStock(item))
     .map(item => ({
       ...item,
-      gap: item.safetyStock - item.quantity_on_hand,
-      coverage: item.safetyStock > 0 ? item.quantity_on_hand / item.safetyStock : 1
+      name_ko: getInventoryDisplayName(item),
+      safetyStock: getInventorySafetyStock(item),
+      gap: getInventorySafetyStock(item) - item.quantity_on_hand,
+      coverage: getInventorySafetyStock(item) > 0 ? item.quantity_on_hand / getInventorySafetyStock(item) : 1
     }))
     .sort((a, b) => a.coverage - b.coverage);
 
   const watchlistCount = inventory.filter(item =>
-    item.safetyStock > 0 &&
-    item.quantity_on_hand >= item.safetyStock &&
-    item.quantity_on_hand <= item.safetyStock * 1.2
+    getInventorySafetyStock(item) > 0 &&
+    item.quantity_on_hand >= getInventorySafetyStock(item) &&
+    item.quantity_on_hand <= getInventorySafetyStock(item) * 1.2
   ).length;
   const initialRecipeSnapshot = buildRecipeInsights(recipes, new Map<string, number>());
 

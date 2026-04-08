@@ -1,23 +1,26 @@
 /**
  * AuthContext.tsx
- * Supabase Google 인증 상태 관리 + 사용자 프로필 관리
+ * Supabase OAuth 인증 상태 관리 + 사용자 프로필 관리
  */
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import axios from 'axios';
 import { Capacitor } from '@capacitor/core';
 import { App as CapacitorApp } from '@capacitor/app';
-import { Browser } from '@capacitor/browser';
-import type { User, Session } from '@supabase/supabase-js';
+import type { Session } from '@supabase/supabase-js';
 import {
-    assertSupabaseConfigured,
-    getSupabaseRedirectUrl,
     supabase,
     SUPABASE_NATIVE_REDIRECT_URL,
-    SUPABASE_WEB_CALLBACK_PATH,
 } from '../supabase';
 import { userApi, setAuthToken, type UserProfile } from '../services/api';
+import { getApiErrorMessage, getApiStatus } from '../utils/apiErrors';
+import {
+    beginSupabaseOAuthSignIn,
+    closeInAppBrowserSafely,
+    completeSupabaseAuthFromUrl,
+    mapSupabaseUser,
+} from '../features/auth/supabaseAuth';
+import type { OAuthProvider } from '../features/auth/oauthProviders';
 
 export interface AppAuthUser {
     id: string;
@@ -34,7 +37,7 @@ interface AuthContextType {
     loading: boolean;
     needsRegistration: boolean;
     authIssue: string | null;
-    signInWithGoogle: (redirectPath?: string) => Promise<void>;
+    signInWithOAuth: (provider: OAuthProvider, redirectPath?: string) => Promise<void>;
     logout: () => Promise<void>;
     refreshProfile: () => Promise<void>;
     retryProfileCheck: () => Promise<void>;
@@ -54,6 +57,9 @@ interface AuthProviderProps {
     children: ReactNode;
 }
 
+const AUTH_CALLBACK_ERROR_MESSAGE = '로그인 응답을 처리하지 못했습니다. 다시 시도해주세요.';
+const PROFILE_CHECK_ERROR_MESSAGE = '계정 상태를 확인하지 못했습니다. 네트워크 또는 서버 상태를 확인해주세요.';
+
 export const AuthProvider = ({ children }: AuthProviderProps) => {
     const [user, setUser] = useState<AppAuthUser | null>(null);
     const [session, setSession] = useState<Session | null>(null);
@@ -62,38 +68,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     const [needsRegistration, setNeedsRegistration] = useState(false);
     const [authIssue, setAuthIssue] = useState<string | null>(null);
     const lastHandledAuthUrlRef = useRef<string | null>(null);
-
-    const mapSupabaseUser = (supabaseUser: User): AppAuthUser => ({
-        id: supabaseUser.id,
-        uid: supabaseUser.id,
-        email: supabaseUser.email ?? null,
-        displayName:
-            supabaseUser.user_metadata?.full_name
-            ?? supabaseUser.user_metadata?.name
-            ?? supabaseUser.user_metadata?.display_name
-            ?? null,
-        photoURL:
-            supabaseUser.user_metadata?.avatar_url
-            ?? supabaseUser.user_metadata?.picture
-            ?? null,
-    });
-
-    const getErrorMessage = (error: unknown, fallback: string) => {
-        if (axios.isAxiosError(error)) {
-            const detail = error.response?.data?.detail;
-            if (typeof detail === 'string') {
-                return detail;
-            }
-        }
-
-        if (error instanceof Error && error.message) {
-            return error.message;
-        }
-
-        return fallback;
-    };
+    const profileRequestIdRef = useRef(0);
 
     const clearAuthState = useCallback(() => {
+        profileRequestIdRef.current += 1;
         setUser(null);
         setSession(null);
         setUserProfile(null);
@@ -103,81 +81,38 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         lastHandledAuthUrlRef.current = null;
     }, []);
 
-    const readParamFromUrl = (url: URL, key: string) => {
-        const searchValue = url.searchParams.get(key);
-        if (searchValue) {
-            return searchValue;
-        }
-
-        const hashValue = url.hash.startsWith('#') ? url.hash.slice(1) : url.hash;
-        return new URLSearchParams(hashValue).get(key);
-    };
-
-    const shouldHandleAuthCallback = (url: URL) => {
-        const isNativeCallback =
-            url.protocol === 'com.imcerp.coffeeerp:' &&
-            url.hostname === 'auth' &&
-            url.pathname === '/callback';
-
-        const isWebCallback = url.pathname === SUPABASE_WEB_CALLBACK_PATH;
-
-        return isNativeCallback || isWebCallback;
-    };
-
     const completeAuthFromUrl = useCallback(async (rawUrl: string) => {
-        const callbackUrl = new URL(rawUrl);
-
-        if (!shouldHandleAuthCallback(callbackUrl)) {
-            return false;
-        }
-
         if (lastHandledAuthUrlRef.current === rawUrl) {
             return true;
         }
 
-        const providerError =
-            readParamFromUrl(callbackUrl, 'error_description')
-            ?? readParamFromUrl(callbackUrl, 'error');
-
-        if (providerError) {
-            throw new Error(providerError);
-        }
-
-        const authCode = readParamFromUrl(callbackUrl, 'code');
-        if (authCode) {
-            const { error } = await supabase.auth.exchangeCodeForSession(authCode);
-            if (error) {
-                throw error;
-            }
-
+        const handled = await completeSupabaseAuthFromUrl(rawUrl);
+        if (handled) {
             lastHandledAuthUrlRef.current = rawUrl;
-            return true;
         }
-
-        const accessToken = readParamFromUrl(callbackUrl, 'access_token');
-        const refreshToken = readParamFromUrl(callbackUrl, 'refresh_token');
-
-        if (accessToken && refreshToken) {
-            const { error } = await supabase.auth.setSession({
-                access_token: accessToken,
-                refresh_token: refreshToken,
-            });
-
-            if (error) {
-                throw error;
-            }
-
-            lastHandledAuthUrlRef.current = rawUrl;
-            return true;
-        }
-
-        return false;
+        return handled;
     }, []);
+
+    const handleAuthCallbackUrl = useCallback(async (rawUrl: string) => {
+        const handled = await completeAuthFromUrl(rawUrl);
+        if (handled) {
+            await closeInAppBrowserSafely();
+        }
+
+        return handled;
+    }, [completeAuthFromUrl]);
 
     // 사용자 프로필 로드
     const loadUserProfile = useCallback(async () => {
+        const requestId = profileRequestIdRef.current + 1;
+        profileRequestIdRef.current = requestId;
+
         try {
             const response = await userApi.checkRegistration();
+
+            if (requestId !== profileRequestIdRef.current) {
+                return;
+            }
 
             if (response.data.is_registered && response.data.profile) {
                 setUserProfile(response.data.profile);
@@ -189,9 +124,13 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
                 setAuthIssue(null);
             }
         } catch (error: unknown) {
+            if (requestId !== profileRequestIdRef.current) {
+                return;
+            }
+
             console.error('[AUTH] Failed to check registration:', error);
 
-            const status = axios.isAxiosError(error) ? error.response?.status : undefined;
+            const status = getApiStatus(error);
             if (status === 401 || status === 403) {
                 console.warn('[AUTH] Stale session detected, signing out...');
                 await supabase.auth.signOut();
@@ -200,7 +139,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
             }
 
             setNeedsRegistration(false);
-            setAuthIssue(getErrorMessage(error, '계정 상태를 확인하지 못했습니다. 네트워크 또는 서버 상태를 확인해주세요.'));
+            setAuthIssue(getApiErrorMessage(error, PROFILE_CHECK_ERROR_MESSAGE));
         }
     }, [clearAuthState]);
 
@@ -237,42 +176,18 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         }
     }, [clearAuthState, loadUserProfile, user]);
 
-    // Google 로그인
-    const signInWithGoogle = async (redirectPath?: string) => {
+    const signInWithOAuth = useCallback(async (
+        provider: OAuthProvider,
+        redirectPath?: string,
+    ) => {
         try {
-            assertSupabaseConfigured();
             setAuthIssue(null);
-
-            const { data, error } = await supabase.auth.signInWithOAuth({
-                provider: 'google',
-                options: {
-                    redirectTo: getSupabaseRedirectUrl(redirectPath),
-                    skipBrowserRedirect: true,
-                },
-            });
-
-            if (error) {
-                throw error;
-            }
-
-            if (!data.url) {
-                throw new Error('Supabase OAuth URL을 생성하지 못했습니다.');
-            }
-
-            if (Capacitor.isNativePlatform()) {
-                await Browser.open({
-                    url: data.url,
-                    presentationStyle: 'fullscreen',
-                });
-                return;
-            }
-
-            window.location.assign(data.url);
+            await beginSupabaseOAuthSignIn(provider, redirectPath);
         } catch (error) {
-            console.error('Google 로그인 실패:', error);
+            console.error(`${provider} 로그인 실패:`, error);
             throw error;
         }
-    };
+    }, []);
 
     // 로그아웃
     const logout = async () => {
@@ -295,10 +210,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
             try {
                 if (!Capacitor.isNativePlatform() && typeof window !== 'undefined') {
                     try {
-                        await completeAuthFromUrl(window.location.href);
+                        await handleAuthCallbackUrl(window.location.href);
                     } catch (error) {
                         console.error('웹 OAuth 콜백 처리 실패:', error);
-                        setAuthIssue(getErrorMessage(error, '로그인 응답을 처리하지 못했습니다. 다시 시도해주세요.'));
+                        setAuthIssue(getApiErrorMessage(error, AUTH_CALLBACK_ERROR_MESSAGE));
                     }
                 }
 
@@ -306,14 +221,11 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
                     try {
                         const launchUrl = (await CapacitorApp.getLaunchUrl())?.url;
                         if (launchUrl) {
-                            const handled = await completeAuthFromUrl(launchUrl);
-                            if (handled) {
-                                await Browser.close().catch(() => undefined);
-                            }
+                            await handleAuthCallbackUrl(launchUrl);
                         }
                     } catch (error) {
                         console.error('초기 네이티브 OAuth 콜백 처리 실패:', error);
-                        setAuthIssue(getErrorMessage(error, '로그인 응답을 처리하지 못했습니다. 다시 시도해주세요.'));
+                        setAuthIssue(getApiErrorMessage(error, AUTH_CALLBACK_ERROR_MESSAGE));
                     }
                 }
 
@@ -376,15 +288,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         if (Capacitor.isNativePlatform()) {
             void CapacitorApp.addListener('appUrlOpen', async ({ url }) => {
                 try {
-                    const handled = await completeAuthFromUrl(url);
-                    if (!handled) {
-                        return;
-                    }
-
-                    await Browser.close().catch(() => undefined);
+                    await handleAuthCallbackUrl(url);
                 } catch (error) {
                     console.error(`네이티브 OAuth 콜백 처리 실패 (${SUPABASE_NATIVE_REDIRECT_URL}):`, error);
-                    setAuthIssue(getErrorMessage(error, '로그인 응답을 처리하지 못했습니다. 다시 시도해주세요.'));
+                    setAuthIssue(getApiErrorMessage(error, AUTH_CALLBACK_ERROR_MESSAGE));
                 }
             }).then((listener) => {
                 appListenerCleanup = () => listener.remove();
@@ -400,7 +307,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
                 void appListenerCleanup();
             }
         };
-    }, [applySession, clearAuthState, completeAuthFromUrl]);
+    }, [applySession, clearAuthState, handleAuthCallbackUrl]);
 
     const value: AuthContextType = {
         user,
@@ -409,7 +316,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         loading,
         needsRegistration,
         authIssue,
-        signInWithGoogle,
+        signInWithOAuth,
         logout,
         refreshProfile,
         retryProfileCheck,

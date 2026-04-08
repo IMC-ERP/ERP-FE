@@ -1,6 +1,6 @@
 /**
  * RegisterPage - 사용자 회원가입 페이지
- * Firebase 인증 후 매장 정보 등록
+ * 앱 첫 사용을 위한 최소 매장 정보 등록
  */
 
 import { useState, useEffect } from 'react';
@@ -16,12 +16,29 @@ export default function RegisterPage() {
         storeName: '',
         ownerName: '',
         phone: '',
-        address: '',
-        establishedYear: ''
     });
 
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+
+    const getRegistrationErrorMessage = (error: unknown) => {
+        if (
+            typeof error === 'object' &&
+            error !== null &&
+            'response' in error
+        ) {
+            const response = (error as { response?: { data?: { detail?: string } } }).response;
+            if (response?.data?.detail) {
+                return response.data.detail;
+            }
+        }
+
+        if (error instanceof Error && error.message) {
+            return error.message;
+        }
+
+        return '등록에 실패했습니다. 다시 시도해주세요.';
+    };
 
     // 이미 등록된 사용자는 대시보드로 리다이렉트
     useEffect(() => {
@@ -31,7 +48,7 @@ export default function RegisterPage() {
             try {
                 const response = await userApi.checkRegistration();
                 if (response.data.is_registered) {
-                    navigate('/dashboard');
+                    navigate('/');
                 }
             } catch (err) {
                 console.error('Failed to check registration:', err);
@@ -63,16 +80,14 @@ export default function RegisterPage() {
                 store_name: formData.storeName,
                 name: formData.ownerName,
                 phone: formData.phone,
-                address: formData.address,
-                established_year: formData.establishedYear ? parseInt(formData.establishedYear) : undefined,
             });
 
-            // 등록 성공 - 프로필 새로고침 후 대시보드로 이동
+            // 등록 성공 - 프로필 새로고침 후 홈으로 이동
             await refreshProfile();
-            navigate('/dashboard');
-        } catch (err: any) {
+            navigate('/');
+        } catch (err: unknown) {
             console.error('Registration failed:', err);
-            setError(err.response?.data?.detail || '등록에 실패했습니다. 다시 시도해주세요.');
+            setError(getRegistrationErrorMessage(err));
         } finally {
             setLoading(false);
         }
@@ -92,7 +107,7 @@ export default function RegisterPage() {
                     <div className="text-5xl mb-4">☕</div>
                     <h1 className="text-2xl font-bold text-slate-800 mb-2">매장 등록</h1>
                     <p className="text-slate-500 text-sm">
-                        Coffee ERP를 사용하기 위해 매장 정보를 등록해주세요
+                        매장명과 대표자명만 입력하면 바로 홈, 재고, 입고/OCR 화면을 사용할 수 있습니다.
                     </p>
                 </div>
 
@@ -103,6 +118,15 @@ export default function RegisterPage() {
                 )}
 
                 <form onSubmit={handleSubmit} className="space-y-5">
+                    <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                        <p className="font-semibold">등록 후 바로 할 수 있는 일</p>
+                        <ul className="mt-2 space-y-1 text-amber-800">
+                            <li>1. 영수증 업로드로 오늘 입고 정리</li>
+                            <li>2. 부족 재고와 발주 필요 품목 확인</li>
+                            <li>3. 오늘 매출과 잘 팔린 메뉴 점검</li>
+                        </ul>
+                    </div>
+
                     <div>
                         <label htmlFor="storeName" className="block text-sm font-medium text-slate-700 mb-2">
                             매장명 <span className="text-red-500">*</span>
@@ -137,7 +161,7 @@ export default function RegisterPage() {
 
                     <div>
                         <label htmlFor="phone" className="block text-sm font-medium text-slate-700 mb-2">
-                            연락처
+                            연락처 <span className="text-slate-400">(선택)</span>
                         </label>
                         <input
                             type="tel"
@@ -146,38 +170,6 @@ export default function RegisterPage() {
                             value={formData.phone}
                             onChange={handleChange}
                             placeholder="예: 010-1234-5678"
-                            className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all"
-                        />
-                    </div>
-
-                    <div>
-                        <label htmlFor="address" className="block text-sm font-medium text-slate-700 mb-2">
-                            매장 주소
-                        </label>
-                        <textarea
-                            id="address"
-                            name="address"
-                            value={formData.address}
-                            onChange={handleChange}
-                            placeholder="예: 서울시 강남구 테헤란로 123"
-                            rows={3}
-                            className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all resize-none"
-                        />
-                    </div>
-
-                    <div>
-                        <label htmlFor="establishedYear" className="block text-sm font-medium text-slate-700 mb-2">
-                            설립 연도
-                        </label>
-                        <input
-                            type="number"
-                            id="establishedYear"
-                            name="establishedYear"
-                            value={formData.establishedYear}
-                            onChange={handleChange}
-                            placeholder="예: 2024"
-                            min="1900"
-                            max="2100"
                             className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all"
                         />
                     </div>
@@ -193,7 +185,7 @@ export default function RegisterPage() {
 
                 <div className="mt-6 text-center">
                     <p className="text-xs text-slate-500">
-                        등록하신 정보는 나중에 설정에서 수정할 수 있습니다
+                        전화번호와 나머지 매장 정보는 나중에 설정에서 언제든 수정할 수 있습니다
                     </p>
                 </div>
             </div>

@@ -6,6 +6,7 @@ export const APP_INFO = {
   supportEmail: import.meta.env.VITE_SUPPORT_EMAIL || DEFAULT_SUPPORT_EMAIL,
   supportPhone: import.meta.env.VITE_SUPPORT_PHONE || '',
   supportResponseWindow: import.meta.env.VITE_SUPPORT_RESPONSE_WINDOW || '영업일 기준 2~3일 이내',
+  pricingPath: '/pricing',
   privacyPolicyPath: '/privacy-policy',
   supportPath: '/support',
   accountDeletionPath: '/account-deletion',

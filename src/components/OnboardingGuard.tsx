@@ -7,7 +7,11 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { inventoryApi } from '../services/api';
+import {
+    isOnboardingComplete,
+    loadOnboardingProgress,
+    setSavedOnboardingStep,
+} from '../features/onboarding/onboardingProgress';
 
 export default function OnboardingGuard({ children }: { children: React.ReactNode }) {
     const { userProfile, loading } = useAuth();
@@ -32,28 +36,17 @@ export default function OnboardingGuard({ children }: { children: React.ReactNod
             }
 
             // 1차 체크: CompleteSetupStep에서 로컬스토리지에 저장한 '완료 플래그' 확인
-            const isOnboardingComplete = localStorage.getItem(`onboarding_complete_${userProfile.uid}`) === 'true';
-
-            if (isOnboardingComplete) {
+            if (userProfile.onboarding_completed || isOnboardingComplete(userProfile.uid)) {
                 // 이미 완료한 유저는 통과
                 setIsChecking(false);
                 return;
             }
 
-            // 2차 체크 (가장 확실함): DB의 원재료 데이터를 확인하여 Condition 판별
+            // 2차 체크: 실제 재고/레시피 상태를 기준으로 추천 스텝 결정
             try {
-                const res = await inventoryApi.getAll();
-                const hasInventory = res.data && res.data.length > 0;
-
-                if (!hasInventory) {
-                    // Condition A: 원재료 데이터가 아예 없음 -> [Step 1]로 강제 리다이렉트
-                    localStorage.setItem(`onboarding_step_${userProfile.uid}`, '1');
-                    navigate('/onboarding', { replace: true });
-                } else {
-                    // Condition B: 원재료는 있으나 완료되지 않음 -> [Step 2]로 리다이렉트
-                    localStorage.setItem(`onboarding_step_${userProfile.uid}`, '2');
-                    navigate('/onboarding', { replace: true });
-                }
+                const progress = await loadOnboardingProgress(userProfile.uid);
+                setSavedOnboardingStep(userProfile.uid, progress.recommendedStep);
+                navigate('/onboarding', { replace: true });
             } catch (err) {
                 console.error('Failed to check onboarding guard status', err);
                 setIsChecking(false); // 에러 페치 시 무한 로딩 방지 통과 (또는 리다이렉트)

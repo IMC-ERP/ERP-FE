@@ -3,10 +3,10 @@
  * Mock 데이터 대신 실제 API 호출로 대체
  */
 
-import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { SaleItem, InventoryItem, StoreProfile, AppSettings } from '../types';
 import { salesApi, inventoryApi, type Sale } from '../services/api';
-import { supabase } from '../supabase';
+import { useAuth } from './AuthContext';
 
 interface DataContextType {
     sales: SaleItem[];
@@ -23,6 +23,16 @@ interface DataContextType {
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
+
+const DEFAULT_STORE_PROFILE: StoreProfile = {
+    store_id: 'default',
+    store_name: 'Coffee ERP',
+    status: 'ACTIVE',
+    owner_name: '홍길동',
+    established_year: 2023,
+    address: '서울시 강남구 테헤란로 123',
+    contact_number: '02-1234-5678',
+};
 
 // API 응답을 프론트엔드 타입으로 변환
 const transformSale = (apiSale: Sale): SaleItem => ({
@@ -41,21 +51,15 @@ const transformSale = (apiSale: Sale): SaleItem => ({
 // transformInventory function removed to directly consume API response
 
 export const DataProvider = ({ children }: { children?: ReactNode }) => {
+    const { user, userProfile, loading: authLoading, needsRegistration, authIssue } = useAuth();
     const [sales, setSales] = useState<SaleItem[]>([]);
     const [inventory, setInventory] = useState<InventoryItem[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const dataRequestIdRef = useRef(0);
 
     // Default Profile
-    const [storeProfile, setStoreProfile] = useState<StoreProfile>({
-        store_id: "default",
-        store_name: "Coffee ERP",
-        status: "ACTIVE",
-        owner_name: "홍길동",
-        established_year: 2023,
-        address: "서울시 강남구 테헤란로 123",
-        contact_number: "02-1234-5678"
-    });
+    const [storeProfile, setStoreProfile] = useState<StoreProfile>(DEFAULT_STORE_PROFILE);
 
     // Default Settings — localStorage에서 복원
     const [appSettings, setAppSettings] = useState<AppSettings>(() => {
@@ -106,7 +110,17 @@ export const DataProvider = ({ children }: { children?: ReactNode }) => {
         html.classList.add(`text-${appSettings.fontSize}`);
     }, [appSettings]);
 
-    const fetchData = async () => {
+    const resetDataState = useCallback((nextError: string | null = null) => {
+        dataRequestIdRef.current += 1;
+        setSales([]);
+        setInventory([]);
+        setError(nextError);
+        setIsLoading(false);
+    }, []);
+
+    const fetchData = useCallback(async () => {
+        const requestId = dataRequestIdRef.current + 1;
+        dataRequestIdRef.current = requestId;
         setIsLoading(true);
         setError(null);
 
@@ -120,34 +134,64 @@ export const DataProvider = ({ children }: { children?: ReactNode }) => {
             // 데이터 변환 및 저장
             const transformedSales = salesRes.data.map(transformSale);
 
+            if (requestId !== dataRequestIdRef.current) {
+                return;
+            }
+
             setSales(transformedSales);
             setInventory(inventoryRes.data);
         } catch (err) {
+            if (requestId !== dataRequestIdRef.current) {
+                return;
+            }
+
             console.error('Failed to fetch data from API:', err);
-            setError('백엔드 서버에 연결할 수 없습니다. 서버가 실행 중인지 확인해주세요.');
-            // 에러 시 빈 배열로 설정
-            setSales([]);
-            setInventory([]);
+            resetDataState('백엔드 서버에 연결할 수 없습니다. 서버가 실행 중인지 확인해주세요.');
+            return;
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [resetDataState]);
 
     useEffect(() => {
-        // Auth 상태 변경 감지
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-            if (session?.user) {
-                fetchData();
-            } else {
-                // 로그아웃 시 데이터 초기화
-                setSales([]);
-                setInventory([]);
-                setIsLoading(false);
-            }
-        });
+        if (userProfile) {
+            setStoreProfile((current) => ({
+                ...current,
+                store_id: userProfile.store_id,
+                store_name: userProfile.store_name,
+                owner_name: userProfile.owner_name ?? userProfile.name ?? current.owner_name,
+                contact_number: userProfile.phone ?? current.contact_number,
+                address: userProfile.address ?? current.address,
+            }));
+            return;
+        }
 
-        return () => subscription.unsubscribe();
-    }, []);
+        setStoreProfile(DEFAULT_STORE_PROFILE);
+    }, [user, userProfile]);
+
+    useEffect(() => {
+        if (authLoading) {
+            setIsLoading(true);
+            return;
+        }
+
+        if (!user) {
+            resetDataState();
+            return;
+        }
+
+        if (needsRegistration) {
+            resetDataState();
+            return;
+        }
+
+        if (authIssue) {
+            resetDataState(authIssue);
+            return;
+        }
+
+        void fetchData();
+    }, [authIssue, authLoading, fetchData, needsRegistration, resetDataState, user]);
 
     const addSale = (newSale: SaleItem) => {
         setSales(prev => [...prev, newSale]);

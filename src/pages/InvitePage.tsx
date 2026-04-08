@@ -3,20 +3,30 @@
  * 구성원(직원) 초대 수락 전용 페이지
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { invitationApi } from '../services/api';
 import { Key, ArrowRight, Loader } from 'lucide-react';
+import OAuthProviderButton from '../components/auth/OAuthProviderButton';
+import { getApiErrorMessage } from '../utils/apiErrors';
+import { getOAuthProviderContinueLabel, OAUTH_PROVIDERS, type OAuthProvider } from '../features/auth/oauthProviders';
 
 export default function InvitePage() {
-    const { user, signInWithGoogle } = useAuth();
+    const { user, signInWithOAuth, refreshProfile } = useAuth();
     const navigate = useNavigate();
 
     const [code, setCode] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState(false);
+    const redirectTimeoutRef = useRef<number | null>(null);
+
+    useEffect(() => () => {
+        if (redirectTimeoutRef.current !== null) {
+            window.clearTimeout(redirectTimeoutRef.current);
+        }
+    }, []);
 
     // ========== 이벤트 핸들러 ==========
     const handleSubmit = async (e: React.FormEvent) => {
@@ -38,18 +48,21 @@ export default function InvitePage() {
             setError('');
 
             await invitationApi.consume(trimmedCode);
+            await refreshProfile();
             setSuccess(true);
-            setTimeout(() => {
-                navigate('/');
-                // 상태 동기화를 위해 강제 새로고침 (간단한 해결책)
-                window.location.reload();
+            redirectTimeoutRef.current = window.setTimeout(() => {
+                navigate('/', { replace: true });
             }, 2000);
 
-        } catch (err: any) {
-            setError(err.response?.data?.detail || '유효하지 않거나 만료된 초대 코드입니다.');
+        } catch (err: unknown) {
+            setError(getApiErrorMessage(err, '유효하지 않거나 만료된 초대 코드입니다.'));
         } finally {
             setLoading(false);
         }
+    };
+
+    const handleOAuth = (provider: OAuthProvider) => {
+        void signInWithOAuth(provider);
     };
 
     // ========== 렌더링 ==========
@@ -72,15 +85,19 @@ export default function InvitePage() {
                 {!user ? (
                     <div className="space-y-3">
                         <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-amber-700 text-sm text-center font-medium">
-                            매장에 합류하려면 먼저 구글 계정으로 로그인해주세요.
+                            매장에 합류하려면 먼저 Apple 또는 Google 계정으로 로그인해주세요.
                         </div>
-                        <button
-                            onClick={signInWithGoogle}
-                            className="w-full flex items-center justify-center gap-3 bg-white border border-slate-300 rounded-xl px-4 py-3.5 text-slate-700 font-bold hover:bg-slate-50 transition-colors shadow-sm"
-                        >
-                            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-5 h-5" />
-                            Google 계정으로 계속하기
-                        </button>
+                        <div className="space-y-3">
+                            {OAUTH_PROVIDERS.map((provider) => (
+                                <OAuthProviderButton
+                                    key={provider}
+                                    provider={provider}
+                                    onClick={() => handleOAuth(provider)}
+                                    label={getOAuthProviderContinueLabel(provider)}
+                                    className="font-bold"
+                                />
+                            ))}
+                        </div>
                     </div>
                 ) : (
                     /* 상태 2: 로그인 후 코드 입력 */

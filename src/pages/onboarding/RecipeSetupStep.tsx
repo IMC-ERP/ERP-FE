@@ -1,37 +1,82 @@
 import { useState, useEffect } from 'react';
 import { inventoryApi, recipeCostApi } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
-import { Search, Plus, X, ChevronRight, Check, AlertCircle, Info, Hash } from 'lucide-react';
+import type { InventoryItem, RecipeCost } from '../../types';
 
-export default function RecipeSetupStep({ onNext }: any) {
+interface RecipeSetupStepProps {
+  onNext: () => void;
+}
+
+type MenuType = 'ICE' | 'HOT' | '통합/기타';
+
+interface IngredientDraft {
+  id: number;
+  inventoryId: string;
+  usageAmount: string;
+  searchText: string;
+  showSuggestions: boolean;
+}
+
+interface RegisteredMenu {
+  id: string;
+  name: string;
+  type: string;
+  category: string;
+  sellingPrice: number;
+  totalCost: number;
+}
+
+interface CreatedRecipeResponse {
+  id?: string | number;
+  total_cost?: number;
+}
+
+const DEFAULT_CATEGORIES = ['Coffee', 'Non-Coffee', 'Ade/Tea', 'Dessert'];
+const MENU_TYPES: MenuType[] = ['ICE', 'HOT', '통합/기타'];
+
+const createEmptyIngredient = (): IngredientDraft => ({
+  id: Date.now(),
+  inventoryId: '',
+  usageAmount: '',
+  searchText: '',
+  showSuggestions: false,
+});
+
+const getInventoryDisplayName = (item: InventoryItem) => item.name || item.item_name_ko || item.id;
+
+const getRecipeDisplayName = (recipe: RecipeCost) => recipe.menu_name || recipe.name || '이름 없음';
+
+const getErrorMessage = (error: unknown, fallback: string) => {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  return fallback;
+};
+
+export default function RecipeSetupStep({ onNext }: RecipeSetupStepProps) {
   const { userProfile } = useAuth();
   
-  const [inventory, setInventory] = useState<any[]>([]);
+  const [inventory, setInventory] = useState<InventoryItem[]>([]);
   
   // Menu Info States
   const [menuName, setMenuName] = useState('');
-  const [menuType, setMenuType] = useState('ICE');
+  const [menuType, setMenuType] = useState<MenuType>('ICE');
   const [sellingPrice, setSellingPrice] = useState<number | ''>('');
   
   // Category States
-  const [categories, setCategories] = useState<string[]>(['Coffee', 'Non-Coffee', 'Ade/Tea', 'Dessert']);
+  const [categories, setCategories] = useState<string[]>(DEFAULT_CATEGORIES);
   const [menuCategory, setMenuCategory] = useState('');
   const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [newCategory, setNewCategory] = useState('');
 
   // Ingredients States
-  const [ingredients, setIngredients] = useState<any[]>([{ 
-    id: Date.now(), 
-    inventoryId: '', 
-    usageAmount: '',
-    searchText: '',
-    showSuggestions: false
-  }]);
+  const [ingredients, setIngredients] = useState<IngredientDraft[]>([createEmptyIngredient()]);
   
   // Tabs State
   const [activeTab, setActiveTab] = useState('전체');
   // View States
-  const [registeredMenus, setRegisteredMenus] = useState<any[]>([]);
+  const [registeredMenus, setRegisteredMenus] = useState<RegisteredMenu[]>([]);
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
@@ -47,15 +92,15 @@ export default function RecipeSetupStep({ onNext }: any) {
        recipeCostApi.getAll()
           .then(res => {
             if (res.data && Array.isArray(res.data)) {
-               const mappedMenus = res.data.map((m: any) => {
-                 const menuName = m.menu_name || '이름 없음';
+               const mappedMenus = res.data.map((recipe: RecipeCost) => {
+                 const menuName = getRecipeDisplayName(recipe);
                  return {
-                   id: m.id || Math.random().toString(),
+                   id: recipe.menuId || menuName,
                    name: menuName.includes('_') ? menuName.split('_')[0] : menuName,
                    type: menuName.includes('_') ? menuName.split('_')[1] : '기타',
-                   category: m.category || '미분류',
-                   sellingPrice: Number(m.selling_price) || 0,
-                   totalCost: Number(m.total_cost) || 0
+                   category: recipe.category || '미분류',
+                   sellingPrice: Number(recipe.selling_price ?? recipe.price) || 0,
+                   totalCost: Number(recipe.total_cost ?? recipe.totalCost) || 0
                  };
                });
                setRegisteredMenus(mappedMenus);
@@ -85,16 +130,14 @@ export default function RecipeSetupStep({ onNext }: any) {
 
   // Ingredient Handlers
   const handleAddIngredient = () => {
-    setIngredients([...ingredients, { 
-      id: Date.now(), 
-      inventoryId: '', 
-      usageAmount: '',
-      searchText: '',
-      showSuggestions: false
-    }]);
+    setIngredients([...ingredients, createEmptyIngredient()]);
   };
 
-  const handleUpdateIngredient = (idx: number, field: string, value: any) => {
+  const handleUpdateIngredient = <K extends keyof IngredientDraft>(
+    idx: number,
+    field: K,
+    value: IngredientDraft[K],
+  ) => {
     setIngredients(prev => prev.map((ing, i) => 
       i === idx ? { ...ing, [field]: value } : ing
     ));
@@ -175,9 +218,10 @@ export default function RecipeSetupStep({ onNext }: any) {
       };
 
       // Backend API를 통해 저장 (DB 트랜잭션 진행 및 RLS 통과 보장)
-      const { data: responseData } = await recipeCostApi.create(payload);
+      const { data } = await recipeCostApi.create(payload);
+      const responseData = data as CreatedRecipeResponse;
       
-      const recipeId = responseData.id || Date.now(); // 만약 백엔드 응답에 id가 없으면 임시 UUID 용 Date
+      const recipeId = String(responseData.id || Date.now()); // 만약 백엔드 응답에 id가 없으면 임시 UUID 용 Date
 
       // Success
       setRegisteredMenus(prev => [...prev, {
@@ -200,17 +244,11 @@ export default function RecipeSetupStep({ onNext }: any) {
       setMenuCategory(finalCategory); // Keeps the last used category selected
       setIsAddingCategory(false);
       setNewCategory('');
-      setIngredients([{ 
-        id: Date.now(), 
-        inventoryId: '', 
-        usageAmount: '',
-        searchText: '',
-        showSuggestions: false
-      }]);
+      setIngredients([createEmptyIngredient()]);
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error saving recipe:', error);
-      alert(error.message);
+      alert(getErrorMessage(error, '레시피 저장 중 오류가 발생했습니다.'));
     } finally {
       setIsSaving(false);
     }
@@ -232,14 +270,14 @@ export default function RecipeSetupStep({ onNext }: any) {
   return (
     <div className="animate-fade-in space-y-8">
       <div>
-        <h2 className="text-2xl font-bold text-slate-800 mb-2">2단계: 메뉴별 레시피를 완성해 주세요</h2>
-        <p className="text-slate-500">생성한 메뉴들은 등록 즉시 DB에 안전하게 저장됩니다.</p>
+        <h2 className="text-2xl font-bold text-slate-800 mb-2">2단계: 잘 팔리는 메뉴 몇 개만 먼저 등록하세요</h2>
+        <p className="text-slate-500">자주 나가는 메뉴부터 등록하면 홈에서 원가 점검과 잘 팔린 메뉴 요약을 더 정확하게 보여줄 수 있습니다.</p>
       </div>
 
       <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-md mb-6 shadow-sm">
         <p className="text-sm text-blue-800 leading-relaxed font-medium">
-          💡 지금 당장 모든 항목을 완벽하게 등록하지 않아도 괜찮습니다. 서비스 이용 중에도 언제든지 새로운 항목을 추가하거나 수정할 수 있습니다.<br/><br/>
-          💾 아래에 추가된 레시피들은 안전하게 실시간으로 자동 저장됩니다. 창을 닫거나 종료해도 등록한 메뉴들은 사라지지 않으니 안심하세요!
+          💡 처음부터 모든 메뉴를 등록하지 않아도 괜찮습니다. 아메리카노, 라떼처럼 매출 비중이 큰 메뉴 3개 정도만 먼저 등록해도 충분합니다.<br/><br/>
+          💾 아래에 추가된 메뉴는 저장 즉시 반영되며, 나중에 운영하면서 언제든지 더 추가하거나 수정할 수 있습니다.
         </p>
       </div>
       
@@ -263,7 +301,7 @@ export default function RecipeSetupStep({ onNext }: any) {
           <div className="space-y-2">
             <label className="text-sm font-medium text-slate-700">구분 (온도/유형) <span className="text-red-500">*</span></label>
             <div className="flex bg-slate-100 p-1 rounded-lg">
-              {['ICE', 'HOT', '통합/기타'].map(type => (
+              {MENU_TYPES.map(type => (
                 <button
                   key={type}
                   onClick={() => setMenuType(type)}
@@ -358,7 +396,7 @@ export default function RecipeSetupStep({ onNext }: any) {
                 
                 // Autocomplete 필터링
                 const filteredInventory = inventory.filter(inv => 
-                  (inv.name || inv.id).toLowerCase().includes(ing.searchText?.toLowerCase() || '')
+                  getInventoryDisplayName(inv).toLowerCase().includes(ing.searchText.toLowerCase())
                 );
 
                 return (
@@ -384,12 +422,12 @@ export default function RecipeSetupStep({ onNext }: any) {
                                   onMouseDown={(e) => {
                                     e.preventDefault();
                                     setIngredients(prev => prev.map((item, i) => 
-                                      i === idx ? { ...item, inventoryId: inv.id, searchText: inv.name || inv.id, showSuggestions: false } : item
+                                      i === idx ? { ...item, inventoryId: inv.id, searchText: getInventoryDisplayName(inv), showSuggestions: false } : item
                                     ));
                                   }}
                                   className="px-4 py-2 hover:bg-blue-50 cursor-pointer text-sm border-b border-slate-50 last:border-0"
                                 >
-                                  <div className="font-bold text-slate-700">{inv.name || inv.id}</div>
+                                  <div className="font-bold text-slate-700">{getInventoryDisplayName(inv)}</div>
                                   <div className="text-xs text-slate-400">{inv.category} | 재고: {inv.quantity_on_hand}{inv.uom}</div>
                                 </div>
                               ))
@@ -548,7 +586,7 @@ export default function RecipeSetupStep({ onNext }: any) {
           onClick={onNext} 
           className="px-8 py-3 bg-slate-800 text-white rounded-lg font-bold hover:bg-slate-700 transition shadow-md flex items-center gap-2"
         >
-          {registeredMenus.length > 0 ? '레시피 등록 완료' : '건너뛰기'} ➔
+          {registeredMenus.length > 0 ? '메뉴 등록 마치고 다음' : '나중에 하고 다음'} ➔
         </button>
       </div>
     </div>

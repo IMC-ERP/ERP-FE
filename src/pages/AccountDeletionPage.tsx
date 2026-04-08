@@ -1,9 +1,9 @@
-import axios from 'axios';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { APP_INFO, SUPPORT_EMAIL_IS_PLACEHOLDER } from '../config/appInfo';
 import PublicPageShell from '../components/PublicPageShell';
 import { useAuth } from '../contexts/AuthContext';
 import { userApi, type AccountDeletionRequestResponse } from '../services/api';
+import { getApiErrorMessage } from '../utils/apiErrors';
 
 export default function AccountDeletionPage() {
   const { user, userProfile } = useAuth();
@@ -17,6 +17,13 @@ export default function AccountDeletionPage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submittedRequest, setSubmittedRequest] = useState<AccountDeletionRequestResponse | null>(null);
+  const copyResetTimeoutRef = useRef<number | null>(null);
+
+  useEffect(() => () => {
+    if (copyResetTimeoutRef.current !== null) {
+      window.clearTimeout(copyResetTimeoutRef.current);
+    }
+  }, []);
 
   const email = emailTouched ? emailInput : user?.email ?? '';
   const storeName = storeNameTouched ? storeNameInput : userProfile?.store_name ?? '';
@@ -41,7 +48,10 @@ export default function AccountDeletionPage() {
     try {
       await navigator.clipboard.writeText(requestBody);
       setCopied(true);
-      window.setTimeout(() => setCopied(false), 2000);
+      if (copyResetTimeoutRef.current !== null) {
+        window.clearTimeout(copyResetTimeoutRef.current);
+      }
+      copyResetTimeoutRef.current = window.setTimeout(() => setCopied(false), 2000);
     } catch (error) {
       console.error('삭제 요청 내용 복사 실패:', error);
     }
@@ -64,12 +74,7 @@ export default function AccountDeletionPage() {
       });
       setSubmittedRequest(response.data);
     } catch (error) {
-      const errorDetail = axios.isAxiosError(error) ? error.response?.data?.detail : undefined;
-      setSubmitError(
-        typeof errorDetail === 'string'
-          ? errorDetail
-          : '계정 삭제 요청을 제출하지 못했습니다. 잠시 후 다시 시도하거나 이메일 경로를 이용해주세요.'
-      );
+      setSubmitError(getApiErrorMessage(error, '계정 삭제 요청을 제출하지 못했습니다. 잠시 후 다시 시도하거나 이메일 경로를 이용해주세요.'));
     } finally {
       setSubmitting(false);
     }

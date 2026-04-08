@@ -17,6 +17,8 @@ import type {
   ManualSaleResponse
 } from '../types';
 
+export type { RecipeCost } from '../types';
+
 const API_BASE_URL = runtimeConfig.apiBaseUrl;
 
 let currentToken: string | null = null;
@@ -191,7 +193,23 @@ export const stockIntakeApi = {
 export const recipeCostApi = {
   getAll: () => api.get<RecipeCost[]>('/recipe-costs'),
   getByName: (menuName: string) => api.get<RecipeCost>(`/recipe-costs/${encodeURIComponent(menuName)}`),
-  create: (data: Omit<RecipeCost, 'totalCost' | 'marginRate' | 'status'>) => api.post('/recipe-costs', data),
+  create: (data: {
+    menu_name?: string;
+    name?: string;
+    menuId?: string;
+    category: string;
+    selling_price?: number;
+    price?: number;
+    ingredients: Array<{
+      name: string;
+      usage?: number;
+      quantity?: number;
+      cost_per_unit?: number;
+      unit_cost?: number;
+      cost?: number;
+      uom?: string;
+    }>;
+  }) => api.post('/recipe-costs', data),
   delete: (menuName: string) => api.delete(`/recipe-costs/${encodeURIComponent(menuName)}`),
 };
 
@@ -292,15 +310,10 @@ export const profitDashboardApi = {
 export interface HomeSummary {
   todaySales: number;
   salesTrend: number;
-  todayProfit: number;
-  profitTrend: number;
   todayOrders: number;
   orderTrend: number;
-}
-
-export interface HomeHourlyData {
-  hour: string;
-  amount: number;
+  lowStockCount: number;
+  marginWarningCount: number;
 }
 
 export interface HomeStockWarning {
@@ -314,8 +327,9 @@ export interface HomeStockWarning {
 export interface HomeMarginWarning {
   id: string;
   name: string;
-  margin: number;
-  price: number;
+  costRatio: number;
+  sellingPrice: number;
+  status: 'needs_check' | 'danger';
 }
 
 export interface HomeTopMenuItem {
@@ -326,12 +340,9 @@ export interface HomeTopMenuItem {
 
 export interface HomeDataResponse {
   summary: HomeSummary;
-  hourlySales: HomeHourlyData[];
   topMenus: HomeTopMenuItem[];
   stockWarnings: HomeStockWarning[];
   marginWarnings: HomeMarginWarning[];
-  openHour: number;
-  closeHour: number;
   updatedAt: string;
 }
 
@@ -468,10 +479,13 @@ export interface UserProfile {
   email: string;
   store_id: string;
   store_name: string;
+  owner_name?: string;
   name: string;
   phone?: string;
   address?: string;
   role?: string;
+  onboarding_completed?: boolean;
+  onboarding_completed_at?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -511,11 +525,70 @@ export interface RegistrationStatus {
   profile: UserProfile | null;
 }
 
+export interface OnboardingStatusResponse {
+  hasInventory: boolean;
+  hasRecipes: boolean;
+  recommendedStep: number;
+  isCompleted: boolean;
+}
+
+export interface OnboardingCompletionResponse {
+  success: boolean;
+  completedAt: string;
+}
+
+interface UserProfileApiPayload {
+  uid: string;
+  email: string;
+  store_id: string;
+  store_name: string;
+  owner_name?: string;
+  name?: string;
+  phone?: string;
+  address?: string;
+  role?: string;
+  onboarding_completed?: boolean;
+  onboarding_completed_at?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+const normalizeUserProfile = (profile: UserProfileApiPayload): UserProfile => ({
+  ...profile,
+  owner_name: profile.owner_name ?? profile.name ?? '',
+  name: profile.name ?? profile.owner_name ?? '',
+});
+
+const normalizeProfileResponse = <T extends { data: UserProfileApiPayload }>(response: T) => ({
+  ...response,
+  data: normalizeUserProfile(response.data),
+});
+
+const normalizeRegistrationStatus = <T extends { data: RegistrationStatus & { profile: UserProfileApiPayload | null } }>(response: T) => ({
+  ...response,
+  data: {
+    ...response.data,
+    profile: response.data.profile ? normalizeUserProfile(response.data.profile) : null,
+  },
+});
+
 export const userApi = {
-  register: (data: UserRegistration) => api.post<UserProfile>('/users/register', data),
-  getProfile: () => api.get<UserProfile>('/users/profile'),
-  updateProfile: (data: UserProfileUpdate) => api.put<UserProfile>('/users/profile', data),
-  checkRegistration: () => api.get<RegistrationStatus>('/users/check-registration'),
+  register: (data: UserRegistration) => api.post<UserProfileApiPayload>('/users/register', {
+    email: data.email,
+    store_name: data.store_name,
+    owner_name: data.name,
+    phone: data.phone,
+    address: data.address,
+  }).then(normalizeProfileResponse),
+  getProfile: () => api.get<UserProfileApiPayload>('/users/profile').then(normalizeProfileResponse),
+  updateProfile: (data: UserProfileUpdate) => api.put<UserProfileApiPayload>('/users/profile', {
+    store_name: data.store_name,
+    owner_name: data.name,
+    phone: data.phone,
+  }).then(normalizeProfileResponse),
+  checkRegistration: () => api.get<RegistrationStatus & { profile: UserProfileApiPayload | null }>('/users/check-registration').then(normalizeRegistrationStatus),
+  getOnboardingStatus: () => api.get<OnboardingStatusResponse>('/users/onboarding-status'),
+  completeOnboarding: () => api.post<OnboardingCompletionResponse>('/users/onboarding-complete'),
   requestAccountDeletion: (data: AccountDeletionRequestCreate) =>
     api.post<AccountDeletionRequestResponse>('/users/account-deletion-request', data),
   getStoreProfile: () => api.get<StoreProfileData>('/users/store-profile'),

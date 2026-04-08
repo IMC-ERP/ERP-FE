@@ -3,7 +3,9 @@
 ## Supabase Dashboard
 
 - Auth > Providers에서 Google provider를 활성화
+- Auth > Providers에서 Apple provider를 활성화
 - Google Cloud OAuth client를 연결
+- Apple provider는 Supabase 가이드에 따라 Services ID / Team ID / Key ID / private key를 연결
 - Redirect URL 허용 목록에 아래 두 값을 추가
   - `com.imcerp.coffeeerp://auth/callback`
   - `https://<frontend-domain>/auth/callback`
@@ -24,7 +26,8 @@
 
 - `npx cap sync` 실행
 - Android 실기기에서 Google 로그인 확인
-- iOS는 Xcode 설치 후 signing 설정과 함께 실기기 로그인 확인
+- iOS 실기기에서 Apple 로그인과 Google 로그인을 모두 확인
+- App Review 계정 경로에서는 Apple 로그인을 우선 검증
 
 ## 참고
 

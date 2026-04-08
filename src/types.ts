@@ -63,11 +63,15 @@ export interface InventoryPrepRecipe {
 export interface InventoryItem {
     id: string;
     name: string;
-    item_type: 'RAW' | 'PREP'; // or string
+    name_ko?: string;
+    item_name_ko?: string;
+    item_type: 'RAW' | 'PREP' | 'raw' | 'prep';
+    type?: 'RAW' | 'PREP' | 'raw' | 'prep';
     category: string;
     uom: string;
     quantity_on_hand: number;
     safety_stock: number;
+    safetyStock?: number;
     max_stock_level: number;
     unit_cost: number;
     needs_reorder: boolean;
@@ -81,21 +85,28 @@ export interface InventoryItem {
 // ==========================================
 
 export interface RecipeCostIngredient {
-    ingredientId: string;
+    ingredientId?: string;
     name: string;
-    quantity: number;
+    quantity?: number;
+    usage?: number;
     uom: string;
-    unit_cost: number;
-    total_ingredient_cost: number;
+    unit_cost?: number;
+    cost_per_unit?: number;
+    total_ingredient_cost?: number;
+    cost?: number;
 }
 
 export interface RecipeCost {
     menuId: string;
     name: string;
+    menu_name?: string;
     category: string;
     price: number;
+    selling_price?: number;
     totalCost: number;
+    total_cost?: number;
     marginRate: number;
+    cost_ratio?: number;
     status?: string | null; // calculated safely in backend but UI might use it
     ingredients: RecipeCostIngredient[];
 }

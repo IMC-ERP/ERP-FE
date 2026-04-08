@@ -5,12 +5,42 @@
 
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useSearchParams } from 'react-router-dom';
 import { RefreshCw, ChevronDown, ChevronUp, Plus, X, Trash2 } from 'lucide-react';
 import { inventoryApi, stockIntakeApi, ocrApi, type OCRReceiptData } from '../services/api';
 import type { InventoryItem, StockIntake } from '../types';
 import './Inventory.css';
 
 type TabType = 'overview' | 'pricing' | 'receiving' | 'forecast' | 'history';
+
+const TAB_VALUES: TabType[] = ['overview', 'pricing', 'receiving', 'forecast', 'history'];
+
+const parseTab = (value: string | null): TabType => (
+  TAB_VALUES.includes(value as TabType) ? (value as TabType) : 'overview'
+);
+
+const TAB_HEADER_COPY: Record<TabType, { title: string; description: string }> = {
+  overview: {
+    title: '재고 현황',
+    description: '부족 재고와 발주 타이밍을 한눈에 확인하세요.',
+  },
+  pricing: {
+    title: '시세 모니터링',
+    description: '원재료 단가 변화를 점검하는 화면입니다.',
+  },
+  receiving: {
+    title: '입고 등록',
+    description: '영수증 OCR 또는 수기 입력으로 오늘 입고를 바로 반영하세요.',
+  },
+  history: {
+    title: '입고 기록',
+    description: '최근 입고 내역과 수정 이력을 확인하세요.',
+  },
+  forecast: {
+    title: '수요 예측',
+    description: '다음 발주를 준비하기 위한 예측 기능입니다.',
+  },
+};
 
 // Define IntakeItem interface based on the instruction's provided structure
 interface IntakeItem {
@@ -25,9 +55,10 @@ interface IntakeItem {
 }
 
 export default function Inventory() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<TabType>('overview');
+  const [activeTab, setActiveTab] = useState<TabType>(() => parseTab(searchParams.get('tab')));
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
 
   // 품목 추가 모달 관련 상태
@@ -74,6 +105,7 @@ export default function Inventory() {
   // 자동완성 드롭다운 상태
   const [activeSearchIndex, setActiveSearchIndex] = useState<number | null>(null);
   const [dropdownPosition, setDropdownPosition] = useState<{ top: number; left: number } | null>(null);
+  const headerCopy = TAB_HEADER_COPY[activeTab];
 
   const handleInputFocus = (index: number, e: React.FocusEvent<HTMLInputElement> | React.MouseEvent<HTMLInputElement>) => {
     setActiveSearchIndex(index);
@@ -115,6 +147,18 @@ export default function Inventory() {
   useEffect(() => {
     fetchInventory();
   }, []);
+
+  useEffect(() => {
+    const nextTab = parseTab(searchParams.get('tab'));
+    setActiveTab((current) => (current === nextTab ? current : nextTab));
+  }, [searchParams]);
+
+  const handleTabChange = (nextTab: TabType) => {
+    setActiveTab(nextTab);
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set('tab', nextTab);
+    setSearchParams(nextParams, { replace: true });
+  };
 
   const toggleCategory = (category: string) => {
     const newExpanded = new Set(expandedCategories);
@@ -1084,8 +1128,8 @@ export default function Inventory() {
     <div className="inventory-page-new">
       <header className="page-header-new">
         <div>
-          <h1>📦 재고 통합 대시보드</h1>
-          <p>전체 50개 품목의 실시간 소진량과 발주 타이밍을 AI가 분석합니다.</p>
+          <h1>📦 {headerCopy.title}</h1>
+          <p>{headerCopy.description}</p>
         </div>
         <div className="header-actions">
           <button className="btn btn-secondary" onClick={fetchInventory}>
@@ -1103,31 +1147,31 @@ export default function Inventory() {
       <nav className="tab-navigation">
         <button
           className={`tab-btn ${activeTab === 'overview' ? 'active' : ''}`}
-          onClick={() => setActiveTab('overview')}
+          onClick={() => handleTabChange('overview')}
         >
           📊 현황 요약
         </button>
         <button
           className={`tab-btn ${activeTab === 'pricing' ? 'active' : ''}`}
-          onClick={() => setActiveTab('pricing')}
+          onClick={() => handleTabChange('pricing')}
         >
           💰 시세 모니터링
         </button>
         <button
           className={`tab-btn ${activeTab === 'receiving' ? 'active' : ''}`}
-          onClick={() => setActiveTab('receiving')}
+          onClick={() => handleTabChange('receiving')}
         >
           📥 재고 입고
         </button>
         <button
           className={`tab-btn ${activeTab === 'history' ? 'active' : ''}`}
-          onClick={() => setActiveTab('history')}
+          onClick={() => handleTabChange('history')}
         >
           📋 재고 입고 기록
         </button>
         <button
           className={`tab-btn ${activeTab === 'forecast' ? 'active' : ''}`}
-          onClick={() => setActiveTab('forecast')}
+          onClick={() => handleTabChange('forecast')}
         >
           📈 수요예측
         </button>

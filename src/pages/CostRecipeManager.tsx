@@ -934,7 +934,7 @@ export default function CostRecipeManager() {
                 ingredients: r.ingredients.map((ing, idx) => ({
                     id: `${r.name}-${idx}`,
                     materialId: ing.ingredientId || ing.name,
-                    qty: ing.quantity
+                    qty: ing.quantity ?? ing.usage ?? 0
                 }))
             }));
             setRecipes(loadedRecipes);
@@ -1064,6 +1064,7 @@ export default function CostRecipeManager() {
             await inventoryApi.create({
                 id: newItemId,
                 name: newItemId,
+                item_type: 'RAW',
                 type: 'RAW',
                 category: data.category,
                 quantity_on_hand: data.quantity_on_hand,

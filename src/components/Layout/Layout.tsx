@@ -1,55 +1,165 @@
 /**
  * Layout Component
- * GCP-ERP 스타일 - 고정 사이드바 + AI 드로어
+ * 카페 사장님용 일일 운영 중심 사이드바
  */
 
-import { useState, lazy, Suspense } from 'react';
-import { Link, Outlet, useLocation } from 'react-router-dom';
+import { useMemo, useState } from 'react';
+import { Link, Outlet, useLocation, type Location } from 'react-router-dom';
 import {
-  LayoutDashboard,
-  Calendar,
-  Package,
-  Bot,
-  Coffee,
-  Home,
+  BarChart3,
+  ChevronDown,
+  ChevronUp,
   ClipboardList,
+  Coffee,
   ChefHat,
+  Home,
+  LayoutDashboard,
+  LifeBuoy,
+  LogOut,
+  Package,
+  ReceiptText,
   Settings,
-  HelpCircle,
-  X,
-  LogOut
+  Sparkles,
 } from 'lucide-react';
 import { useData } from '../../contexts/DataContext';
 import { useAuth } from '../../contexts/AuthContext';
 
-// Lazy load AIAssistant to avoid circular dependency
-const AIAssistant = lazy(() => import('../../pages/AIAssistant'));
-
-interface NavItemProps {
+interface NavItemDefinition {
   to: string;
   icon: React.ComponentType<{ size?: number }>;
   label: string;
+  caption: string;
+  isActive: (location: Location) => boolean;
+}
+
+interface NavItemProps {
+  item: NavItemDefinition;
   active: boolean;
 }
 
-const NavItem = ({ to, icon: Icon, label, active }: NavItemProps) => (
+const hasTab = (location: Location, tab: string) =>
+  location.pathname === '/inventory' && new URLSearchParams(location.search).get('tab') === tab;
+
+const PRIMARY_NAV_ITEMS: NavItemDefinition[] = [
+  {
+    to: '/',
+    icon: Home,
+    label: '홈',
+    caption: '오늘 매장 체크',
+    isActive: (location) => location.pathname === '/',
+  },
+  {
+    to: '/inventory?tab=overview',
+    icon: Package,
+    label: '재고',
+    caption: '부족 재고와 발주 확인',
+    isActive: (location) => hasTab(location, 'overview') || (location.pathname === '/inventory' && !location.search),
+  },
+  {
+    to: '/inventory?tab=receiving',
+    icon: ReceiptText,
+    label: '입고 / OCR',
+    caption: '영수증 업로드와 입고 정리',
+    isActive: (location) => hasTab(location, 'receiving'),
+  },
+  {
+    to: '/sales',
+    icon: BarChart3,
+    label: '매출',
+    caption: '오늘 매출과 판매 입력',
+    isActive: (location) => location.pathname === '/sales',
+  },
+];
+
+const ADVANCED_NAV_ITEMS: NavItemDefinition[] = [
+  {
+    to: '/dashboard',
+    icon: LayoutDashboard,
+    label: '경영 현황',
+    caption: '상세 KPI 보기',
+    isActive: (location) => location.pathname === '/dashboard',
+  },
+  {
+    to: '/period',
+    icon: BarChart3,
+    label: '매출 분석',
+    caption: '기간별 추이 확인',
+    isActive: (location) => location.pathname === '/period',
+  },
+  {
+    to: '/transactions',
+    icon: ClipboardList,
+    label: '거래 관리',
+    caption: '거래 이력과 OCR 매출',
+    isActive: (location) => location.pathname === '/transactions',
+  },
+  {
+    to: '/cost-recipe',
+    icon: ChefHat,
+    label: '원가 / 레시피',
+    caption: '메뉴 원가 점검',
+    isActive: (location) => location.pathname === '/cost-recipe' || location.pathname === '/recipes',
+  },
+  {
+    to: '/ai',
+    icon: Sparkles,
+    label: 'AI 도우미',
+    caption: '고급 운영 인사이트',
+    isActive: (location) => location.pathname === '/ai',
+  },
+];
+
+const UTILITY_NAV_ITEMS: NavItemDefinition[] = [
+  {
+    to: '/settings',
+    icon: Settings,
+    label: '설정',
+    caption: '매장 정보와 계정',
+    isActive: (location) => location.pathname === '/settings',
+  },
+  {
+    to: '/help',
+    icon: LifeBuoy,
+    label: '도움말',
+    caption: '지원 및 가이드',
+    isActive: (location) => location.pathname === '/help',
+  },
+];
+
+const NavItem = ({ item, active }: NavItemProps) => {
+  const { to, icon: Icon, label, caption } = item;
+
+  return (
   <Link
     to={to}
-    className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors duration-200 ${active
-      ? "bg-blue-100 text-blue-700 font-semibold"
-      : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-      }`}
+    className={`flex items-start gap-3 rounded-2xl px-4 py-3 transition-colors duration-200 ${
+      active
+        ? 'bg-amber-50 text-amber-700 ring-1 ring-amber-200'
+        : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+    }`}
   >
-    <Icon size={20} />
-    <span>{label}</span>
+    <div className={`mt-0.5 rounded-xl p-2 ${active ? 'bg-white text-amber-600' : 'bg-slate-100 text-slate-500'}`}>
+      <Icon size={18} />
+    </div>
+    <div className="min-w-0">
+      <p className={`text-sm font-semibold ${active ? 'text-amber-800' : 'text-slate-800'}`}>{label}</p>
+      <p className="mt-0.5 text-xs text-slate-500">{caption}</p>
+    </div>
   </Link>
-);
+  );
+};
 
 export default function Layout() {
   const location = useLocation();
-  const [isAIDrawerOpen, setIsAIDrawerOpen] = useState(false);
+  const [showAdvancedTools, setShowAdvancedTools] = useState(false);
   const { storeProfile } = useData();
   const { user, logout } = useAuth();
+
+  const hasAdvancedRouteActive = useMemo(
+    () => ADVANCED_NAV_ITEMS.some((item) => item.isActive(location)),
+    [location],
+  );
+  const isAdvancedSectionOpen = hasAdvancedRouteActive || showAdvancedTools;
 
   const handleLogout = async () => {
     try {
@@ -60,37 +170,62 @@ export default function Layout() {
   };
 
   return (
-    <div className="flex min-h-screen bg-slate-50 relative">
-      {/* Sidebar */}
-      <div className="w-64 bg-white border-r border-slate-200 flex-shrink-0 fixed h-full z-10 transition-all duration-300 flex flex-col">
-        {/* Sidebar Header */}
-        <div className="p-6 border-b border-slate-100 flex items-center gap-3">
+    <div className="flex min-h-screen bg-slate-50">
+      <div className="fixed z-10 flex h-full w-72 flex-shrink-0 flex-col border-r border-slate-200 bg-white">
+        <div className="border-b border-slate-100 p-6">
+          <div className="flex items-center gap-3">
           <div className="bg-amber-100 p-2 rounded-full">
             <Coffee className="text-amber-700" size={24} />
           </div>
           <div>
-            <h1 className="text-base font-bold text-slate-800 tracking-tight leading-tight">{storeProfile.store_name}</h1>
-            <p className="text-[10px] text-slate-400">Coffee ERP v2.5.4</p>
+              <h1 className="text-base font-bold leading-tight text-slate-800 tracking-tight">
+                {storeProfile.store_name}
+              </h1>
+              <p className="text-[11px] text-slate-500">카페 운영을 매일 10분 안에 점검하세요</p>
+            </div>
+          </div>
+          <div className="mt-4 rounded-2xl bg-slate-50 px-4 py-3">
+            <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">오늘의 기본 메뉴</p>
+            <p className="mt-1 text-sm text-slate-600">홈, 재고, 입고, 매출만 먼저 보고 운영 루틴을 잡을 수 있게 구성했습니다.</p>
           </div>
         </div>
 
-        {/* Main Navigation */}
-        <nav className="p-4 space-y-1 flex-1 overflow-y-auto">
-          <NavItem to="/" icon={Home} label="홈" active={location.pathname === '/'} />
-          <NavItem to="/dashboard" icon={LayoutDashboard} label="경영 현황" active={location.pathname === '/dashboard'} />
-          <NavItem to="/period" icon={Calendar} label="매출 분석" active={location.pathname === '/period'} />
-          <NavItem to="/transactions" icon={ClipboardList} label="거래 데이터 관리" active={location.pathname === '/transactions'} />
-          <NavItem to="/inventory" icon={Package} label="재고 관리" active={location.pathname === '/inventory'} />
-          <NavItem to="/cost-recipe" icon={ChefHat} label="원가/레시피 관리" active={location.pathname === '/cost-recipe'} />
+        <nav className="flex-1 space-y-6 overflow-y-auto p-4">
+          <div className="space-y-2">
+            {PRIMARY_NAV_ITEMS.map((item) => (
+              <NavItem key={item.label} item={item} active={item.isActive(location)} />
+            ))}
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-slate-50/70">
+            <button
+              type="button"
+              onClick={() => setShowAdvancedTools((current) => !current)}
+              className="flex w-full items-center justify-between px-4 py-3 text-left"
+            >
+              <div>
+                <p className="text-sm font-semibold text-slate-800">고급 기능</p>
+                <p className="mt-0.5 text-xs text-slate-500">상세 분석과 설정이 필요한 경우만 여세요</p>
+              </div>
+              {isAdvancedSectionOpen ? <ChevronUp size={18} className="text-slate-400" /> : <ChevronDown size={18} className="text-slate-400" />}
+            </button>
+
+            {isAdvancedSectionOpen && (
+              <div className="space-y-2 border-t border-slate-200 px-3 py-3">
+                {ADVANCED_NAV_ITEMS.map((item) => (
+                  <NavItem key={item.label} item={item} active={item.isActive(location)} />
+                ))}
+              </div>
+            )}
+          </div>
         </nav>
 
-        {/* Bottom Utility Navigation */}
-        <div className="p-4 border-t border-slate-100 space-y-1 bg-slate-50/50">
-          <NavItem to="/help" icon={HelpCircle} label="도움말" active={location.pathname === '/help'} />
-          <NavItem to="/settings" icon={Settings} label="설정" active={location.pathname === '/settings'} />
+        <div className="space-y-2 border-t border-slate-100 bg-slate-50/50 p-4">
+          {UTILITY_NAV_ITEMS.map((item) => (
+            <NavItem key={item.label} item={item} active={item.isActive(location)} />
+          ))}
         </div>
 
-        {/* User Profile & Logout */}
         {user && (
           <div className="p-4 border-t border-slate-200 bg-slate-50">
             <div className="flex items-center gap-3 mb-3">
@@ -126,52 +261,10 @@ export default function Layout() {
         )}
       </div>
 
-      {/* Main Content Wrapper - Pushes content when drawer is open */}
-      <div
-        className="flex-1 ml-64 relative transition-all duration-300 ease-in-out"
-        style={{ marginRight: isAIDrawerOpen ? '400px' : '0' }}
-      >
+      <div className="relative ml-72 flex-1">
         <main className="p-8 max-w-7xl mx-auto">
           <Outlet />
         </main>
-      </div>
-
-      {/* Floating AI Button (Bottom Right) */}
-      <button
-        onClick={() => setIsAIDrawerOpen(prev => !prev)}
-        className={`fixed bottom-8 right-8 z-40 p-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-full shadow-lg hover:shadow-xl hover:scale-110 transition-all duration-200 group border-2 border-white/20 ${isAIDrawerOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
-        title="AI 비서 열기"
-      >
-        <Bot size={24} className="group-hover:rotate-12 transition-transform" />
-      </button>
-
-      {/* AI Assistant Drawer (Push Mode) */}
-      <div
-        className={`fixed inset-y-0 right-0 w-[400px] bg-white shadow-xl z-50 transform transition-transform duration-300 ease-in-out border-l border-slate-200 flex flex-col ${isAIDrawerOpen ? 'translate-x-0' : 'translate-x-full'
-          }`}
-      >
-        {/* Drawer Header */}
-        <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-100 flex justify-between items-center flex-shrink-0">
-          <div className="flex items-center gap-2 font-bold text-slate-800">
-            <div className="bg-white p-1.5 rounded-full shadow-sm">
-              <Bot className="text-blue-600" size={20} />
-            </div>
-            <span>AI 경영 비서</span>
-          </div>
-          <button
-            onClick={() => setIsAIDrawerOpen(false)}
-            className="p-1 text-slate-400 hover:text-slate-600 hover:bg-white/50 rounded-full transition-colors"
-          >
-            <X size={20} />
-          </button>
-        </div>
-
-        {/* Drawer Content */}
-        <div className="flex-1 overflow-hidden">
-          <Suspense fallback={<div className="p-4 text-center text-slate-400">로딩 중...</div>}>
-            <AIAssistant isWidget={true} />
-          </Suspense>
-        </div>
       </div>
     </div>
   );

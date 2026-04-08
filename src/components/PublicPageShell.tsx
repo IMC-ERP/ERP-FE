@@ -27,6 +27,12 @@ export default function PublicPageShell({
               앱으로 돌아가기
             </Link>
             <Link
+              to={APP_INFO.pricingPath}
+              className="rounded-full border border-slate-200 px-4 py-2 text-slate-600 transition-colors hover:border-slate-300 hover:text-slate-900"
+            >
+              요금 안내
+            </Link>
+            <Link
               to={APP_INFO.privacyPolicyPath}
               className="rounded-full border border-slate-200 px-4 py-2 text-slate-600 transition-colors hover:border-slate-300 hover:text-slate-900"
             >

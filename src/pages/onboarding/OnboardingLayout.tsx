@@ -1,41 +1,41 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { inventoryApi } from '../../services/api';
 import InventorySetupStep from './InventorySetupStep';
 import RecipeSetupStep from './RecipeSetupStep';
 import CompleteSetupStep from './CompleteSetupStep';
+import {
+  completeOnboarding,
+  loadOnboardingProgress,
+  setSavedOnboardingStep,
+  type OnboardingStep,
+} from '../../features/onboarding/onboardingProgress';
 
 export default function OnboardingLayout() {
   const { userProfile, loading } = useAuth();
   const navigate = useNavigate();
-  const [currentStep, setCurrentStep] = useState<number | null>(null);
+  const [currentStep, setCurrentStep] = useState<OnboardingStep | null>(null);
 
   useEffect(() => {
     const checkOnboardingState = async () => {
-      // 1. 프로필이 없으면 login 또는 register로 리다이렉트 (AuthContext / ProtectedRoute 에서 처리되겠지만 2차 방어)
       if (!userProfile) return;
+      if (userProfile.role && userProfile.role !== 'owner') {
+        navigate('/', { replace: true });
+        return;
+      }
 
       try {
-        // 2. 재고 보유 여부 확인
-        const res = await inventoryApi.getAll();
-        const hasInventory = res.data && res.data.length > 0;
-
-        // 임시 로컬스토리지 단계 (새로고침 시 유지용)
-        const savedStep = localStorage.getItem(`onboarding_step_${userProfile.uid}`);
-        
-        if (!hasInventory) {
-          setCurrentStep(1); // 재고가 없으면 무조건 1단계
-        } else if (savedStep) {
-          setCurrentStep(parseInt(savedStep, 10)); // 저장된 단계가 있으면 해당 단계로 복원
-        } else {
-          // 재고는 있는데 저장된 단계가 없으면 레시피 단계 또는 이미 완료된 상태일 수 있음. 
-          // 안전하게 메인으로 보냄. (여기서는 step=3으로 테스트 가능)
-          navigate('/dashboard', { replace: true });
+        const progress = await loadOnboardingProgress(userProfile.uid);
+        if (progress.isComplete) {
+          navigate('/', { replace: true });
+          return;
         }
+
+        setSavedOnboardingStep(userProfile.uid, progress.recommendedStep);
+        setCurrentStep(progress.recommendedStep);
       } catch (error) {
         console.error('Failed to check onboarding state', error);
-        setCurrentStep(1); // 에러 발생 시 1단계로 Fallback
+        setCurrentStep(1);
       }
     };
 
@@ -49,21 +49,32 @@ export default function OnboardingLayout() {
   }
 
   const handleNext = () => {
-    const nextStep = currentStep + 1;
+    if (!userProfile || currentStep === null) {
+      return;
+    }
+
+    const nextStep = Math.min(currentStep + 1, 3) as OnboardingStep;
     setCurrentStep(nextStep);
-    localStorage.setItem(`onboarding_step_${userProfile?.uid}`, nextStep.toString());
+    setSavedOnboardingStep(userProfile.uid, nextStep);
   };
 
   const handlePrev = () => {
-    const prevStep = Math.max(1, currentStep - 1);
+    if (!userProfile || currentStep === null) {
+      return;
+    }
+
+    const prevStep = Math.max(1, currentStep - 1) as OnboardingStep;
     setCurrentStep(prevStep);
-    localStorage.setItem(`onboarding_step_${userProfile?.uid}`, prevStep.toString());
+    setSavedOnboardingStep(userProfile.uid, prevStep);
   };
 
-  const handleComplete = () => {
-    localStorage.removeItem(`onboarding_step_${userProfile?.uid}`);
-    localStorage.setItem(`onboarding_complete_${userProfile?.uid}`, 'true');
-    navigate('/dashboard', { replace: true });
+  const handleComplete = async () => {
+    if (!userProfile) {
+      return;
+    }
+
+    await completeOnboarding(userProfile.uid);
+    navigate('/', { replace: true });
   };
 
   return (
@@ -72,18 +83,26 @@ export default function OnboardingLayout() {
         
         {/* Progress Header */}
         <div className="p-6 sm:p-8 bg-slate-50/50 border-b border-slate-200">
-          <div className="flex justify-between text-sm font-semibold text-blue-600 mb-2 uppercase tracking-wide">
-            <span>Onboarding Progress</span>
-            <span>{Math.round((currentStep / 3) * 100)}% Complete</span>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-sm font-semibold text-blue-600 uppercase tracking-wide">첫 사용 설정</p>
+              <h1 className="mt-2 text-2xl font-bold text-slate-900">오늘 운영 점검을 위한 3단계 준비</h1>
+              <p className="mt-2 text-sm text-slate-500">
+                자주 쓰는 재료와 메뉴 몇 가지만 먼저 등록하면 홈, 재고, 입고/OCR 화면부터 바로 활용할 수 있습니다.
+              </p>
+            </div>
+            <div className="text-sm font-semibold text-blue-600">
+              {Math.round((currentStep / 3) * 100)}% 완료
+            </div>
           </div>
-          <div className="w-full bg-slate-200 rounded-full h-2 mb-2">
+          <div className="mt-4 w-full bg-slate-200 rounded-full h-2 mb-2">
             <div 
               className="bg-blue-600 h-2 rounded-full transition-all duration-300 ease-in-out" 
               style={{ width: `${(currentStep / 3) * 100}%` }}
             ></div>
           </div>
           <div className="text-xs text-slate-400 font-medium">
-            {currentStep} / 3 Steps
+            {currentStep} / 3 단계
           </div>
         </div>
 
@@ -91,7 +110,7 @@ export default function OnboardingLayout() {
         <div className="p-6 sm:p-8">
           {currentStep === 1 && <InventorySetupStep onNext={handleNext} />}
           {currentStep === 2 && <RecipeSetupStep onNext={handleNext} />}
-          {currentStep === 3 && <CompleteSetupStep onComplete={handleComplete} onPrev={handlePrev} />}
+          {currentStep === 3 && <CompleteSetupStep onComplete={() => void handleComplete()} onPrev={handlePrev} />}
         </div>
       </div>
     </div>
