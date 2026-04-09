@@ -554,8 +554,10 @@ export interface UserProfile {
   owner_name: string;
   phone?: string;
   address?: string;
+  role?: string;
   created_at: string;
   updated_at: string;
+  onboarding_completed_at?: string | null;
 }
 
 export interface UserProfileUpdate {
@@ -611,6 +613,8 @@ export const userApi = {
     api.delete<{ deleted: number }>('/users/invitations/cleanup'),
   forceRemoveMember: (email: string) =>
     api.delete<{ success: boolean; email: string }>(`/users/members/${encodeURIComponent(email)}`),
+  completeOnboarding: () =>
+    api.post<{ success: boolean; onboarding_completed_at: string }>('/users/complete-onboarding'),
 };
 
 // ==================== Auth API ====================

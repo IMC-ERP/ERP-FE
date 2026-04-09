@@ -148,11 +148,35 @@ export default function InventorySetupStep({ onNext }: InventorySetupStepProps) 
     }
     setIsProcessing(true);
     try {
-      // API 하나씩 순차 등록 (TODO: Bulk insert API 지원 여부를 확인, 현재는 map.create 활용)
-      const promises = previewData.map(item => {
-        // unit_cost는 소수점 계산이 필요할 수 있으나 DB에서 float 처리
+      // 1) 중복 INSERT 방지: 기존 재고 목록 조회 후 slug/id 비교
+      let existingIds = new Set<string>();
+      try {
+        const existingRes = await inventoryApi.getAll();
+        if (existingRes?.data && Array.isArray(existingRes.data)) {
+          existingRes.data.forEach((it: any) => {
+            if (it?.id) existingIds.add(String(it.id));
+            if (it?.slug) existingIds.add(String(it.slug));
+          });
+        }
+      } catch (e) {
+        // 기존 재고 조회 실패 시에도 등록은 진행 (백엔드 UNIQUE 제약이 최종 방어선)
+        console.warn('[ONBOARDING] 기존 재고 조회 실패 — 중복 체크 생략', e);
+      }
+
+      // 2) 신규 항목만 INSERT
+      const newItems = previewData.filter(item => !existingIds.has(item.slug));
+      const skippedCount = previewData.length - newItems.length;
+
+      if (newItems.length === 0) {
+        // 모두 이미 등록되어 있으면 다음 단계로 이동
+        console.log(`[ONBOARDING] 모든 ${previewData.length}개 항목이 이미 등록되어 있음 → 다음 단계로 이동`);
+        onNext();
+        return;
+      }
+
+      const promises = newItems.map(item => {
         const payload = {
-          id: item.slug, // 필수 필드 id에 slug 할당
+          id: item.slug,
           name: item.name,
           slug: item.slug,
           item_type: item.item_type,
@@ -169,6 +193,9 @@ export default function InventorySetupStep({ onNext }: InventorySetupStepProps) 
       });
 
       await Promise.all(promises);
+      if (skippedCount > 0) {
+        console.log(`[ONBOARDING] ${newItems.length}개 신규 등록, ${skippedCount}개 중복 스킵`);
+      }
       onNext();
     } catch (err: any) {
       console.error(err);
