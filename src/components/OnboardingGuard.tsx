@@ -33,22 +33,14 @@ export default function OnboardingGuard({ children }: { children: React.ReactNod
 
             // ===== 1차 (진실의 원천): DB의 onboarding_completed_at 플래그 =====
             // userProfile에 포함되어 있음 (백엔드 /users/check-registration 응답)
+            // localStorage 캐시는 사용하지 않음 — DB가 항상 진실이며,
+            // userProfile은 매 로그인마다 API에서 받아오므로 캐시가 불필요.
             if (userProfile.onboarding_completed_at) {
-                // 로컬스토리지도 동기화 (다음 진입 시 빠른 통과를 위한 캐시)
-                localStorage.setItem(`onboarding_complete_${userProfile.uid}`, 'true');
                 setIsChecking(false);
                 return;
             }
 
-            // ===== 2차 (캐시): 로컬스토리지 플래그 =====
-            // DB 조회 실패 등 예외 케이스 대비. DB가 진실이므로 우선순위는 낮음.
-            const cachedComplete = localStorage.getItem(`onboarding_complete_${userProfile.uid}`) === 'true';
-            if (cachedComplete) {
-                setIsChecking(false);
-                return;
-            }
-
-            // ===== 3차 (안전망): DB의 inventory_items 존재 여부 =====
+            // ===== 2차 (안전망): DB의 inventory_items 존재 여부 =====
             // 어떤 이유로 플래그가 누락된 매장은 데이터 유무로 추론하여 안전망 제공
             try {
                 const res = await inventoryApi.getAll();

@@ -72,7 +72,8 @@ export default function OnboardingLayout() {
 
       // 2. 성공 시 로컬스토리지 정리 (UI 진행 단계 흔적 제거)
       localStorage.removeItem(`onboarding_step_${userProfile?.uid}`);
-      localStorage.setItem(`onboarding_complete_${userProfile?.uid}`, 'true');
+      // 완료 캐시는 더 이상 사용하지 않음 (DB 플래그가 진실의 원천)
+      localStorage.removeItem(`onboarding_complete_${userProfile?.uid}`);
 
       // 3. 메인으로 이동
       navigate('/dashboard', { replace: true });
