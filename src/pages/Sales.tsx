@@ -1,11 +1,7 @@
-/**
- * Sales Page
- * GCP-ERP 스타일 판매 관리 페이지
- */
-
 import { useEffect, useState } from 'react';
-import { Plus, Trash2, RefreshCw, ShoppingCart, Calendar } from 'lucide-react';
+import { Plus, Trash2, RefreshCw, ShoppingCart, Calendar, Camera } from 'lucide-react';
 import { salesApi, type Sale } from '../services/api';
+import SpotlightTour from '../components/SpotlightTour';
 
 const MENU_OPTIONS = [
   'Americano (I/H)',
@@ -76,8 +72,29 @@ export default function Sales() {
     }
   };
 
+  const SALES_TOUR = [
+    {
+      targetId: 'tour-sales-add-btn',
+      title: '✍️ 간편 매출 입력',
+      content: '새로운 판매 내역을 직접 입력하고 싶을 때 이 버튼을 눌러보세요.',
+      placement: 'bottom' as const,
+    },
+    {
+      targetId: 'tour-sales-action',
+      title: '📸 스마트 영수증 스캔',
+      content: '많은 양의 매출도 걱정 마세요! 영수증을 촬영하면 AI가 메뉴와 금액을 자동으로 인식하여 입력해 드립니다.',
+      placement: 'left' as const,
+    },
+    {
+      targetId: 'tour-sales-table',
+      title: '📋 판매 내역 관리',
+      content: '등록된 모든 내역은 이곳에서 실시간으로 확인하고 필요시 삭제할 수 있습니다.',
+      placement: 'top' as const,
+    }
+  ];
+
   return (
-    <div className="space-y-4 md:space-y-6 animate-fade-in">
+    <div className="relative space-y-4 md:space-y-6 animate-fade-in min-h-[70vh]">
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <span className="text-blue-600"><ShoppingCart size={isMobile ? 24 : 32} /></span>
@@ -94,6 +111,7 @@ export default function Sales() {
             <RefreshCw size={16} /> 새로고침
           </button>
           <button
+            id="tour-sales-add-btn"
             onClick={() => setShowForm(!showForm)}
             className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2.5 md:py-2 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700 shadow-sm transition-colors"
           >
@@ -170,7 +188,7 @@ export default function Sales() {
       )}
 
       {/* 판매 목록 */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+      <div id="tour-sales-table" className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="p-3 md:p-4 bg-slate-50 border-b border-slate-200">
           <h3 className="font-bold text-slate-700 text-sm md:text-base">📋 판매 내역 ({sales.length}건)</h3>
         </div>
@@ -251,6 +269,23 @@ export default function Sales() {
           </div>
         )}
       </div>
+
+      {/* 우측 하단 플로팅 버튼 (영수증 스캔) */}
+      <button
+        id="tour-sales-action"
+        onClick={() => alert('영수증 스캔 기능은 곧 출시될 예정입니다!')}
+        className="fixed bottom-8 right-8 w-16 h-16 bg-blue-600 text-white rounded-full shadow-2xl flex items-center justify-center hover:bg-blue-700 transition-all active:scale-95 z-40 group"
+        title="영수증 스캔하기"
+      >
+        <Camera size={28} className="group-hover:rotate-12 transition-transform" />
+      </button>
+
+      <SpotlightTour 
+        steps={SALES_TOUR} 
+        tourKey="sales_onboarding" 
+        autoStart={true} 
+        showIntro={false} 
+      />
     </div>
   );
 }

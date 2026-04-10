@@ -31,6 +31,7 @@ import { useAuth } from '../../contexts/AuthContext';
 const AIAssistant = lazy(() => import('../../pages/AIAssistant'));
 
 interface NavItemProps {
+  id?: string;
   to: string;
   icon: React.ComponentType<{ size?: number }>;
   label: string;
@@ -38,8 +39,9 @@ interface NavItemProps {
   onClick?: () => void;
 }
 
-const NavItem = ({ to, icon: Icon, label, active, onClick }: NavItemProps) => (
+const NavItem = ({ id, to, icon: Icon, label, active, onClick }: NavItemProps) => (
   <Link
+    id={id}
     to={to}
     onClick={onClick}
     className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors duration-200 ${active
@@ -116,15 +118,15 @@ export default function Layout() {
   const fontSizeLabel = appSettings.fontSize === 'small' ? '작게' : appSettings.fontSize === 'medium' ? '보통' : '크게';
 
   const navItems = [
-    { to: '/', icon: Home, label: '홈' },
-    { to: '/dashboard', icon: LayoutDashboard, label: '경영 현황' },
-    { to: '/sales', icon: ScrollText, label: '매출 입력' },
-    { to: '/period', icon: Calendar, label: '매출 분석' },
-    { to: '/transactions', icon: ClipboardList, label: '거래 데이터 관리' },
-    { to: '/inventory', icon: Package, label: '재고 관리' },
-    { to: '/cost-recipe', icon: ChefHat, label: '원가/레시피 관리' },
-    { to: '/kpi', icon: BarChart3, label: 'KPI 현황' },
-    { to: '/ai', icon: Bot, label: 'AI Monstock' }
+    { id: 'tour-nav-home', to: '/', icon: Home, label: '홈' },
+    { id: 'tour-nav-dashboard', to: '/dashboard', icon: LayoutDashboard, label: '경영 현황' },
+    { id: 'tour-nav-sales', to: '/sales', icon: ScrollText, label: '매출 입력' },
+    { id: 'tour-nav-analysis', to: '/period', icon: Calendar, label: '매출 분석' },
+    { id: 'tour-nav-transactions', to: '/transactions', icon: ClipboardList, label: '거래 데이터 관리' },
+    { id: 'tour-nav-inventory', to: '/inventory', icon: Package, label: '재고 관리' },
+    { id: 'tour-nav-recipe', to: '/cost-recipe', icon: ChefHat, label: '원가/레시피 관리' },
+    { id: 'tour-nav-kpi', to: '/kpi', icon: BarChart3, label: 'KPI 현황' },
+    { id: 'tour-nav-ai', to: '/ai', icon: Bot, label: 'AI Monstock' }
   ];
 
   return (
@@ -209,10 +211,11 @@ export default function Layout() {
           )}
         </Link>
 
-        <nav className="p-4 space-y-1 flex-1 overflow-y-auto">
+        <nav id="tour-sidebar-nav" className="p-4 space-y-1 flex-1 overflow-y-auto">
           {navItems.map(item => (
             <NavItem
               key={item.to}
+              id={item.id}
               to={item.to}
               icon={item.icon}
               label={item.label}

@@ -10,6 +10,7 @@ import {
 import {
     AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from 'recharts';
+import SpotlightTour from '../components/SpotlightTour';
 
 export default function Home() {
     const { userProfile } = useAuth();
@@ -18,6 +19,7 @@ export default function Home() {
     const [loading, setLoading] = useState(true);
     const [updated_at, setLastUpdated] = useState<Date | null>(null);
     const [showRevenue, setShowRevenue] = useState(false);
+    const [tourReady, setTourReady] = useState(false);
 
     const fetchHomeData = useCallback(async (isSilent = false) => {
         try {
@@ -41,6 +43,35 @@ export default function Home() {
         }, 60000);
         return () => clearInterval(interval);
     }, [fetchHomeData]);
+
+    // 투어: 데이터 로드 완료 후 시작
+    useEffect(() => {
+        if (!loading && data) {
+            const t = setTimeout(() => setTourReady(true), 500);
+            return () => clearTimeout(t);
+        }
+    }, [loading, data]);
+
+    const DASHBOARD_TOUR = [
+        {
+            targetId: 'tour-kpi-cards',
+            title: '📊 매장 현황 한눈에',
+            content: '사장님, 오늘 하루의 매장 현황을 한눈에 파악하세요.',
+            placement: 'bottom' as const,
+        },
+        {
+            targetId: 'tour-stock-warning',
+            title: '⚠️ 긴급 재고 알림',
+            content: '안전 재고가 떨어지면 ERP가 알아서 챙겨드릴게요.',
+            placement: 'top' as const,
+        },
+        {
+            targetId: 'tour-sidebar-nav',
+            title: '📂 매장 관리의 모든 것',
+            content: '매출 분석부터 AI 수요 예측까지, 사장님의 매장 관리를 위한 모든 도구가 여기에 있습니다. 지금 바로 메뉴를 눌러 시작해 보세요!',
+            placement: 'right' as const,
+        },
+    ];
 
     if (loading && !data) {
         return (
@@ -92,6 +123,7 @@ export default function Home() {
                         <span>최종 업데이트: {updated_at?.toLocaleTimeString()}</span>
                     </div>
                     <button
+                        id="tour-privacy-toggle"
                         onClick={() => setShowRevenue(!showRevenue)}
                         className={`flex items-center gap-1.5 px-3 py-1.5 font-medium text-xs rounded-full transition-colors border shadow-sm ${showRevenue
                             ? 'bg-rose-50 text-rose-600 border-rose-200 hover:bg-rose-100'
@@ -107,8 +139,8 @@ export default function Home() {
 
             {/* 🔹 최상단 KPI & 숨김 패널 그룹 (공백 최적화) */}
             <div className="flex flex-col w-full">
-                {/* 🔹 상단 요약 칩 */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full">
+                {/* 🔹 상단 요약 칩 - Tour Step 1 target */}
+                <div id="tour-kpi-cards" className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full">
                     <SummaryCard
                         title="오늘 방문(주문) 건수"
                         value={summary.todayOrders}
@@ -154,8 +186,8 @@ export default function Home() {
                 </div>
             </div>
 
-            {/* 🔹 베스트 메뉴 섹션 (위치 상향 조정) */}
-            <div className="w-full">
+            {/* 🔹 베스트 메뉴 섹션 - Tour Step 2 target */}
+            <div id="tour-best-menu" className="w-full">
                 <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm">
                     <h3 className="font-bold text-slate-800 mb-6 font-mono tracking-tight border-l-4 border-blue-600 pl-3">
                         오늘의 인기 메뉴
@@ -183,28 +215,31 @@ export default function Home() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 w-full items-start">
                 {/* 좌측: 액션 카드 리스트 */}
                 <div className="flex flex-col space-y-6">
-                    <ActionCard
-                        title="긴급 재고 부족"
-                        icon={Package}
-                        count={stockWarnings.length}
-                        type="negative"
-                    >
-                        {stockWarnings.length > 0 ? (
-                            <ul className="divide-y divide-slate-100">
-                                {stockWarnings.map(item => (
-                                    <li key={item.id} className="py-3 flex justify-between items-center">
-                                        <div className="pr-4">
-                                            <span className="font-semibold text-slate-700 block">{item.name}</span>
-                                            <p className="text-xs text-slate-400 mt-0.5">현재: {item.current}{item.unit} / 안전재고: {item.safety}{item.unit}</p>
-                                        </div>
-                                        <span className="text-xs font-bold px-2 py-1 bg-red-50 text-red-600 rounded border border-red-100 whitespace-nowrap">발주 필요</span>
-                                    </li>
-                                ))}
-                            </ul>
-                        ) : (
-                            <EmptyState message="모든 재고가 충분합니다." />
-                        )}
-                    </ActionCard>
+                {/* 긴급 재고 부족 - Tour Step 3 target */}
+                <div id="tour-stock-warning">
+                <ActionCard
+                    title="긴급 재고 부족"
+                    icon={Package}
+                    count={stockWarnings.length}
+                    type="negative"
+                >
+                    {stockWarnings.length > 0 ? (
+                        <ul className="divide-y divide-slate-100">
+                            {stockWarnings.map(item => (
+                                <li key={item.id} className="py-3 flex justify-between items-center">
+                                    <div className="pr-4">
+                                        <span className="font-semibold text-slate-700 block">{item.name}</span>
+                                        <p className="text-xs text-slate-400 mt-0.5">현재: {item.current}{item.unit} / 안전재고: {item.safety}{item.unit}</p>
+                                    </div>
+                                    <span className="text-xs font-bold px-2 py-1 bg-red-50 text-red-600 rounded border border-red-100 whitespace-nowrap">발주 필요</span>
+                                </li>
+                            ))}
+                        </ul>
+                    ) : (
+                        <EmptyState message="모든 재고가 충분합니다." />
+                    )}
+                </ActionCard>
+                </div>
 
                 </div>
 
@@ -256,7 +291,12 @@ export default function Home() {
                 </div>
             </div>
 
-
+            {/* 스포트라이트 투어 */}
+            <SpotlightTour 
+                steps={DASHBOARD_TOUR} 
+                tourKey="dashboard_main"
+                autoStart={tourReady} 
+            />
         </div>
     );
 }

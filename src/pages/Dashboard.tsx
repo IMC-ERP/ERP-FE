@@ -16,6 +16,7 @@ import { ChevronDown, ChevronRight, Info, Calendar, Plus, Trash2, Tag, TrendingU
 import {
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
 } from 'recharts';
+import SpotlightTour from '../components/SpotlightTour';
 
 // ==================== 상수 ====================
 
@@ -324,7 +325,7 @@ export default function Dashboard() {
     <div className="max-w-4xl mx-auto space-y-6 animate-fade-in overflow-visible">
 
       {/* ==================== 1. 수익성 분석 카드 ==================== */}
-      <div className="bg-white rounded-2xl shadow-lg border border-slate-200">
+      <div id="tour-dashboard-profit" className="bg-white rounded-2xl shadow-lg border border-slate-200">
         <div className={`relative ${theme.gradient} p-8 text-white transition-colors duration-500 rounded-t-2xl ${!showProfitDetails ? 'rounded-b-2xl' : ''}`}>
           <div className="flex items-start justify-between">
             <div>
@@ -369,7 +370,11 @@ export default function Dashboard() {
                     )}
                   </div>
                 )}
-                <button onClick={() => setShowProfitDetails(!showProfitDetails)} className="ml-4 mb-1 p-1 rounded-full hover:bg-white/20 transition-colors">
+                <button
+                  id="tour-dashboard-expand"
+                  onClick={() => setShowProfitDetails(!showProfitDetails)}
+                  className="ml-4 mb-1 p-1 rounded-full hover:bg-white/20 transition-colors"
+                >
                   {showProfitDetails ? <ChevronDown size={28} /> : <ChevronRight size={28} />}
                 </button>
               </div>
@@ -466,7 +471,7 @@ export default function Dashboard() {
       </div>
 
       {/* ==================== 2. 차트 카드 2종 ==================== */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div id="tour-dashboard-charts" className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* 차트 A: 매출 대비 비용 -> 수익 구조 분석 */}
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
           <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-4">수익 구조 분석</h3>
@@ -561,7 +566,7 @@ export default function Dashboard() {
       </div>
 
       {/* ==================== 3. 매장 운영비 관리 ==================== */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+      <div id="tour-dashboard-manage" className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="p-6 flex items-center justify-between cursor-pointer hover:bg-slate-50 transition-colors" onClick={() => setShowExpenseDetails(!showExpenseDetails)}>
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
@@ -754,6 +759,37 @@ export default function Dashboard() {
         </div>
       )}
 
+      <SpotlightTour
+        tourKey="dashboard_page"
+        steps={[
+          {
+            targetId: 'tour-dashboard-profit',
+            title: '💰 실시간 수익성 분석',
+            content: '이번 달 매장의 실제 수익률과 순수익을 한눈에 파악할 수 있는 가장 중요한 공간입니다.',
+            placement: 'bottom',
+          },
+          {
+            targetId: 'tour-dashboard-expand',
+            title: '🔍 상세 내역 보기',
+            content: '이 버튼을 누르면 매출과 비용의 상세 내역을 포함한 심층 분석 리포트가 펼쳐집니다.',
+            placement: 'bottom',
+          },
+          {
+            targetId: 'tour-dashboard-charts',
+            title: '📊 지출 구조 시각화',
+            content: '임대료, 인건비 등 비중이 높은 지출 항목을 차트로 분석하여 고정비를 줄일 수 있는 포인트를 찾아보세요.',
+            placement: 'top',
+          },
+          {
+            targetId: 'tour-dashboard-manage',
+            title: '🛠️ 운영비 직접 관리',
+            content: '매달 발생하는 운영비를 직접 입력하고 관리하세요. 입력된 정보는 수익성 분석에 즉시 반영됩니다.',
+            placement: 'top',
+          },
+        ]}
+        autoStart={true}
+        showIntro={false}
+      />
     </div>
   );
 }

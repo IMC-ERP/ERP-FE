@@ -6,6 +6,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { ChevronDown, ChevronRight, Plus, Trash2, DollarSign, Calculator, Archive, AlertCircle, ArrowUp, ArrowDown, X, Save } from 'lucide-react';
 import { recipeCostApi, inventoryApi, type InventoryUsageImpact } from '../services/api';
+import SpotlightTour from '../components/SpotlightTour';
 import { supabase } from '../supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { RecipeIngredientsTable } from './cost-recipe/RecipeIngredientsTable';
@@ -404,108 +405,109 @@ const MaterialTable = ({ materials, dirtyMaterialIds, onUpdate, onDelete, onSave
                         <span className="text-xs text-slate-400">{items.length}개 품목</span>
                     </div>
                     <div className="responsive-table-shell">
-                    <table className="w-full min-w-[780px] text-sm text-left">
-                        <thead className="bg-white text-slate-500 font-semibold border-b border-slate-100">
-                            <tr>
-                                <th className="px-6 py-3">원재료명</th>
-                                <th className="px-6 py-3 text-right">구매가(원)</th>
-                                <th className="px-6 py-3 text-right">구매 용량</th>
-                                <th className="px-6 py-3 text-center">단위</th>
-                                <th className="px-6 py-3 text-right bg-blue-50/50">단위당 가격</th>
-                                <th className="px-6 py-3 text-right">현재 재고</th>
-                                <th className="px-6 py-3 text-center">관리</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                            {items.map(mat => {
-                                const isDirty = dirtyMaterialIds.has(mat.id);
-                                return (
-                                <tr key={mat.id} className={isDirty ? "bg-indigo-50/40 hover:bg-indigo-50" : "hover:bg-slate-50"}>
-                                    <td className="px-6 py-3">
-                                        <div className="space-y-1">
-                                            <input
-                                                type="text"
-                                                value={mat.name}
-                                                onChange={(e) => onUpdate(mat.id, 'name', e.target.value)}
-                                                className="w-full bg-transparent border-none focus:ring-0 p-0 font-medium text-slate-800"
-                                            />
-                                            <div className="flex items-center gap-2 text-[11px]">
-                                                <span className="rounded-full bg-slate-100 px-2 py-0.5 font-medium text-slate-500">{mat.category}</span>
-                                                {isDirty && (
-                                                    <span className="rounded-full bg-indigo-100 px-2 py-0.5 font-semibold text-indigo-700">변경됨</span>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-3 text-right">
-                                        <div className="inline-flex w-32 items-center rounded-lg border border-slate-200 bg-white px-2 py-1 shadow-sm">
-                                            <input
-                                                type="number"
-                                                value={mat.purchasePrice}
-                                                onChange={(e) => onUpdate(mat.id, 'purchasePrice', parseFloat(e.target.value) || 0)}
-                                                className="w-full border-none bg-transparent p-0 text-right text-sm font-medium focus:outline-none focus:ring-0"
-                                            />
-                                            <span className="ml-2 text-xs font-medium text-slate-400">원</span>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-3 text-right">
-                                        <div className="inline-flex w-28 items-center rounded-lg border border-slate-200 bg-white px-2 py-1 shadow-sm">
-                                            <input
-                                                type="number"
-                                                value={mat.purchaseUnitQty}
-                                                onChange={(e) => onUpdate(mat.id, 'purchaseUnitQty', parseFloat(e.target.value) || 0)}
-                                                step="any"
-                                                className="w-full border-none bg-transparent p-0 text-right text-sm font-medium focus:outline-none focus:ring-0"
-                                            />
-                                            <span className="ml-2 text-xs font-medium text-slate-400">{mat.unit}</span>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-3 text-center">
-                                        <select
-                                            value={mat.unit}
-                                            onChange={(e) => onUpdate(mat.id, 'unit', e.target.value)}
-                                            className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-600"
-                                        >
-                                            <option value="g">g</option>
-                                            <option value="ml">ml</option>
-                                            <option value="ea">ea</option>
-                                        </select>
-                                    </td>
-                                    <td className="px-6 py-3 text-right font-mono text-blue-600 bg-blue-50/30 font-bold">
-                                        <div className="space-y-1">
-                                            <div>{formatUnitCost(getUnitPrice(mat), mat.unit)}</div>
-                                            <div className="text-[11px] font-medium text-slate-400">구매가/용량 기준</div>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-3 text-right text-slate-600">
-                                        {mat.currentStock.toLocaleString('ko-KR', { maximumFractionDigits: 2 })}
-                                    </td>
-                                    <td className="px-6 py-3 text-center">
-                                        <div className="flex gap-2 justify-center">
-                                            <button
-                                                onClick={() => onSave(mat)}
-                                                disabled={!isDirty || savingMaterialId === mat.id || deletingMaterialId === mat.id}
-                                                className="inline-flex items-center gap-1 rounded-md border border-indigo-200 bg-white px-3 py-1.5 text-xs font-semibold text-indigo-600 transition-colors hover:bg-indigo-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-300"
-                                                title="저장"
-                                                aria-label={`${mat.name} 원재료 저장`}
-                                            >
-                                                <Save size={14} />
-                                                {savingMaterialId === mat.id ? '저장 중' : '저장'}
-                                            </button>
-                                            <button
-                                                onClick={() => onDelete(mat.id)}
-                                                disabled={savingMaterialId === mat.id || deletingMaterialId === mat.id}
-                                                className="text-slate-300 hover:text-red-500 transition-colors disabled:cursor-not-allowed disabled:text-slate-200"
-                                                aria-label={`${mat.name} 원재료 삭제`}
-                                            >
-                                                <Trash2 size={16} />
-                                            </button>
-                                        </div>
-                                    </td>
+                        <table className="w-full min-w-[780px] text-sm text-left">
+                            <thead className="bg-white text-slate-500 font-semibold border-b border-slate-100">
+                                <tr>
+                                    <th className="px-6 py-3">원재료명</th>
+                                    <th className="px-6 py-3 text-right">구매가(원)</th>
+                                    <th className="px-6 py-3 text-right">구매 용량</th>
+                                    <th className="px-6 py-3 text-center">단위</th>
+                                    <th className="px-6 py-3 text-right bg-blue-50/50">단위당 가격</th>
+                                    <th className="px-6 py-3 text-right">현재 재고</th>
+                                    <th className="px-6 py-3 text-center">관리</th>
                                 </tr>
-                            )})}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                                {items.map(mat => {
+                                    const isDirty = dirtyMaterialIds.has(mat.id);
+                                    return (
+                                        <tr key={mat.id} className={isDirty ? "bg-indigo-50/40 hover:bg-indigo-50" : "hover:bg-slate-50"}>
+                                            <td className="px-6 py-3">
+                                                <div className="space-y-1">
+                                                    <input
+                                                        type="text"
+                                                        value={mat.name}
+                                                        onChange={(e) => onUpdate(mat.id, 'name', e.target.value)}
+                                                        className="w-full bg-transparent border-none focus:ring-0 p-0 font-medium text-slate-800"
+                                                    />
+                                                    <div className="flex items-center gap-2 text-[11px]">
+                                                        <span className="rounded-full bg-slate-100 px-2 py-0.5 font-medium text-slate-500">{mat.category}</span>
+                                                        {isDirty && (
+                                                            <span className="rounded-full bg-indigo-100 px-2 py-0.5 font-semibold text-indigo-700">변경됨</span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-3 text-right">
+                                                <div className="inline-flex w-32 items-center rounded-lg border border-slate-200 bg-white px-2 py-1 shadow-sm">
+                                                    <input
+                                                        type="number"
+                                                        value={mat.purchasePrice}
+                                                        onChange={(e) => onUpdate(mat.id, 'purchasePrice', parseFloat(e.target.value) || 0)}
+                                                        className="w-full border-none bg-transparent p-0 text-right text-sm font-medium focus:outline-none focus:ring-0"
+                                                    />
+                                                    <span className="ml-2 text-xs font-medium text-slate-400">원</span>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-3 text-right">
+                                                <div className="inline-flex w-28 items-center rounded-lg border border-slate-200 bg-white px-2 py-1 shadow-sm">
+                                                    <input
+                                                        type="number"
+                                                        value={mat.purchaseUnitQty}
+                                                        onChange={(e) => onUpdate(mat.id, 'purchaseUnitQty', parseFloat(e.target.value) || 0)}
+                                                        step="any"
+                                                        className="w-full border-none bg-transparent p-0 text-right text-sm font-medium focus:outline-none focus:ring-0"
+                                                    />
+                                                    <span className="ml-2 text-xs font-medium text-slate-400">{mat.unit}</span>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-3 text-center">
+                                                <select
+                                                    value={mat.unit}
+                                                    onChange={(e) => onUpdate(mat.id, 'unit', e.target.value)}
+                                                    className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-600"
+                                                >
+                                                    <option value="g">g</option>
+                                                    <option value="ml">ml</option>
+                                                    <option value="ea">ea</option>
+                                                </select>
+                                            </td>
+                                            <td className="px-6 py-3 text-right font-mono text-blue-600 bg-blue-50/30 font-bold">
+                                                <div className="space-y-1">
+                                                    <div>{formatUnitCost(getUnitPrice(mat), mat.unit)}</div>
+                                                    <div className="text-[11px] font-medium text-slate-400">구매가/용량 기준</div>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-3 text-right text-slate-600">
+                                                {mat.currentStock.toLocaleString('ko-KR', { maximumFractionDigits: 2 })}
+                                            </td>
+                                            <td className="px-6 py-3 text-center">
+                                                <div className="flex gap-2 justify-center">
+                                                    <button
+                                                        onClick={() => onSave(mat)}
+                                                        disabled={!isDirty || savingMaterialId === mat.id || deletingMaterialId === mat.id}
+                                                        className="inline-flex items-center gap-1 rounded-md border border-indigo-200 bg-white px-3 py-1.5 text-xs font-semibold text-indigo-600 transition-colors hover:bg-indigo-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-300"
+                                                        title="저장"
+                                                        aria-label={`${mat.name} 원재료 저장`}
+                                                    >
+                                                        <Save size={14} />
+                                                        {savingMaterialId === mat.id ? '저장 중' : '저장'}
+                                                    </button>
+                                                    <button
+                                                        onClick={() => onDelete(mat.id)}
+                                                        disabled={savingMaterialId === mat.id || deletingMaterialId === mat.id}
+                                                        className="text-slate-300 hover:text-red-500 transition-colors disabled:cursor-not-allowed disabled:text-slate-200"
+                                                        aria-label={`${mat.name} 원재료 삭제`}
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    )
+                                })}
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             ))}
@@ -1037,6 +1039,27 @@ export default function CostRecipeManager() {
 
     const [isDangerSectionExpanded, setIsDangerSectionExpanded] = useState(true);
 
+    const COST_RECIPE_TOUR = [
+        {
+            targetId: 'tour-cr-tab-recipe',
+            title: '📊 원가/레시피 분석',
+            content: '판매가 대비 원재료가 차지하는 비중(원가율)을 분석하여 매장의 수익성을 한눈에 관리하세요.',
+            placement: 'bottom' as const,
+        },
+        {
+            targetId: 'tour-cr-add-button',
+            title: '➕ 신규 메뉴 구상',
+            content: '신메뉴 출시 전, 레시피를 미리 입력하여 예상 수익성을 시뮬레이션해 보세요.',
+            placement: 'bottom' as const,
+        },
+        {
+            targetId: 'tour-cr-tab-material',
+            title: '📦 원재료 정보 관리',
+            content: '레시피 계산의 기초가 되는 각 원재료의 구매 단가와 용량 정보를 체계적으로 관리하세요.',
+            placement: 'bottom' as const,
+        }
+    ];
+
     return (
         <div className="space-y-6 animate-fade-in relative">
             {/* Modals */}
@@ -1059,6 +1082,7 @@ export default function CostRecipeManager() {
                 <div className="flex w-full sm:w-auto gap-2">
                     {activeTab === 'recipe' ? (
                         <button
+                            id="tour-cr-add-button"
                             onClick={handleAddRecipe}
                             className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg font-bold shadow hover:bg-indigo-700 transition-colors"
                         >
@@ -1075,6 +1099,7 @@ export default function CostRecipeManager() {
             {/* Tabs */}
             <div className="flex gap-2 border-b border-slate-200 overflow-x-auto pb-1 scrollbar-hide">
                 <button
+                    id="tour-cr-tab-recipe"
                     onClick={() => setActiveTab('recipe')}
                     className={`flex items-center gap-2 px-4 sm:px-6 py-3 text-xs sm:text-sm font-bold rounded-t-lg transition-colors whitespace-nowrap ${activeTab === 'recipe'
                         ? "bg-white text-indigo-600 border-b-2 border-indigo-600"
@@ -1085,6 +1110,7 @@ export default function CostRecipeManager() {
                     원가 및 레시피 관리
                 </button>
                 <button
+                    id="tour-cr-tab-material"
                     onClick={() => setActiveTab('material')}
                     className={`flex items-center gap-2 px-4 sm:px-6 py-3 text-xs sm:text-sm font-bold rounded-t-lg transition-colors whitespace-nowrap ${activeTab === 'material'
                         ? "bg-white text-indigo-600 border-b-2 border-indigo-600"
@@ -1120,7 +1146,7 @@ export default function CostRecipeManager() {
                     <div className="space-y-4">
                         {/* Danger Section (Cost Ratio >= 33%) */}
                         {dangerRecipes.length > 0 && (
-                            <div className="mb-8 bg-red-50 rounded-xl border border-red-200 shadow-sm overflow-hidden">
+                            <div id="tour-cr-danger-section" className="mb-8 bg-red-50 rounded-xl border border-red-200 shadow-sm overflow-hidden">
                                 <div
                                     onClick={() => setIsDangerSectionExpanded(!isDangerSectionExpanded)}
                                     className="px-4 sm:px-6 py-4 flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center cursor-pointer hover:bg-red-100/50 transition-colors"
@@ -1253,6 +1279,17 @@ export default function CostRecipeManager() {
                     )
                 )}
             </div >
+
+            <SpotlightTour
+                steps={COST_RECIPE_TOUR}
+                tourKey="cost_recipe_onboarding"
+                autoStart={true}
+                showIntro={false}
+                onStepChange={(newIdx) => {
+                    if (newIdx === 2) setActiveTab('material');
+                    else setActiveTab('recipe');
+                }}
+            />
         </div >
     );
 }

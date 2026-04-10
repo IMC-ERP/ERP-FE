@@ -12,6 +12,7 @@ import {
 } from 'recharts';
 import { Info, Loader2, Calendar } from 'lucide-react';
 import { analyticsApi, storeHoursApi, type SalesAnalyticsResponse } from '../services/api';
+import SpotlightTour from '../components/SpotlightTour';
 
 // ==================== 유틸리티 ====================
 
@@ -209,7 +210,7 @@ export default function SalesAnalysis() {
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
 
                     {/* 기간 설정 카드 */}
-                    <div className="lg:col-span-4 bg-white rounded-2xl shadow-sm border border-slate-200 p-5 flex flex-col">
+                    <div id="tour-sales-period" className="lg:col-span-4 bg-white rounded-2xl shadow-sm border border-slate-200 p-5 flex flex-col">
                         <div className="flex items-center gap-2 mb-3">
                             <Calendar size={16} className="text-slate-500" />
                             <span className="text-sm font-semibold text-slate-700">조회 기간</span>
@@ -271,7 +272,7 @@ export default function SalesAnalysis() {
                     </div>
 
                     {/* 병합된 총 매출 카드 */}
-                    <div className="lg:col-span-8 bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col justify-center relative overflow-hidden">
+                    <div id="tour-sales-summary" className="lg:col-span-8 bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col justify-center relative overflow-hidden">
                         <div className="absolute top-0 right-0 w-32 h-32 bg-blue-50 rounded-bl-full -z-10 opacity-50" />
                         <div className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-2">기간 내 총 매출</div>
                         <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
@@ -295,7 +296,7 @@ export default function SalesAnalysis() {
                 </div>
 
                 {/* ===== 차트 그리드 ===== */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div id="tour-sales-charts" className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
                     {/* 1. 요일별 매출 (Bar Chart) */}
                     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
@@ -423,6 +424,32 @@ export default function SalesAnalysis() {
                     <Loader2 className="w-8 h-8 animate-spin text-white" />
                 </div>
             )}
+
+            <SpotlightTour
+                tourKey="sales_analysis_page"
+                steps={[
+                    {
+                        targetId: 'tour-sales-period',
+                        title: '📅 조회 기간 설정',
+                        content: '분석하고 싶은 기간을 자유롭게 설정하세요. 1주일, 1개월 등 퀵 필터를 사용하면 더 빠릅니다.',
+                        placement: 'bottom',
+                    },
+                    {
+                        targetId: 'tour-sales-summary',
+                        title: '💰 매출 요약 요약',
+                        content: '조회된 기간의 총 매출과 지난 동기 대비 변화율입니다. 성장이 지속되고 있는지 확인하세요.',
+                        placement: 'bottom',
+                    },
+                    {
+                        targetId: 'tour-sales-charts',
+                        title: '📈 요일/시간대 트렌드',
+                        content: '매출 추이를 분석하여 매장의 피크 타임을 파악하고 효율적인 운영 전략을 세워보세요.',
+                        placement: 'top',
+                    },
+                ]}
+                autoStart={true}
+                showIntro={false}
+            />
         </div>
     );
 }

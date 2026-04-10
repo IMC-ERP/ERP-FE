@@ -9,6 +9,7 @@ import { FileText, PlusCircle, Search, Filter, RotateCcw, Calendar, Clock, X, Al
 import { dailySalesApi, recipeCostApi, transactionsApi, manualSalesApi, hourlySalesApi } from '../services/api';
 import type { HourlyTransaction, HourlyOCRResponse } from '../services/api';
 import type { RecipeCost, OCRSalesResponse, SaleItem, ManualSaleRequest } from '../types';
+import SpotlightTour from '../components/SpotlightTour';
 
 // Order State Mapping for UI (Korean translation)
 const ORDER_STATE_MAP: Record<string, { label: string; color: string }> = {
@@ -203,8 +204,8 @@ const HistoryView = () => {
 
     return (
         <div className="space-y-4 animate-fade-in relative">
-            {/* Advanced Filter Panel */}
-            <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm">
+            {/* Advanced Filter Panel - Tour Step 1 target */}
+            <div id="tour-date-filter" className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm">
                 <div className="flex items-center justify-between mb-6 border-b border-slate-100 pb-4">
                     <div className="flex items-center gap-2 text-slate-800 font-black">
                         <Filter size={18} className="text-indigo-600" />
@@ -324,7 +325,7 @@ const HistoryView = () => {
             </div>
 
             {/* Data Table Container */}
-            <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex flex-col relative min-h-[400px]">
+            <div id="tour-transaction-list" className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex flex-col relative min-h-[400px]">
                 {/* Header Info */}
                 <div className="px-8 py-4 bg-white border-b border-slate-100 flex justify-between items-center">
                     <div className="flex items-center gap-3">
@@ -499,7 +500,7 @@ const HistoryView = () => {
             <div className="flex justify-between items-center px-4">
                 <span className="text-[11px] font-bold text-slate-400">* 최대 30개의 거래 행을 기준으로 스크롤이 제공됩니다.</span>
                 {!editingId && transactions.length > 0 && (
-                    <span className="text-[11px] font-bold text-slate-400">행을 더블클릭하여 상세 정보를 수정할 수 있습니다.</span>
+                    <span id="tour-row-edit-hint" className="text-[11px] font-bold text-slate-400">행을 더블클릭하여 상세 정보를 수정할 수 있습니다.</span>
                 )}
             </div>
 
@@ -1009,7 +1010,7 @@ const DailySalesAddView = () => {
                 )}
 
                 {!isOcrLoading && !isHourlyLoading && (
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div id="tour-sales-add-options" className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         {/* OCR Scan Card - 메뉴별 */}
                         <div className="bg-white p-8 rounded-2xl border border-slate-200 hover:border-blue-500 hover:shadow-xl transition-all group relative overflow-hidden">
                             <div className="absolute top-0 right-0 w-32 h-32 bg-blue-50 rounded-bl-full -mr-10 -mt-10 transition-transform group-hover:scale-110"></div>
@@ -1694,6 +1695,7 @@ const DailySalesAddView = () => {
 export default function TransactionManager() {
     const [activeTab, setActiveTab] = useState("dailySalesAdd");
 
+
     return (
         <div className="space-y-6 animate-fade-in">
             <header>
@@ -1716,6 +1718,7 @@ export default function TransactionManager() {
                     매출 등록
                 </button>
                 <button
+                    id="tour-tab-history"
                     onClick={() => setActiveTab("history")}
                     className={`flex items-center gap-2 px-6 py-3 text-sm font-bold rounded-t-lg transition-colors whitespace-nowrap ${activeTab === "history"
                         ? "bg-white text-blue-600 border-b-2 border-blue-600"
@@ -1731,8 +1734,48 @@ export default function TransactionManager() {
             <div className="mt-4">
                 {activeTab === "dailySalesAdd" && <DailySalesAddView />}
                 {activeTab === "history" && <HistoryView />}
-
             </div>
+
+            <SpotlightTour
+                tourKey="transaction_manager_page"
+                steps={[
+                    {
+                        targetId: 'tour-sales-add-options',
+                        title: '📥 매출 등록 방식 선택',
+                        content: '영수증 사진 스캔(메뉴별/시간대별) 또는 직접 입력을 통해 매출을 손쉽게 등록할 수 있습니다.',
+                        placement: 'top',
+                    },
+                    {
+                        targetId: 'tour-tab-history',
+                        title: '📁 거래 내역 확인',
+                        content: '등록된 거래 내역은 옆 탭에서 언제든지 확인하고 수정할 수 있습니다.',
+                        placement: 'bottom',
+                    },
+                    {
+                        targetId: 'tour-date-filter',
+                        title: '🔍 상세 검색 필터',
+                        content: '원하는 기간이나 카테고리, 메뉴명을 입력하여 거래 내역을 정밀하게 검색할 수 있습니다.',
+                        placement: 'bottom',
+                    },
+                    {
+                        targetId: 'tour-transaction-list',
+                        title: '📋 거래 내역 리스트',
+                        content: '검색된 모든 거래 내역이 리스트로 표시됩니다. 수량, 단가, 총 금액과 현재 처리 상태를 확인하세요.',
+                        placement: 'top',
+                    },
+                ]}
+                autoStart={true}
+                showIntro={false}
+                onStepChange={(newIdx) => {
+                    // Step 3 (index 2) onwards are about 'History' tab
+                    if (newIdx >= 2) {
+                        setActiveTab("history");
+                    } else {
+                        // Option to go back to registration tab if going back in the tour
+                        setActiveTab("dailySalesAdd");
+                    }
+                }}
+            />
         </div>
     );
 }

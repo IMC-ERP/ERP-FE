@@ -6,6 +6,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { RefreshCw, ChevronDown, ChevronUp, Plus, X, Trash2, Camera, ImageIcon } from 'lucide-react';
+import SpotlightTour from '../components/SpotlightTour';
 import {
   intermediateApi,
   inventoryApi,
@@ -2497,6 +2498,45 @@ export default function Inventory() {
 
 
 
+  const INVENTORY_TOUR = [
+    {
+      targetId: 'tour-inv-tab-overview',
+      title: '📊 현황 요약',
+      content: '매장의 모든 재고 현황을 한눈에 파악하고 실시간 소진 상태를 확인하는 대시보드입니다.',
+      placement: 'bottom' as const,
+    },
+    {
+      targetId: 'tour-inv-tab-pricing',
+      title: '💰 시세 모니터링',
+      content: '원재료의 시장 시세 변동을 모니터링하여 최적의 매입 타이밍을 잡도록 도와드립니다.',
+      placement: 'bottom' as const,
+    },
+    {
+      targetId: 'tour-inv-tab-receiving',
+      title: '📥 재고 입고',
+      content: '새로운 물건이 들어왔을 때 영수증 스캔이나 수기 입력을 통해 즉시 재고에 반영하세요.',
+      placement: 'bottom' as const,
+    },
+    {
+      targetId: 'tour-inv-tab-history',
+      title: '📋 재고 입고 기록',
+      content: '과거에 입고된 모든 내역을 투명하게 확인하고 필요시 상세 정보를 수정할 수 있습니다.',
+      placement: 'bottom' as const,
+    },
+    {
+      targetId: 'tour-inv-tab-forecast',
+      title: '📈 수요예측',
+      content: 'AI가 과거 데이터를 분석하여 다음 주에 필요한 예상 재고량을 미리 제안해 드립니다.',
+      placement: 'bottom' as const,
+    },
+    {
+      targetId: 'tour-inv-tab-intermediate',
+      title: '🧪 중간재 관리',
+      content: '원재료를 조합해 직접 만드는 소스, 청 등의 레시피와 생산 로그를 체계적으로 관리하세요.',
+      placement: 'bottom' as const,
+    }
+  ];
+
   return (
     <div className="inventory-page-new">
       <header className="page-header-new">
@@ -2509,7 +2549,7 @@ export default function Inventory() {
             <RefreshCw size={18} /> 전체 불러오기
           </button>
           {activeTab === 'overview' && (
-            <button className="btn btn-primary btn-add-item" onClick={handleAddItem}>
+            <button id="tour-inventory-add" className="btn btn-primary btn-add-item" onClick={handleAddItem}>
               <Plus size={18} /> 품목 추가
             </button>
           )}
@@ -2519,36 +2559,42 @@ export default function Inventory() {
       {/* 탭 네비게이션 */}
       <nav className="tab-navigation">
         <button
+          id="tour-inv-tab-overview"
           className={`tab-btn ${activeTab === 'overview' ? 'active' : ''}`}
           onClick={() => setActiveTab('overview')}
         >
           📊 현황 요약
         </button>
         <button
+          id="tour-inv-tab-pricing"
           className={`tab-btn ${activeTab === 'pricing' ? 'active' : ''}`}
           onClick={() => setActiveTab('pricing')}
         >
           💰 시세 모니터링
         </button>
         <button
+          id="tour-inv-tab-receiving"
           className={`tab-btn ${activeTab === 'receiving' ? 'active' : ''}`}
           onClick={() => setActiveTab('receiving')}
         >
           📥 재고 입고
         </button>
         <button
+          id="tour-inv-tab-history"
           className={`tab-btn ${activeTab === 'history' ? 'active' : ''}`}
           onClick={() => setActiveTab('history')}
         >
           📋 재고 입고 기록
         </button>
         <button
+          id="tour-inv-tab-forecast"
           className={`tab-btn ${activeTab === 'forecast' ? 'active' : ''}`}
           onClick={() => setActiveTab('forecast')}
         >
           📈 수요예측
         </button>
         <button
+          id="tour-inv-tab-intermediate"
           className={`tab-btn ${activeTab === 'intermediate' ? 'active' : ''}`}
           onClick={() => setActiveTab('intermediate')}
         >
@@ -2571,6 +2617,24 @@ export default function Inventory() {
           </>
         )}
       </div>
+
+      <SpotlightTour 
+        steps={INVENTORY_TOUR} 
+        tourKey="inventory_onboarding" 
+        autoStart={true} 
+        showIntro={false} 
+        onStepChange={(newIdx) => {
+          switch(newIdx) {
+            case 0: setActiveTab('overview'); break;
+            case 1: setActiveTab('pricing'); break;
+            case 2: setActiveTab('receiving'); break;
+            case 3: setActiveTab('history'); break;
+            case 4: setActiveTab('forecast'); break;
+            case 5: setActiveTab('intermediate'); break;
+            default: break;
+          }
+        }}
+      />
 
       {/* 품목 추가 모달 */}
       {selectedItem && modalPortalTarget && createPortal(
