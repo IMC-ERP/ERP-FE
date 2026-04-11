@@ -105,14 +105,17 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     // 로그아웃
     const logout = async () => {
         try {
-            const { error } = await supabase.auth.signOut();
-            if (error) throw error;
+            // 즉시 상태 초기화 (리스너에 의존하지 않음)
+            setUser(null);
+            setSession(null);
             setUserProfile(null);
             setAuthToken(null);
             setNeedsRegistration(false);
+            // Supabase 세션 삭제
+            await supabase.auth.signOut();
         } catch (error) {
             console.error('로그아웃 실패:', error);
-            throw error;
+            // signOut 실패해도 로컬 상태는 이미 정리됨 → 로그인 페이지로 이동 가능
         }
     };
 

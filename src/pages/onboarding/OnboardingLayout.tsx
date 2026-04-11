@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { inventoryApi } from '../../services/api';
+import { inventoryApi, userApi } from '../../services/api';
 import InventorySetupStep from './InventorySetupStep';
 import RecipeSetupStep from './RecipeSetupStep';
 import CompleteSetupStep from './CompleteSetupStep';
@@ -10,6 +10,8 @@ export default function OnboardingLayout() {
   const { userProfile, loading } = useAuth();
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState<number | null>(null);
+  const [isCompleting, setIsCompleting] = useState(false);
+  const [completeError, setCompleteError] = useState<string | null>(null);
 
   useEffect(() => {
     const checkOnboardingState = async () => {
@@ -60,10 +62,28 @@ export default function OnboardingLayout() {
     localStorage.setItem(`onboarding_step_${userProfile?.uid}`, prevStep.toString());
   };
 
-  const handleComplete = () => {
-    localStorage.removeItem(`onboarding_step_${userProfile?.uid}`);
-    localStorage.setItem(`onboarding_complete_${userProfile?.uid}`, 'true');
-    navigate('/dashboard', { replace: true });
+  const handleComplete = async () => {
+    if (isCompleting) return;
+    setCompleteError(null);
+    setIsCompleting(true);
+    try {
+      // 1. DB에 온보딩 완료 플래그 기록 (필수)
+      await userApi.completeOnboarding();
+
+      // 2. 성공 시 로컬스토리지 정리 (UI 진행 단계 흔적 제거)
+      localStorage.removeItem(`onboarding_step_${userProfile?.uid}`);
+      // 완료 캐시는 더 이상 사용하지 않음 (DB 플래그가 진실의 원천)
+      localStorage.removeItem(`onboarding_complete_${userProfile?.uid}`);
+
+      // 3. 메인으로 이동
+      navigate('/dashboard', { replace: true });
+    } catch (error: any) {
+      console.error('[ONBOARDING] complete-onboarding failed:', error);
+      const msg = error?.response?.data?.detail || error?.message || '온보딩 완료 처리 중 오류가 발생했습니다.';
+      setCompleteError(`${msg}\n\n다시 시도해주세요.`);
+    } finally {
+      setIsCompleting(false);
+    }
   };
 
   return (
@@ -91,7 +111,14 @@ export default function OnboardingLayout() {
         <div className="p-6 sm:p-8">
           {currentStep === 1 && <InventorySetupStep onNext={handleNext} />}
           {currentStep === 2 && <RecipeSetupStep onNext={handleNext} />}
-          {currentStep === 3 && <CompleteSetupStep onComplete={handleComplete} onPrev={handlePrev} />}
+          {currentStep === 3 && (
+            <CompleteSetupStep
+              onComplete={handleComplete}
+              onPrev={handlePrev}
+              isCompleting={isCompleting}
+              errorMessage={completeError}
+            />
+          )}
         </div>
       </div>
     </div>

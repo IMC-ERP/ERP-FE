@@ -543,6 +543,7 @@ export interface UserRegistration {
   owner_name: string;
   phone?: string;
   address?: string;
+  established_year?: number;
 }
 
 export interface UserProfile {
@@ -553,8 +554,10 @@ export interface UserProfile {
   owner_name: string;
   phone?: string;
   address?: string;
+  role?: string;
   created_at: string;
   updated_at: string;
+  onboarding_completed_at?: string | null;
 }
 
 export interface UserProfileUpdate {
@@ -610,6 +613,8 @@ export const userApi = {
     api.delete<{ deleted: number }>('/users/invitations/cleanup'),
   forceRemoveMember: (email: string) =>
     api.delete<{ success: boolean; email: string }>(`/users/members/${encodeURIComponent(email)}`),
+  completeOnboarding: () =>
+    api.post<{ success: boolean; onboarding_completed_at: string }>('/users/complete-onboarding'),
 };
 
 // ==================== Auth API ====================
@@ -832,6 +837,52 @@ export const storeProfileApi = {
 
 export const manualSalesApi = {
   create: (data: any) => api.post('/sales/manual', data),
+};
+
+// ==================== 시간대별 매출 OCR API ====================
+
+export interface HourlyTransaction {
+  time: string;       // "09:18:51"
+  amount: number;     // 46800
+  table_no?: string;
+}
+
+export interface HourlyOCRResponse {
+  success: boolean;
+  date: string;
+  transactions: HourlyTransaction[];
+  summary: {
+    totalCount: number;
+    nonZeroCount: number;
+    totalAmount: number;
+  };
+  warnings: string[];
+  error: string | null;
+}
+
+export interface HourlySaveResponse {
+  success: boolean;
+  date: string;
+  insertedCount: number;
+  totalAmount: number;
+  overwritten: boolean;
+  previousCount: number;
+}
+
+export const hourlySalesApi = {
+  preview: (files: FileList | File[]) => {
+    const formData = new FormData();
+    if (files instanceof FileList) {
+      Array.from(files).forEach((file) => formData.append('files', file));
+    } else {
+      files.forEach((file) => formData.append('files', file));
+    }
+    return api.post<HourlyOCRResponse>('/sales/ocr-hourly/preview', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+  save: (data: { date: string; transactions: HourlyTransaction[] }) =>
+    api.post<HourlySaveResponse>('/sales/ocr-hourly/save', data),
 };
 
 // ==================== Transactions API ====================

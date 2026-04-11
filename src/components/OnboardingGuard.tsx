@@ -31,32 +31,33 @@ export default function OnboardingGuard({ children }: { children: React.ReactNod
                 return;
             }
 
-            // 1차 체크: CompleteSetupStep에서 로컬스토리지에 저장한 '완료 플래그' 확인
-            const isOnboardingComplete = localStorage.getItem(`onboarding_complete_${userProfile.uid}`) === 'true';
-
-            if (isOnboardingComplete) {
-                // 이미 완료한 유저는 통과
+            // ===== 1차 (진실의 원천): DB의 onboarding_completed_at 플래그 =====
+            // userProfile에 포함되어 있음 (백엔드 /users/check-registration 응답)
+            // localStorage 캐시는 사용하지 않음 — DB가 항상 진실이며,
+            // userProfile은 매 로그인마다 API에서 받아오므로 캐시가 불필요.
+            if (userProfile.onboarding_completed_at) {
                 setIsChecking(false);
                 return;
             }
 
-            // 2차 체크 (가장 확실함): DB의 원재료 데이터를 확인하여 Condition 판별
+            // ===== 2차 (안전망): DB의 inventory_items 존재 여부 =====
+            // 어떤 이유로 플래그가 누락된 매장은 데이터 유무로 추론하여 안전망 제공
             try {
                 const res = await inventoryApi.getAll();
                 const hasInventory = res.data && res.data.length > 0;
 
                 if (!hasInventory) {
-                    // Condition A: 원재료 데이터가 아예 없음 -> [Step 1]로 강제 리다이렉트
+                    // 재고 없음 → Step 1부터 시작
                     localStorage.setItem(`onboarding_step_${userProfile.uid}`, '1');
                     navigate('/onboarding', { replace: true });
                 } else {
-                    // Condition B: 원재료는 있으나 완료되지 않음 -> [Step 2]로 리다이렉트
+                    // 재고는 있으나 완료 플래그 없음 → Step 2부터 재개
                     localStorage.setItem(`onboarding_step_${userProfile.uid}`, '2');
                     navigate('/onboarding', { replace: true });
                 }
             } catch (err) {
                 console.error('Failed to check onboarding guard status', err);
-                setIsChecking(false); // 에러 페치 시 무한 로딩 방지 통과 (또는 리다이렉트)
+                setIsChecking(false); // 에러 페치 시 무한 로딩 방지 통과
             }
         };
 
