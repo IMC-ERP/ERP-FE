@@ -39,13 +39,13 @@ const NavItem = ({ to, icon: Icon, label, active, onClick }: NavItemProps) => (
   <Link
     to={to}
     onClick={onClick}
-    className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors duration-200 ${active
+    className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors duration-200 ${active
       ? 'bg-blue-100 text-blue-700 font-semibold nav-item-active'
       : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
       }`}
   >
     <Icon size={20} />
-    <span>{label}</span>
+    <span className="min-w-0 break-words leading-snug">{label}</span>
   </Link>
 );
 

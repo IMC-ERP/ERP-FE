@@ -88,7 +88,7 @@ ${userMsg}
   // Dynamic classes based on isWidget prop
   const containerClass = isWidget
     ? "flex flex-col h-full bg-white"
-    : "h-[calc(100vh-8rem)] flex flex-col bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden animate-fade-in";
+    : "min-h-[calc(100vh-7rem)] sm:h-[calc(100vh-8rem)] flex flex-col bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden animate-fade-in";
 
   return (
     <div className={containerClass}>
@@ -108,10 +108,10 @@ ${userMsg}
       )}
 
       {/* Chat Area */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4" ref={scrollRef}>
+      <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-4" ref={scrollRef}>
         {messages.map((msg, idx) => (
           <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`flex items-start gap-3 max-w-[90%] ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
+            <div className={`flex items-start gap-3 max-w-[94%] sm:max-w-[90%] ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
               <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${msg.role === 'user' ? 'bg-blue-100' : 'bg-amber-100'}`}>
                 {msg.role === 'user' ? <User size={16} className="text-blue-700" /> : <Bot size={16} className="text-amber-700" />}
               </div>
@@ -134,8 +134,8 @@ ${userMsg}
       </div>
 
       {/* Input Area */}
-      <div className="p-4 border-t border-slate-100 bg-white">
-        <div className="flex gap-2 mb-4 overflow-x-auto pb-2 scrollbar-hide">
+      <div className="border-t border-slate-100 bg-white p-3 sm:p-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
+        <div className="-mx-1 mb-3 flex gap-2 overflow-x-auto px-1 pb-2 scrollbar-hide sm:mb-4">
           {["🚨 재고 위험 분석해줘", "💰 마진 분석해줘", "📈 판매 패턴 알려줘"].map((txt) => (
             <button
               key={txt}

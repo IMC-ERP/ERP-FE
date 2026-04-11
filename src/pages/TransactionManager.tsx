@@ -205,22 +205,22 @@ const HistoryView = () => {
         <div className="space-y-4 animate-fade-in relative">
             {/* Advanced Filter Panel */}
             <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm">
-                <div className="flex items-center justify-between mb-6 border-b border-slate-100 pb-4">
+                <div className="mb-6 flex flex-col gap-3 border-b border-slate-100 pb-4 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex items-center gap-2 text-slate-800 font-black">
                         <Filter size={18} className="text-indigo-600" />
                         <span className="tracking-tight text-lg">상세 검색 필터</span>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex w-full gap-2 sm:w-auto sm:justify-end">
                         <button
                             onClick={handleReset}
-                            className="flex items-center gap-1.5 px-4 py-2 text-sm font-bold text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition-all"
+                            className="flex flex-1 items-center justify-center gap-1.5 px-4 py-2 text-sm font-bold text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition-all sm:flex-none"
                         >
                             <RotateCcw size={14} /> 초기화
                         </button>
                         <button
                             onClick={handleSearch}
                             disabled={loading}
-                            className="flex items-center gap-2 px-6 py-2 bg-indigo-600 text-white rounded-xl text-sm font-black shadow-lg shadow-indigo-100 hover:bg-indigo-700 active:scale-95 transition-all disabled:opacity-50"
+                            className="flex flex-1 items-center justify-center gap-2 px-6 py-2 bg-indigo-600 text-white rounded-xl text-sm font-black shadow-lg shadow-indigo-100 hover:bg-indigo-700 active:scale-95 transition-all disabled:opacity-50 sm:flex-none"
                         >
                             {loading ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />}
                             검색하기
@@ -234,7 +234,7 @@ const HistoryView = () => {
                         <label className="text-[11px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1">
                             <Calendar size={12} /> 날짜 범위
                         </label>
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                             <div className="relative flex-1 min-w-[120px]">
                                 <input
                                     type="date"
@@ -260,7 +260,7 @@ const HistoryView = () => {
                         <label className="text-[11px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1">
                             <Clock size={12} /> 시간 범위
                         </label>
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                             <input
                                 type="time"
                                 value={startTime}
@@ -326,7 +326,7 @@ const HistoryView = () => {
             {/* Data Table Container */}
             <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex flex-col relative min-h-[400px]">
                 {/* Header Info */}
-                <div className="px-8 py-4 bg-white border-b border-slate-100 flex justify-between items-center">
+                <div className="px-5 py-4 bg-white border-b border-slate-100 flex flex-col gap-2 sm:px-8 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex items-center gap-3">
                         <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
                         <span className="text-xs font-bold text-slate-500">
@@ -337,7 +337,7 @@ const HistoryView = () => {
 
                 <p className="text-xs text-slate-400 mb-1 sm:hidden">표는 좌우로 밀어서 확인할 수 있습니다.</p>
                 <div className="overflow-auto flex-1 custom-scrollbar max-h-[750px] overflow-y-auto">
-                    <table className="w-full min-w-[700px] text-sm text-left border-collapse">
+                    <table className="w-full min-w-[860px] text-sm text-left border-collapse">
                         <thead className="bg-slate-50 text-slate-400 uppercase font-black text-[10px] tracking-widest border-b border-slate-100 sticky top-0 z-10">
                             <tr>
                                 <th className="px-3 md:px-8 py-3 md:py-4 whitespace-nowrap bg-slate-50">날짜/시간</th>
@@ -1180,14 +1180,15 @@ const DailySalesAddView = () => {
                             />
                         </div>
 
-                        <table className="w-full text-sm">
+                        <div className="responsive-table-shell">
+                        <table className="w-full min-w-[680px] text-sm">
                             <thead className="bg-slate-50">
                                 <tr>
-                                    <th className="p-3 text-left">상품명</th>
-                                    <th className="p-3 text-right">수량</th>
-                                    <th className="p-3 text-right">판매 단가</th>
-                                    <th className="p-3 text-right">합계</th>
-                                    <th className="p-3 text-center">삭제</th>
+                                    <th className="p-3 text-left whitespace-nowrap">상품명</th>
+                                    <th className="p-3 text-right whitespace-nowrap">수량</th>
+                                    <th className="p-3 text-right whitespace-nowrap">판매 단가</th>
+                                    <th className="p-3 text-right whitespace-nowrap">합계</th>
+                                    <th className="p-3 text-center whitespace-nowrap">삭제</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -1256,6 +1257,8 @@ const DailySalesAddView = () => {
                                 })}
                             </tbody>
                         </table>
+                        </div>
+                        <p className="responsive-table-hint sm:hidden">표는 좌우로 밀어서 확인할 수 있습니다.</p>
 
                         <button
                             onClick={handleAddOcrRow}
@@ -1343,7 +1346,7 @@ const DailySalesAddView = () => {
                         )}
 
                         {/* 요약 */}
-                        <div className="grid grid-cols-3 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                             <div className="bg-purple-50 p-4 rounded-xl text-center">
                                 <p className="text-2xl font-bold text-purple-700">{hourlyResult.summary.totalCount}</p>
                                 <p className="text-xs text-purple-500 mt-1">전체 건수</p>
@@ -1370,15 +1373,16 @@ const DailySalesAddView = () => {
                         </div>
 
                         {/* 거래 목록 테이블 */}
-                        <table className="w-full text-sm">
+                        <div className="responsive-table-shell">
+                        <table className="w-full min-w-[640px] text-sm">
                             <thead className="bg-slate-50">
                                 <tr>
-                                    <th className="p-3 text-left text-slate-600 font-bold">#</th>
-                                    <th className="p-3 text-left text-slate-600 font-bold">시간</th>
-                                    <th className="p-3 text-right text-slate-600 font-bold">매출금액</th>
-                                    <th className="p-3 text-center text-slate-600 font-bold">테이블</th>
-                                    <th className="p-3 text-center text-slate-600 font-bold">상태</th>
-                                    <th className="p-3 text-center text-slate-600 font-bold">삭제</th>
+                                    <th className="p-3 text-left text-slate-600 font-bold whitespace-nowrap">#</th>
+                                    <th className="p-3 text-left text-slate-600 font-bold whitespace-nowrap">시간</th>
+                                    <th className="p-3 text-right text-slate-600 font-bold whitespace-nowrap">매출금액</th>
+                                    <th className="p-3 text-center text-slate-600 font-bold whitespace-nowrap">테이블</th>
+                                    <th className="p-3 text-center text-slate-600 font-bold whitespace-nowrap">상태</th>
+                                    <th className="p-3 text-center text-slate-600 font-bold whitespace-nowrap">삭제</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -1424,6 +1428,8 @@ const DailySalesAddView = () => {
                                 ))}
                             </tbody>
                         </table>
+                        </div>
+                        <p className="responsive-table-hint sm:hidden">표는 좌우로 밀어서 확인할 수 있습니다.</p>
 
                         {/* 저장 버튼 */}
                         <button

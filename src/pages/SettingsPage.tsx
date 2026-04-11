@@ -556,15 +556,16 @@ export default function SettingsPage() {
                                             </div>
                                         ) : !membersError ? (
                                             <div className="overflow-hidden rounded-lg border border-slate-200">
-                                                <table className="w-full text-sm">
+                                                <div className="responsive-table-shell">
+                                                <table className="w-full min-w-[520px] text-sm">
                                                     <thead className="bg-slate-50">
                                                         <tr>
-                                                            <th className="text-left px-4 py-3 font-semibold text-slate-600">이름</th>
-                                                            <th className="text-left px-4 py-3 font-semibold text-slate-600">직급</th>
-                                                            <th className="text-left px-4 py-3 font-semibold text-slate-600">전화번호</th>
+                                                            <th className="text-left px-4 py-3 font-semibold text-slate-600 whitespace-nowrap">이름</th>
+                                                            <th className="text-left px-4 py-3 font-semibold text-slate-600 whitespace-nowrap">직급</th>
+                                                            <th className="text-left px-4 py-3 font-semibold text-slate-600 whitespace-nowrap">전화번호</th>
                                                             {/* owner만 관리 컬럼 표시 */}
                                                             {userProfile?.role === 'owner' && (
-                                                                <th className="text-center px-4 py-3 font-semibold text-slate-600 w-16">관리</th>
+                                                                <th className="text-center px-4 py-3 font-semibold text-slate-600 w-16 whitespace-nowrap">관리</th>
                                                             )}
                                                         </tr>
                                                     </thead>
@@ -623,6 +624,8 @@ export default function SettingsPage() {
                                                         ))}
                                                     </tbody>
                                                 </table>
+                                                </div>
+                                                <p className="responsive-table-hint px-4 py-3 sm:hidden">표는 좌우로 밀어서 확인할 수 있습니다.</p>
                                             </div>
                                         ) : null}
                                     </>
@@ -676,14 +679,15 @@ export default function SettingsPage() {
                                             </div>
                                         ) : !invitationsError ? (
                                             <div className="overflow-hidden rounded-lg border border-slate-200">
-                                                <table className="w-full text-sm">
+                                                <div className="responsive-table-shell">
+                                                <table className="w-full min-w-[760px] text-sm">
                                                     <thead className="bg-slate-50">
                                                         <tr>
-                                                            <th className="text-left px-4 py-3 font-semibold text-slate-600">코드</th>
-                                                            <th className="text-left px-4 py-3 font-semibold text-slate-600">초대된 사람</th>
-                                                            <th className="text-left px-4 py-3 font-semibold text-slate-600">코드 생성 시각</th>
-                                                            <th className="text-left px-4 py-3 font-semibold text-slate-600">코드 만료 여부</th>
-                                                            <th className="text-center px-4 py-3 font-semibold text-slate-600">관리</th>
+                                                            <th className="text-left px-4 py-3 font-semibold text-slate-600 whitespace-nowrap">코드</th>
+                                                            <th className="text-left px-4 py-3 font-semibold text-slate-600 whitespace-nowrap">초대된 사람</th>
+                                                            <th className="text-left px-4 py-3 font-semibold text-slate-600 whitespace-nowrap">코드 생성 시각</th>
+                                                            <th className="text-left px-4 py-3 font-semibold text-slate-600 whitespace-nowrap">코드 만료 여부</th>
+                                                            <th className="text-center px-4 py-3 font-semibold text-slate-600 whitespace-nowrap">관리</th>
                                                         </tr>
                                                     </thead>
                                                     <tbody className="divide-y divide-slate-100">
@@ -732,6 +736,8 @@ export default function SettingsPage() {
                                                         ))}
                                                     </tbody>
                                                 </table>
+                                                </div>
+                                                <p className="responsive-table-hint px-4 py-3 sm:hidden">표는 좌우로 밀어서 확인할 수 있습니다.</p>
                                             </div>
                                         ) : null}
                                     </>
@@ -917,24 +923,24 @@ export default function SettingsPage() {
 
                             <div>
                                 <label className="block text-sm font-bold text-slate-700 mb-3">테마 색상</label>
-                                <div className="flex flex-wrap gap-4">
+                                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                     {themeColors.map(color => (
                                         <button
                                             key={color.id}
                                             onClick={() => updateAppSettings({ themeColor: color.id as 'blue' | 'indigo' | 'rose' | 'amber' | 'green' })}
-                                            className={`group relative flex items-center gap-2 p-2 pr-4 rounded-full border transition-all ${appSettings.themeColor === color.id
+                                            className={`group relative flex w-full items-center gap-3 rounded-2xl border px-3 py-3 text-left transition-all ${appSettings.themeColor === color.id
                                                     ? 'border-slate-800 bg-slate-50 ring-1 ring-slate-200'
                                                     : 'border-slate-200 hover:border-slate-300'
                                                 }`}
                                         >
-                                            <span className={`w-8 h-8 rounded-full ${color.bg} shadow-sm`}>
+                                            <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${color.bg} shadow-sm`}>
                                                 {appSettings.themeColor === color.id && (
                                                     <span className="flex items-center justify-center w-full h-full text-white">
                                                         <Check size={14} />
                                                     </span>
                                                 )}
                                             </span>
-                                            <span className="text-sm text-slate-600 font-medium">{color.label}</span>
+                                            <span className="min-w-0 text-sm text-slate-600 font-medium leading-snug">{color.label}</span>
                                         </button>
                                     ))}
                                 </div>
@@ -942,17 +948,17 @@ export default function SettingsPage() {
 
                             <div>
                                 <label className="block text-sm font-bold text-slate-700 mb-3">화면 모드</label>
-                                <div className="flex flex-col sm:flex-row gap-4">
+                                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                     <button
                                         onClick={() => updateAppSettings({ darkMode: false })}
-                                        className={`flex-1 p-4 rounded-xl border flex flex-col items-center gap-3 transition-all ${!appSettings.darkMode ? 'border-blue-500 bg-blue-50 text-blue-700 ring-1 ring-blue-500' : 'border-slate-200 hover:bg-slate-50'}`}
+                                        className={`min-h-[92px] p-4 rounded-xl border flex flex-col items-center justify-center gap-3 transition-all ${!appSettings.darkMode ? 'border-blue-500 bg-blue-50 text-blue-700 ring-1 ring-blue-500' : 'border-slate-200 hover:bg-slate-50'}`}
                                     >
                                         <Sun size={24} />
                                         <span className="font-bold text-sm">라이트 모드</span>
                                     </button>
                                     <button
                                         onClick={() => updateAppSettings({ darkMode: true })}
-                                        className={`flex-1 p-4 rounded-xl border flex flex-col items-center gap-3 transition-all ${appSettings.darkMode ? 'border-slate-800 bg-slate-800 text-white' : 'border-slate-200 hover:bg-slate-50'}`}
+                                        className={`min-h-[92px] p-4 rounded-xl border flex flex-col items-center justify-center gap-3 transition-all ${appSettings.darkMode ? 'border-slate-800 bg-slate-800 text-white' : 'border-slate-200 hover:bg-slate-50'}`}
                                     >
                                         <Moon size={24} />
                                         <span className="font-bold text-sm">다크 모드</span>
