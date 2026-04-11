@@ -19,9 +19,6 @@ import {
   HelpCircle,
   X,
   Menu,
-  BarChart3,
-  Moon,
-  Sun,
   Type,
   LogOut
 } from 'lucide-react';
@@ -91,7 +88,6 @@ export default function Layout() {
   }, [location.pathname]);
 
   const closeMobileSidebar = () => setIsMobileSidebarOpen(false);
-  const toggleDarkMode = () => updateAppSettings({ darkMode: !appSettings.darkMode });
 
   const cycleFontSize = () => {
     const nextSize = appSettings.fontSize === 'small'
@@ -123,7 +119,6 @@ export default function Layout() {
     { to: '/transactions', icon: ClipboardList, label: '거래 데이터 관리' },
     { to: '/inventory', icon: Package, label: '재고 관리' },
     { to: '/cost-recipe', icon: ChefHat, label: '원가/레시피 관리' },
-    { to: '/kpi', icon: BarChart3, label: 'KPI 현황' },
     { to: '/ai', icon: Bot, label: 'AI Monstock' }
   ];
 
@@ -155,22 +150,6 @@ export default function Layout() {
             >
               <Type size={15} />
               <span>{fontSizeToken}</span>
-            </button>
-            <button
-              onClick={toggleDarkMode}
-              className="mobile-header-utility-btn"
-              title={appSettings.darkMode ? '라이트 모드' : '다크 모드'}
-              aria-label={appSettings.darkMode ? '라이트 모드' : '다크 모드'}
-            >
-              {appSettings.darkMode ? <Sun size={16} /> : <Moon size={16} />}
-            </button>
-            <button
-              onClick={() => setIsAIDrawerOpen(prev => !prev)}
-              className={`mobile-header-utility-btn mobile-ai-btn ${isAIDrawerOpen ? 'active' : ''}`}
-              title="AI Monstock"
-              aria-label="AI Monstock"
-            >
-              <Bot size={16} />
             </button>
           </div>
         </div>
@@ -266,39 +245,20 @@ export default function Layout() {
         style={{ marginRight: !isMobile && isAIDrawerOpen ? '400px' : '0' }}
       >
         <main className={`${isMobile ? 'p-4 pb-8' : 'p-8'} max-w-7xl mx-auto w-full min-w-0 overflow-x-hidden`}>
-          {!isMobile && (
-            <div className="desktop-page-header">
-              <div className="desktop-page-header-spacer" aria-hidden="true" />
-              <div className="desktop-page-header-actions">
-                <button
-                  onClick={cycleFontSize}
-                  className="desktop-utility-btn"
-                  title={`글자 크기: ${fontSizeLabel}`}
-                >
-                  <Type size={16} />
-                  <span>{fontSizeToken}</span>
-                </button>
-                <button
-                  onClick={toggleDarkMode}
-                  className="desktop-utility-btn"
-                  title={appSettings.darkMode ? '라이트 모드' : '다크 모드'}
-                >
-                  {appSettings.darkMode ? <Sun size={18} /> : <Moon size={18} />}
-                </button>
-                <button
-                  onClick={() => setIsAIDrawerOpen(prev => !prev)}
-                  className={`desktop-utility-btn desktop-ai-btn ${isAIDrawerOpen ? 'active' : ''}`}
-                  title="AI Monstock 열기"
-                >
-                  <Bot size={18} />
-                  <span>AI</span>
-                </button>
-              </div>
-            </div>
-          )}
           <Outlet />
         </main>
       </div>
+
+      {!isAIDrawerOpen && (
+        <button
+          onClick={() => setIsAIDrawerOpen(true)}
+          className="fixed top-6 right-6 z-40 p-3 rounded-full bg-white border border-slate-200 shadow-md hover:shadow-xl hover:scale-110 transition-all duration-200"
+          title="AI Monstock 열기"
+          aria-label="AI Monstock 열기"
+        >
+          <Bot className="text-blue-600" size={22} />
+        </button>
+      )}
 
       <div
         className={`fixed inset-y-0 right-0 ${isMobile ? 'w-full' : 'w-[400px]'} bg-white shadow-xl z-50 transform transition-transform duration-300 ease-in-out border-l border-slate-200 flex flex-col ${isAIDrawerOpen ? 'translate-x-0' : 'translate-x-full'
