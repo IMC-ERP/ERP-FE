@@ -223,23 +223,23 @@ export default function SalesAnalysis() {
                         </div>
 
                         {/* 달력 입력 */}
-                        <div className="flex items-center gap-2 mb-3">
+                        <div className="flex items-center gap-1.5 md:gap-2 mb-3">
                             <input
                                 type="date"
                                 value={toInputDate(startDate)}
                                 onChange={e => handleStartChange(e.target.value)}
                                 onFocus={() => setActiveQuick(null)}
                                 onClick={() => setActiveQuick(null)}
-                                className="flex-1 px-2 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                                className="flex-1 min-w-0 px-1.5 md:px-2 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-400"
                             />
-                            <span className="text-slate-400 text-xs">~</span>
+                            <span className="text-slate-400 text-xs shrink-0">~</span>
                             <input
                                 type="date"
                                 value={toInputDate(endDate)}
                                 onChange={e => handleEndChange(e.target.value)}
                                 onFocus={() => setActiveQuick(null)}
                                 onClick={() => setActiveQuick(null)}
-                                className="flex-1 px-2 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                                className="flex-1 min-w-0 px-1.5 md:px-2 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-400"
                             />
                         </div>
 

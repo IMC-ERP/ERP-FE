@@ -228,7 +228,7 @@ const HistoryView = () => {
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-y-6 gap-x-5">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-y-4 md:gap-y-6 gap-x-3 md:gap-x-5">
                     {/* Date Range */}
                     <div className="space-y-1.5 lg:col-span-4">
                         <label className="text-[11px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1">
@@ -335,17 +335,18 @@ const HistoryView = () => {
                     </div>
                 </div>
 
+                <p className="text-xs text-slate-400 mb-1 sm:hidden">표는 좌우로 밀어서 확인할 수 있습니다.</p>
                 <div className="overflow-auto flex-1 custom-scrollbar max-h-[750px] overflow-y-auto">
-                    <table className="w-full text-sm text-left border-collapse">
+                    <table className="w-full min-w-[700px] text-sm text-left border-collapse">
                         <thead className="bg-slate-50 text-slate-400 uppercase font-black text-[10px] tracking-widest border-b border-slate-100 sticky top-0 z-10">
                             <tr>
-                                <th className="px-8 py-4 whitespace-nowrap bg-slate-50">날짜/시간</th>
-                                <th className="px-8 py-4 whitespace-nowrap bg-slate-50">상태</th>
-                                <th className="px-8 py-4 whitespace-nowrap bg-slate-50">카테고리</th>
-                                <th className="px-8 py-4 whitespace-nowrap bg-slate-50">메뉴명</th>
-                                <th className="px-8 py-4 text-right whitespace-nowrap bg-slate-50">수량</th>
-                                <th className="px-8 py-4 text-right whitespace-nowrap bg-slate-50">단가</th>
-                                <th className="px-8 py-4 text-right whitespace-nowrap bg-slate-50">금액</th>
+                                <th className="px-3 md:px-8 py-3 md:py-4 whitespace-nowrap bg-slate-50">날짜/시간</th>
+                                <th className="px-3 md:px-8 py-3 md:py-4 whitespace-nowrap bg-slate-50">상태</th>
+                                <th className="px-3 md:px-8 py-3 md:py-4 whitespace-nowrap bg-slate-50">카테고리</th>
+                                <th className="px-3 md:px-8 py-3 md:py-4 whitespace-nowrap bg-slate-50">메뉴명</th>
+                                <th className="px-3 md:px-8 py-3 md:py-4 text-right whitespace-nowrap bg-slate-50">수량</th>
+                                <th className="px-3 md:px-8 py-3 md:py-4 text-right whitespace-nowrap bg-slate-50">단가</th>
+                                <th className="px-3 md:px-8 py-3 md:py-4 text-right whitespace-nowrap bg-slate-50">금액</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50">
@@ -519,40 +520,40 @@ const HistoryView = () => {
                             </div>
                         </div>
 
-                        <div className="p-6 space-y-4">
-                            <div className="grid grid-cols-11 gap-2 items-center text-sm">
+                        <div className="p-4 md:p-6 space-y-4">
+                            <div className="grid grid-cols-3 md:grid-cols-11 gap-2 items-center text-sm">
                                 {/* Header */}
-                                <div className="col-span-5 font-bold text-slate-500 text-center">변경 전</div>
-                                <div className="col-span-1 flex justify-center"></div>
-                                <div className="col-span-5 font-bold text-blue-600 text-center">변경 후</div>
+                                <div className="col-span-1 md:col-span-5 font-bold text-slate-500 text-center">변경 전</div>
+                                <div className="hidden md:flex col-span-1 justify-center"></div>
+                                <div className="col-span-1 md:col-span-5 font-bold text-blue-600 text-center">변경 후</div>
 
                                 {/* Compare Fields */}
                                 {originalData.itemDetail !== editForm.itemDetail && (
                                     <>
-                                        <div className="col-span-5 bg-slate-100 p-2 rounded text-slate-600 text-center">{originalData.itemDetail}</div>
-                                        <div className="col-span-1 flex justify-center"><ArrowRight size={14} className="text-slate-400" /></div>
-                                        <div className="col-span-5 bg-blue-50 p-2 rounded text-blue-700 font-bold text-center">{editForm.itemDetail}</div>
+                                        <div className="col-span-1 md:col-span-5 bg-slate-100 p-2 rounded text-slate-600 text-center text-xs md:text-sm">{originalData.itemDetail}</div>
+                                        <div className="col-span-1 hidden md:flex justify-center"><ArrowRight size={14} className="text-slate-400" /></div>
+                                        <div className="col-span-1 md:col-span-5 bg-blue-50 p-2 rounded text-blue-700 font-bold text-center text-xs md:text-sm">{editForm.itemDetail}</div>
                                     </>
                                 )}
                                 {originalData.qty !== editForm.qty && (
                                     <>
-                                        <div className="col-span-5 bg-slate-100 p-2 rounded text-slate-600 text-center">{originalData.qty}개</div>
-                                        <div className="col-span-1 flex justify-center"><ArrowRight size={14} className="text-slate-400" /></div>
-                                        <div className="col-span-5 bg-blue-50 p-2 rounded text-blue-700 font-bold text-center">{editForm.qty}개</div>
+                                        <div className="col-span-1 md:col-span-5 bg-slate-100 p-2 rounded text-slate-600 text-center text-xs md:text-sm">{originalData.qty}개</div>
+                                        <div className="col-span-1 hidden md:flex justify-center"><ArrowRight size={14} className="text-slate-400" /></div>
+                                        <div className="col-span-1 md:col-span-5 bg-blue-50 p-2 rounded text-blue-700 font-bold text-center text-xs md:text-sm">{editForm.qty}개</div>
                                     </>
                                 )}
                                 {originalData.price !== editForm.price && (
                                     <>
-                                        <div className="col-span-5 bg-slate-100 p-2 rounded text-slate-600 text-center">{originalData.price.toLocaleString()}원</div>
-                                        <div className="col-span-1 flex justify-center"><ArrowRight size={14} className="text-slate-400" /></div>
-                                        <div className="col-span-5 bg-blue-50 p-2 rounded text-blue-700 font-bold text-center">{editForm.price.toLocaleString()}원</div>
+                                        <div className="col-span-1 md:col-span-5 bg-slate-100 p-2 rounded text-slate-600 text-center text-xs md:text-sm">{originalData.price.toLocaleString()}원</div>
+                                        <div className="col-span-1 hidden md:flex justify-center"><ArrowRight size={14} className="text-slate-400" /></div>
+                                        <div className="col-span-1 md:col-span-5 bg-blue-50 p-2 rounded text-blue-700 font-bold text-center text-xs md:text-sm">{editForm.price.toLocaleString()}원</div>
                                     </>
                                 )}
                                 {originalData.date !== editForm.date && (
                                     <>
-                                        <div className="col-span-5 bg-slate-100 p-2 rounded text-slate-600 text-center">{originalData.date}</div>
-                                        <div className="col-span-1 flex justify-center"><ArrowRight size={14} className="text-slate-400" /></div>
-                                        <div className="col-span-5 bg-blue-50 p-2 rounded text-blue-700 font-bold text-center">{editForm.date}</div>
+                                        <div className="col-span-1 md:col-span-5 bg-slate-100 p-2 rounded text-slate-600 text-center text-xs md:text-sm">{originalData.date}</div>
+                                        <div className="col-span-1 hidden md:flex justify-center"><ArrowRight size={14} className="text-slate-400" /></div>
+                                        <div className="col-span-1 md:col-span-5 bg-blue-50 p-2 rounded text-blue-700 font-bold text-center text-xs md:text-sm">{editForm.date}</div>
                                     </>
                                 )}
                             </div>
