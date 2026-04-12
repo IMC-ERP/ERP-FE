@@ -757,24 +757,9 @@ export interface SalesAnalyticsResponse {
   salesByCategory: CategorySales[];
 }
 
-export interface ComparisonMetric { periodA: number; periodB: number; variance: number; diff: number; }
-export interface ComparisonSummary { revenue: ComparisonMetric; orderCount: ComparisonMetric; aov: ComparisonMetric; }
-export interface CompareCategoryShare { category: string; periodA: number; periodB: number; variance: number; }
-export interface RankingItem { rank: number; name: string; qty: number; revenue: number; status?: 'up' | 'down' | 'new' | 'unchanged' | '-'; rankChange?: number; }
-export interface CompareRankings { periodA: RankingItem[]; periodB: RankingItem[]; }
-export interface SalesComparisonResponse {
-  summary: ComparisonSummary;
-  categoryShare: CompareCategoryShare[];
-  rankings: CompareRankings;
-}
-
 export const analyticsApi = {
   getSales: (startDate: string, endDate: string) =>
     api.get<SalesAnalyticsResponse>('/analytics/sales', { params: { start_date: startDate, end_date: endDate } }),
-  getAvailableDates: () =>
-    api.get<{ min_date: string; max_date: string }>('/analytics/available-dates'),
-  getCompareSales: (period_a_start: string, period_a_end: string, period_b_start: string, period_b_end: string, category?: string) =>
-    api.get<SalesComparisonResponse>('/analytics/compare', { params: { period_a_start, period_a_end, period_b_start, period_b_end, category } }),
 };
 
 // ==================== Profit Dashboard API ====================
