@@ -185,8 +185,8 @@ export default function Sales() {
         ) : isMobile ? (
           /* ===== 모바일: 카드 뷰 ===== */
           <div className="divide-y divide-slate-100 max-h-[60vh] overflow-y-auto">
-            {sales.slice(0, 100).map((sale) => (
-              <div key={sale.id} className="p-4 hover:bg-slate-50 transition-colors">
+            {sales.slice(0, 100).map((sale, idx) => (
+              <div key={`${sale.id}-${idx}`} className="p-4 hover:bg-slate-50 transition-colors">
                 <div className="flex justify-between items-start mb-2">
                   <div className="flex-1">
                     <div className="font-semibold text-slate-800 text-sm">{sale.상품상세}</div>
@@ -228,8 +228,8 @@ export default function Sales() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {sales.slice(0, 100).map((sale) => (
-                  <tr key={sale.id} className="hover:bg-slate-50">
+                {sales.slice(0, 100).map((sale, idx) => (
+                  <tr key={`${sale.id}-${idx}`} className="hover:bg-slate-50">
                     <td className="px-4 py-3 text-slate-600 font-mono">{sale.날짜?.slice(0, 10) || '-'}</td>
                     <td className="px-4 py-3 font-medium text-slate-700">{sale.상품상세}</td>
                     <td className="px-4 py-3 text-right text-slate-600">{formatKRW(sale.단가 || 0)}</td>

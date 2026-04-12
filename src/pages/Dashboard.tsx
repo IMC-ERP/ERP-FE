@@ -489,7 +489,7 @@ export default function Dashboard() {
                   {((isDeficit ? totalCost : totalSales) / 10000).toFixed(0)}만원
                 </span>
               </div>
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height={220}>
                 <PieChart>
                   <Pie
                     data={pieData}
@@ -536,7 +536,7 @@ export default function Dashboard() {
                   {(derivedTotal / 10000).toFixed(0)}만원
                 </span>
               </div>
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height={240}>
                 <PieChart>
                   <Pie
                     data={processedChartData}

@@ -382,11 +382,11 @@ const HistoryView = () => {
                                     </td>
                                 </tr>
                             ) : (
-                                transactions.map((sale) => {
+                                transactions.map((sale, idx) => {
                                     const isEditing = editingId === sale.id;
                                     return (
                                         <tr
-                                            key={sale.id}
+                                            key={`${sale.id}-${idx}`}
                                             onDoubleClick={() => handleRowDoubleClick(sale)}
                                             className={`transition-all cursor-pointer group ${isEditing ? 'bg-indigo-50/70' : 'hover:bg-slate-50/50'}`}
                                         >
