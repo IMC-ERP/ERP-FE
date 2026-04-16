@@ -90,6 +90,15 @@ const HistoryView = () => {
         fetchTransactions();
     }, []);
 
+    // 메뉴 검색어 변경 시 자동 재검색 (500ms debounce)
+    useEffect(() => {
+        if (searchKeyword === '') return;
+        const handler = setTimeout(() => {
+            fetchTransactions();
+        }, 500);
+        return () => clearTimeout(handler);
+    }, [searchKeyword]);
+
     // Auto-refresh Logic (1 minute interval if viewing today)
     useEffect(() => {
         const todayStr = new Date().toISOString().split('T')[0];
@@ -1175,6 +1184,7 @@ const DailySalesAddView = () => {
                             <input
                                 type="date"
                                 value={date}
+                                max={new Date().toISOString().split('T')[0]}
                                 onChange={(e) => setDate(e.target.value)}
                                 className="w-full p-3 border border-slate-300 rounded-lg"
                             />
@@ -1364,6 +1374,7 @@ const DailySalesAddView = () => {
                             <input
                                 type="date"
                                 value={hourlyDate}
+                                max={new Date().toISOString().split('T')[0]}
                                 onChange={(e) => setHourlyDate(e.target.value)}
                                 className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:outline-none"
                             />
@@ -1473,6 +1484,7 @@ const DailySalesAddView = () => {
                             <input
                                 type="date"
                                 value={date}
+                                max={new Date().toISOString().split('T')[0]}
                                 onChange={(e) => setDate(e.target.value)}
                                 className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
                             />

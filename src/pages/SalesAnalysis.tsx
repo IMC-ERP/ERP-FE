@@ -114,7 +114,7 @@ export default function SalesAnalysis() {
         { label: '1개월', days: 30 },
         { label: '3개월', days: 90 },
         { label: '6개월', days: 180 },
-        { label: '1년', days: 360 },
+        { label: '1년', days: 365 },
     ];
 
     const handleQuick = (label: string, days: number) => {
