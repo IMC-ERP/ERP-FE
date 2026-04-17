@@ -73,8 +73,8 @@ export default function Home() {
         return hr >= openHour && hr <= closeHour;
     });
 
-    // Calculate total items sold today
-    const itemsSold = topMenus.reduce((acc, menu) => acc + menu.qty, 0) + 120; // 120 is dummy padding for non-top menus
+    // 오늘 판매된 총 개수 (백엔드에서 daily_sale_items SUM 집계)
+    const itemsSold = (summary as any)?.todayItemsSold ?? topMenus.reduce((acc, menu) => acc + menu.qty, 0);
 
     return (
         <div className="flex flex-col space-y-8 animate-fade-in pb-12 w-full max-w-full overflow-hidden">
