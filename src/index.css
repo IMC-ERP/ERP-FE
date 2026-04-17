@@ -152,6 +152,7 @@ textarea {
 .mobile-header-actions {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 8px;
   min-width: max-content;
   flex-shrink: 0;
@@ -333,6 +334,7 @@ textarea {
 @media (max-width: 480px) {
   .mobile-top-header {
     gap: 4px;
+    padding: 0 8px;
   }
 
   .mobile-header-title {
@@ -350,6 +352,41 @@ textarea {
 
   .mobile-header-utility-btn {
     padding: 0 7px;
+  }
+}
+
+@media (max-width: 390px) {
+  .mobile-top-header {
+    grid-template-columns: 36px minmax(0, 1fr) auto;
+    gap: 3px;
+    padding: 0 6px;
+  }
+
+  .mobile-hamburger-btn {
+    width: 36px;
+    height: 36px;
+  }
+
+  .mobile-header-title {
+    gap: 6px;
+  }
+
+  .mobile-header-actions {
+    gap: 3px;
+  }
+
+  .mobile-header-utility-btn {
+    min-width: 32px;
+    min-height: 32px;
+    padding: 0 6px;
+  }
+
+  .mobile-font-btn {
+    padding: 0;
+  }
+
+  .mobile-font-token {
+    display: none;
   }
 }
 

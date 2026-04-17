@@ -362,20 +362,20 @@ export default function Dashboard() {
                     </h1>
                     {/* 전월 대비 비교 지표 */}
                     {momProfitTrend === null || momProfitTrend === undefined ? (
-                      <span className="inline-flex self-start items-center gap-1 rounded-full bg-white/20 px-3 py-1 text-sm font-bold text-slate-100 sm:text-lg">
-                        <span className="text-xs font-normal opacity-80">이전 데이터 없음</span>
+                      <span className="inline-flex self-start items-center whitespace-nowrap gap-1 rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-bold leading-none text-slate-100 sm:px-3 sm:py-1 sm:text-base">
+                        <span className="text-[9px] font-normal opacity-80 sm:text-xs">이전 데이터 없음</span>
                       </span>
                     ) : momProfitTrend > 0 ? (
-                      <span className="inline-flex self-start items-center gap-1 rounded-full bg-white/20 px-3 py-1 text-sm font-bold text-emerald-100 sm:text-lg">
-                        ▲ {momProfitTrend}% <span className="text-xs font-normal opacity-80 ml-1">전월대비</span>
+                      <span className="inline-flex self-start items-center whitespace-nowrap gap-0.5 rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-bold leading-none text-emerald-100 sm:gap-1 sm:px-3 sm:py-1 sm:text-base">
+                        ▲ {momProfitTrend}%
                       </span>
                     ) : momProfitTrend < 0 ? (
-                      <span className="inline-flex self-start items-center gap-1 rounded-full bg-white/20 px-3 py-1 text-sm font-bold text-rose-100 sm:text-lg">
-                        ▼ {Math.abs(momProfitTrend)}% <span className="text-xs font-normal opacity-80 ml-1">전월대비</span>
+                      <span className="inline-flex self-start items-center whitespace-nowrap gap-0.5 rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-bold leading-none text-rose-100 sm:gap-1 sm:px-3 sm:py-1 sm:text-base">
+                        ▼ {Math.abs(momProfitTrend)}%
                       </span>
                     ) : (
-                      <span className="inline-flex self-start items-center gap-1 rounded-full bg-white/20 px-3 py-1 text-sm font-bold text-slate-100 sm:text-lg">
-                        0% <span className="text-xs font-normal opacity-80 ml-1 text-slate-200">전월대비</span>
+                      <span className="inline-flex self-start items-center whitespace-nowrap gap-0.5 rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-bold leading-none text-slate-100 sm:gap-1 sm:px-3 sm:py-1 sm:text-base">
+                        0%
                       </span>
                     )}
                   </div>
