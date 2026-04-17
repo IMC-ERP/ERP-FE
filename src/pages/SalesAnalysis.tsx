@@ -68,6 +68,7 @@ export default function SalesAnalysis() {
     const [openHour, setOpenHour] = useState(0);
     const [closeHour, setCloseHour] = useState(23);
     const [storeHoursLoaded, setStoreHoursLoaded] = useState(false);
+    const [isMobile, setIsMobile] = useState(() => window.innerWidth < 640);
 
     useEffect(() => {
         storeHoursApi.get().then(res => {
@@ -80,6 +81,12 @@ export default function SalesAnalysis() {
             }
             setStoreHoursLoaded(true);
         }).catch(() => { setStoreHoursLoaded(true); });
+    }, []);
+
+    useEffect(() => {
+        const handleResize = () => setIsMobile(window.innerWidth < 640);
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
     }, []);
 
     const fetchData = useCallback(async (s: string, e: string) => {
@@ -178,6 +185,10 @@ export default function SalesAnalysis() {
     }, [filteredHourly]);
 
     const hourlyYDomain = useMemo(() => smartYDomain(filteredHourly.map(h => h.sales)), [filteredHourly]);
+    const hourlyTickInterval = useMemo(
+        () => (isMobile ? Math.max(Math.ceil(filteredHourly.length / 6) - 1, 0) : 0),
+        [filteredHourly.length, isMobile],
+    );
 
     const top5XDomain = useMemo(() => {
         if (!data?.menuTop5.length) return [0, 100];
@@ -215,7 +226,7 @@ export default function SalesAnalysis() {
                             <span className="text-sm font-semibold text-slate-700">조회 기간</span>
                             <div className="group relative ml-auto">
                                 <Info size={14} className="text-slate-400 cursor-help" />
-                                <div className="absolute right-0 bottom-full mb-2 hidden group-hover:block w-72 p-3 bg-slate-800 text-xs text-slate-200 rounded-lg shadow-xl z-50 pointer-events-none">
+                                <div className="absolute right-0 bottom-full mb-2 hidden group-hover:block w-[min(18rem,calc(100vw-2rem))] p-3 bg-slate-800 text-xs text-slate-200 rounded-lg shadow-xl z-50 pointer-events-none">
                                     {tooltipText}
                                     <div className="absolute right-2 top-full w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-slate-800" />
                                 </div>
@@ -341,17 +352,17 @@ export default function SalesAnalysis() {
 
                     {/* 2. 시간대별 매출 (Line Chart — storeHours 기반 X축) */}
                     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-                        <div className="flex items-center justify-between mb-4">
+                        <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                             <h3 className="font-bold text-slate-800">시간대별 매출</h3>
                             {storeHoursLoaded && (openHour > 0 || closeHour < 23) && (
                                 <span className="text-xs text-slate-400">영업시간 {String(openHour).padStart(2, '0')}:00 ~ {String(closeHour).padStart(2, '0')}:00</span>
                             )}
                         </div>
                         <ResponsiveContainer width="100%" height={260}>
-                            <LineChart data={filteredHourly} margin={{ top: 5, right: 10, left: 20, bottom: 5 }}>
+                            <LineChart data={filteredHourly} margin={{ top: 5, right: 10, left: isMobile ? 0 : 20, bottom: 5 }}>
                                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                                <XAxis dataKey="hour" tick={{ fontSize: 10, fill: '#64748b' }} tickFormatter={h => `${h}시`} axisLine={false} tickLine={false} interval={0} />
-                                <YAxis domain={hourlyYDomain} tick={{ fontSize: 10, fill: '#94a3b8' }} tickFormatter={v => `${fmt(Number(v))}원`} axisLine={false} tickLine={false} width={80} />
+                                <XAxis dataKey="hour" tick={{ fontSize: isMobile ? 9 : 10, fill: '#64748b' }} tickFormatter={h => `${h}시`} axisLine={false} tickLine={false} interval={hourlyTickInterval} minTickGap={12} />
+                                <YAxis domain={hourlyYDomain} tick={{ fontSize: isMobile ? 9 : 10, fill: '#94a3b8' }} tickFormatter={v => isMobile ? `${Math.round(Number(v) / 10000)}만` : `${fmt(Number(v))}원`} axisLine={false} tickLine={false} width={isMobile ? 48 : 80} />
                                 <Tooltip
                                     formatter={(v: any) => [`${fmt(Number(v))}원`, '매출']}
                                     labelFormatter={h => `${h}시`}
@@ -377,7 +388,7 @@ export default function SalesAnalysis() {
                                 />
                             </LineChart>
                         </ResponsiveContainer>
-                        <div className="flex items-center gap-4 mt-2 text-xs text-slate-500">
+                        <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-slate-500">
                             <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block" /> 피크 타임</span>
                             <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block" /> 최저 시간</span>
                         </div>

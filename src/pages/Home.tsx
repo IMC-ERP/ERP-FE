@@ -79,21 +79,21 @@ export default function Home() {
     return (
         <div className="flex flex-col space-y-8 animate-fade-in pb-12 w-full max-w-full overflow-hidden">
             {/* 🔹 헤더 인삿말 */}
-            <div className="flex items-end justify-between w-full">
-                <div>
-                    <h1 className="text-2xl font-bold text-slate-800">
+            <div className="flex w-full flex-col gap-3 md:flex-row md:items-end md:justify-between">
+                <div className="min-w-0">
+                    <h1 className="text-2xl font-bold leading-tight text-slate-800 md:text-3xl">
                         {userProfile?.name} 사장님, {storeProfile.store_name}의 오늘 현황입니다.
                     </h1>
-                    <p className="text-slate-500 mt-1">오늘 하루도 힘내세요! 실시간으로 매장을 모니터링 중입니다.</p>
+                    <p className="mt-1 text-sm text-slate-500 md:text-base">오늘 하루도 힘내세요! 실시간으로 매장을 모니터링 중입니다.</p>
                 </div>
-                <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-2 text-xs text-slate-400 bg-white px-3 py-1.5 rounded-full border border-slate-200 shadow-sm whitespace-nowrap">
+                <div className="flex flex-wrap items-center gap-2 md:justify-end">
+                    <div className="flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-400 shadow-sm">
                         <RefreshCcw size={12} className={loading ? 'animate-spin' : ''} />
                         <span>최종 업데이트: {updated_at?.toLocaleTimeString()}</span>
                     </div>
                     <button
                         onClick={() => setShowRevenue(!showRevenue)}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 font-medium text-xs rounded-full transition-colors border shadow-sm ${showRevenue
+                        className={`shrink-0 flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors shadow-sm ${showRevenue
                             ? 'bg-rose-50 text-rose-600 border-rose-200 hover:bg-rose-100'
                             : 'bg-indigo-50 text-indigo-600 border-indigo-200 hover:bg-indigo-100'
                             }`}
@@ -272,7 +272,7 @@ function SummaryCard({ title, value, trend, icon: Icon, color, unit = '원' }: a
     };
 
     return (
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all group">
+        <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all group">
             <div className="flex items-center justify-between mb-4">
                 <div className={`p-2 rounded-xl transition-colors ${colorMap[color]}`}>
                     <Icon size={20} />

@@ -404,16 +404,16 @@ const MaterialTable = ({ materials, dirtyMaterialIds, onUpdate, onDelete, onSave
                         <span className="text-xs text-slate-400">{items.length}개 품목</span>
                     </div>
                     <div className="responsive-table-shell">
-                    <table className="w-full min-w-[780px] text-sm text-left">
+                    <table className="w-full min-w-[920px] table-auto text-sm text-left">
                         <thead className="bg-white text-slate-500 font-semibold border-b border-slate-100">
                             <tr>
-                                <th className="px-6 py-3">원재료명</th>
-                                <th className="px-6 py-3 text-right">구매가(원)</th>
-                                <th className="px-6 py-3 text-right">구매 용량</th>
-                                <th className="px-6 py-3 text-center">단위</th>
-                                <th className="px-6 py-3 text-right bg-blue-50/50">단위당 가격</th>
-                                <th className="px-6 py-3 text-right">현재 재고</th>
-                                <th className="px-6 py-3 text-center">관리</th>
+                                <th className="px-6 py-3 whitespace-nowrap">원재료명</th>
+                                <th className="px-6 py-3 text-right whitespace-nowrap">구매가(원)</th>
+                                <th className="px-6 py-3 text-right whitespace-nowrap">구매 용량</th>
+                                <th className="px-6 py-3 text-center whitespace-nowrap">단위</th>
+                                <th className="px-6 py-3 text-right bg-blue-50/50 whitespace-nowrap">단위당 가격</th>
+                                <th className="px-6 py-3 text-right whitespace-nowrap">현재 재고</th>
+                                <th className="px-6 py-3 text-center whitespace-nowrap">관리</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
@@ -421,7 +421,7 @@ const MaterialTable = ({ materials, dirtyMaterialIds, onUpdate, onDelete, onSave
                                 const isDirty = dirtyMaterialIds.has(mat.id);
                                 return (
                                 <tr key={mat.id} className={isDirty ? "bg-indigo-50/40 hover:bg-indigo-50" : "hover:bg-slate-50"}>
-                                    <td className="px-6 py-3">
+                                    <td className="px-6 py-3 align-top min-w-[180px]">
                                         <div className="space-y-1">
                                             <input
                                                 type="text"
@@ -471,13 +471,13 @@ const MaterialTable = ({ materials, dirtyMaterialIds, onUpdate, onDelete, onSave
                                             <option value="ea">ea</option>
                                         </select>
                                     </td>
-                                    <td className="px-6 py-3 text-right font-mono text-blue-600 bg-blue-50/30 font-bold">
+                                    <td className="px-6 py-3 text-right font-mono text-blue-600 bg-blue-50/30 font-bold whitespace-nowrap">
                                         <div className="space-y-1">
                                             <div>{formatUnitCost(getUnitPrice(mat), mat.unit)}</div>
-                                            <div className="text-[11px] font-medium text-slate-400">구매가/용량 기준</div>
+                                            <div className="text-[11px] font-medium text-slate-400 whitespace-nowrap">구매가/용량 기준</div>
                                         </div>
                                     </td>
-                                    <td className="px-6 py-3 text-right text-slate-600">
+                                    <td className="px-6 py-3 text-right text-slate-600 whitespace-nowrap">
                                         {mat.currentStock.toLocaleString('ko-KR', { maximumFractionDigits: 2 })}
                                     </td>
                                     <td className="px-6 py-3 text-center">
@@ -507,6 +507,7 @@ const MaterialTable = ({ materials, dirtyMaterialIds, onUpdate, onDelete, onSave
                         </tbody>
                     </table>
                     </div>
+                    <p className="responsive-table-hint px-4 py-3 sm:hidden">표는 좌우로 밀어서 확인할 수 있습니다.</p>
                 </div>
             ))}
         </div>
@@ -1076,7 +1077,7 @@ export default function CostRecipeManager() {
             <div className="flex gap-2 border-b border-slate-200 overflow-x-auto pb-1 scrollbar-hide">
                 <button
                     onClick={() => setActiveTab('recipe')}
-                    className={`flex items-center gap-2 px-4 sm:px-6 py-3 text-xs sm:text-sm font-bold rounded-t-lg transition-colors whitespace-nowrap ${activeTab === 'recipe'
+                    className={`flex shrink-0 items-center gap-2 px-4 sm:px-6 py-3 text-xs sm:text-sm font-bold rounded-t-lg transition-colors whitespace-nowrap ${activeTab === 'recipe'
                         ? "bg-white text-indigo-600 border-b-2 border-indigo-600"
                         : "text-slate-500 hover:text-slate-800 hover:bg-slate-50"
                         }`}
@@ -1086,7 +1087,7 @@ export default function CostRecipeManager() {
                 </button>
                 <button
                     onClick={() => setActiveTab('material')}
-                    className={`flex items-center gap-2 px-4 sm:px-6 py-3 text-xs sm:text-sm font-bold rounded-t-lg transition-colors whitespace-nowrap ${activeTab === 'material'
+                    className={`flex shrink-0 items-center gap-2 px-4 sm:px-6 py-3 text-xs sm:text-sm font-bold rounded-t-lg transition-colors whitespace-nowrap ${activeTab === 'material'
                         ? "bg-white text-indigo-600 border-b-2 border-indigo-600"
                         : "text-slate-500 hover:text-slate-800 hover:bg-slate-50"
                         }`}

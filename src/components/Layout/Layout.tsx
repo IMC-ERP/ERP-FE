@@ -39,13 +39,13 @@ const NavItem = ({ to, icon: Icon, label, active, onClick }: NavItemProps) => (
   <Link
     to={to}
     onClick={onClick}
-    className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors duration-200 ${active
+    className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors duration-200 ${active
       ? 'bg-blue-100 text-blue-700 font-semibold nav-item-active'
       : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
       }`}
   >
     <Icon size={20} />
-    <span>{label}</span>
+    <span className="min-w-0 break-words leading-snug">{label}</span>
   </Link>
 );
 
@@ -88,6 +88,10 @@ export default function Layout() {
   }, [location.pathname]);
 
   const closeMobileSidebar = () => setIsMobileSidebarOpen(false);
+  const openAIDrawer = () => {
+    setIsMobileSidebarOpen(false);
+    setIsAIDrawerOpen(true);
+  };
 
   const cycleFontSize = () => {
     const nextSize = appSettings.fontSize === 'small'
@@ -144,12 +148,12 @@ export default function Layout() {
           <div className="mobile-header-actions">
             <button
               onClick={cycleFontSize}
-              className="mobile-header-utility-btn"
+              className="mobile-header-utility-btn mobile-font-btn"
               title={`글자 크기: ${fontSizeLabel}`}
               aria-label={`글자 크기: ${fontSizeLabel}`}
             >
               <Type size={15} />
-              <span>{fontSizeToken}</span>
+              <span className="mobile-font-token">{fontSizeToken}</span>
             </button>
           </div>
         </div>
@@ -249,9 +253,9 @@ export default function Layout() {
         </main>
       </div>
 
-      {!isAIDrawerOpen && (
+      {!isAIDrawerOpen && !isMobile && (
         <button
-          onClick={() => setIsAIDrawerOpen(true)}
+          onClick={openAIDrawer}
           className="fixed top-6 right-6 z-40 p-3 rounded-full bg-white border border-slate-200 shadow-md hover:shadow-xl hover:scale-110 transition-all duration-200"
           title="AI Monstock 열기"
           aria-label="AI Monstock 열기"

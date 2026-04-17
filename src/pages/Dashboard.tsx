@@ -37,6 +37,7 @@ const DEFAULT_CATEGORIES = [
 export default function Dashboard() {
   const { userProfile } = useAuth();
   const storeId = userProfile?.store_id;
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 640);
 
   const now = new Date();
   const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -110,6 +111,11 @@ export default function Dashboard() {
 
   useEffect(() => { fetchProfitData(); }, [fetchProfitData]);
   useEffect(() => { fetchExpenses(); }, [fetchExpenses]);
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 640);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // ==================== 운영비 핸들러 ====================
 
@@ -254,9 +260,14 @@ export default function Dashboard() {
     ];
 
   const getCategoryLabel = (val: string) => categories.find(c => c.value === val)?.label || val;
+  const selectedMonthLabel = selectedMonth.replace('-', '년 ') + '월';
 
   // 커스텀 외부 라벨 렌더러 (Direct Labeling — 긴 텍스트 자르기 및 위치 최적화)
   const renderOutsideLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, payload, percent }: any) => {
+    if (isMobile) {
+      return null;
+    }
+
     const RADIAN = Math.PI / 180;
     // 반지름을 약간 더 넓게 설정하여 그래프와 겹침 방지 (기존 1.5 -> 1.7)
     const radius = innerRadius + (outerRadius - innerRadius) * 1.7;
@@ -325,51 +336,51 @@ export default function Dashboard() {
 
       {/* ==================== 1. 수익성 분석 카드 ==================== */}
       <div className="bg-white rounded-2xl shadow-lg border border-slate-200">
-        <div className={`relative ${theme.gradient} p-8 text-white transition-colors duration-500 rounded-t-2xl ${!showProfitDetails ? 'rounded-b-2xl' : ''}`}>
-          <div className="flex items-start justify-between">
-            <div>
+        <div className={`relative ${theme.gradient} p-5 sm:p-8 text-white transition-colors duration-500 rounded-t-2xl ${!showProfitDetails ? 'rounded-b-2xl' : ''}`}>
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 mb-2">
                 <span className={`${theme.subTitleColor} font-medium text-sm`}>실시간 수익성 분석</span>
                 <div className="group relative">
                   <Info size={16} className={`${theme.iconColor} cursor-help`} />
-                  <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block w-72 p-3 bg-slate-800 text-xs text-slate-200 rounded-lg shadow-xl z-[60] pointer-events-none">
+                  <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block w-[min(18rem,calc(100vw-3rem))] p-3 bg-slate-800 text-xs text-slate-200 rounded-lg shadow-xl z-[60] pointer-events-none">
                     {profitData ? `${profitData.period.start_date} ~ ${profitData.period.end_date} 기간의 stats_daily + expenses 실제 데이터 기반` : '데이터 로딩 중...'}
                     <div className="absolute left-1.5 top-full w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-slate-800" />
                   </div>
                 </div>
               </div>
-              <div className="flex items-end gap-4 items-center min-h-[48px]">
+              <div className="flex min-h-[48px] flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
                 {profitLoading ? (
                   <div className="flex items-center gap-3 text-white/70">
                     <Loader2 className="animate-spin" size={24} />
                     <h1 className="text-2xl font-light">데이터를 불러오는 중...</h1>
                   </div>
                 ) : (
-                  <div className="flex items-baseline gap-3">
-                    <h1 className="text-3xl font-light">
-                      <span className="opacity-90">{selectedMonth.split('-')[1]}월</span> 수익률은 <span className="font-bold text-5xl">{profitMargin.toFixed(1)}%</span> 입니다.
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                    <h1 className="text-2xl font-light leading-tight sm:text-3xl">
+                      <span className="opacity-90">{selectedMonth.split('-')[1]}월</span> 수익률은 <span className="font-bold text-4xl sm:text-5xl">{profitMargin.toFixed(1)}%</span> 입니다.
                     </h1>
                     {/* 전월 대비 비교 지표 */}
                     {momProfitTrend === null || momProfitTrend === undefined ? (
-                      <span className="text-lg font-bold flex items-center gap-1 bg-white/20 px-3 py-1 rounded-full text-slate-100">
-                        <span className="text-xs font-normal opacity-80">이전 데이터 없음</span>
+                      <span className="inline-flex self-start items-center whitespace-nowrap gap-1 rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-bold leading-none text-slate-100 sm:px-3 sm:py-1 sm:text-base">
+                        <span className="text-[9px] font-normal opacity-80 sm:text-xs">이전 데이터 없음</span>
                       </span>
                     ) : momProfitTrend > 0 ? (
-                      <span className="text-lg font-bold flex items-center gap-1 bg-white/20 px-3 py-1 rounded-full text-emerald-100">
-                        ▲ {momProfitTrend}% <span className="text-xs font-normal opacity-80 ml-1">전월대비</span>
+                      <span className="inline-flex self-start items-center whitespace-nowrap gap-0.5 rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-bold leading-none text-emerald-100 sm:gap-1 sm:px-3 sm:py-1 sm:text-base">
+                        ▲ {momProfitTrend}%
                       </span>
                     ) : momProfitTrend < 0 ? (
-                      <span className="text-lg font-bold flex items-center gap-1 bg-white/20 px-3 py-1 rounded-full text-rose-100">
-                        ▼ {Math.abs(momProfitTrend)}% <span className="text-xs font-normal opacity-80 ml-1">전월대비</span>
+                      <span className="inline-flex self-start items-center whitespace-nowrap gap-0.5 rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-bold leading-none text-rose-100 sm:gap-1 sm:px-3 sm:py-1 sm:text-base">
+                        ▼ {Math.abs(momProfitTrend)}%
                       </span>
                     ) : (
-                      <span className="text-lg font-bold flex items-center gap-1 bg-white/20 px-3 py-1 rounded-full text-slate-100">
-                        0% <span className="text-xs font-normal opacity-80 ml-1 text-slate-200">전월대비</span>
+                      <span className="inline-flex self-start items-center whitespace-nowrap gap-0.5 rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-bold leading-none text-slate-100 sm:gap-1 sm:px-3 sm:py-1 sm:text-base">
+                        0%
                       </span>
                     )}
                   </div>
                 )}
-                <button onClick={() => setShowProfitDetails(!showProfitDetails)} className="ml-4 mb-1 p-1 rounded-full hover:bg-white/20 transition-colors">
+                <button onClick={() => setShowProfitDetails(!showProfitDetails)} className="self-end rounded-full p-1 hover:bg-white/20 transition-colors sm:mb-1 sm:ml-4 sm:self-auto">
                   {showProfitDetails ? <ChevronDown size={28} /> : <ChevronRight size={28} />}
                 </button>
               </div>
@@ -495,12 +506,12 @@ export default function Dashboard() {
                     data={pieData}
                     cx="50%"
                     cy="50%"
-                    innerRadius={60}
-                    outerRadius={80}
+                    innerRadius={isMobile ? 52 : 60}
+                    outerRadius={isMobile ? 72 : 80}
                     paddingAngle={0}
                     minAngle={15} // 아주 작은 슬라이스도 최소 각도 확보하여 라벨 겹침 방지
                     dataKey="value"
-                    label={renderOutsideLabel}
+                    label={isMobile ? false : renderOutsideLabel}
                     labelLine={{ stroke: '#cbd5e1', strokeWidth: 1 }} // 지원되지 않는 length 속성 제거
                   >
                     {pieData.map((_, i) => (
@@ -542,12 +553,12 @@ export default function Dashboard() {
                     data={processedChartData}
                     cx="50%"
                     cy="50%"
-                    innerRadius={70}
-                    outerRadius={90}
+                    innerRadius={isMobile ? 58 : 70}
+                    outerRadius={isMobile ? 78 : 90}
                     paddingAngle={2}
                     minAngle={15} // 운영비 비중이 매우 작은 경우에도 라벨 겹침 방지
                     dataKey="value"
-                    label={renderOutsideLabel}
+                    label={isMobile ? false : renderOutsideLabel}
                     labelLine={{ stroke: '#cbd5e1', strokeWidth: 1 }}
                   >
                     {processedChartData.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
@@ -562,17 +573,17 @@ export default function Dashboard() {
 
       {/* ==================== 3. 매장 운영비 관리 ==================== */}
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="p-6 flex items-center justify-between cursor-pointer hover:bg-slate-50 transition-colors" onClick={() => setShowExpenseDetails(!showExpenseDetails)}>
-          <div className="flex items-center gap-3">
+        <div className="p-5 sm:p-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between cursor-pointer hover:bg-slate-50 transition-colors" onClick={() => setShowExpenseDetails(!showExpenseDetails)}>
+          <div className="flex items-center gap-3 min-w-0">
             <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
               <Tag size={20} />
             </div>
-            <div>
-              <h2 className="text-lg font-bold text-slate-800">매장 운영비 관리 및 상세 내역</h2>
+            <div className="min-w-0">
+              <h2 className="text-base sm:text-lg font-bold text-slate-800">매장 운영비 관리 및 상세 내역</h2>
               <p className="text-xs text-slate-500">운영비 항목 추가, 수정 및 삭제</p>
             </div>
           </div>
-          <button className="p-2 rounded-full hover:bg-slate-200 text-slate-400 transition-colors">
+          <button className="self-end p-2 rounded-full hover:bg-slate-200 text-slate-400 transition-colors sm:self-auto">
             {showExpenseDetails ? <ChevronDown size={24} /> : <ChevronRight size={24} />}
           </button>
         </div>
@@ -580,15 +591,15 @@ export default function Dashboard() {
         {showExpenseDetails && (
           <div className="border-t border-slate-100 bg-slate-50/50 p-6 animate-fade-in">
             {/* 월 선택 */}
-            <div className="flex justify-between items-center mb-6">
+            <div className="mb-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <div className="relative">
                 <Calendar className="absolute left-3 top-2.5 text-slate-400" size={16} />
                 <input type="month" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="pl-10 pr-4 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white text-slate-900" style={{ colorScheme: 'light' }} />
               </div>
-              <div className="text-sm text-slate-500">
-                <span className="font-medium text-slate-700">{selectedMonth}</span>월 데이터 관리 중
+              <div className="text-xs sm:text-sm text-slate-500">
+                <span className="font-medium text-slate-700">{selectedMonthLabel}</span> 데이터 관리 중
                 {expensesData && (
-                  <span className="ml-2 text-xs text-slate-400">
+                  <span className="mt-1 block text-xs text-slate-400 md:ml-2 md:mt-0 md:inline">
                     (고정: {(expensesData.totalFixed ?? 0).toLocaleString()}원 / 변동: {(expensesData.totalVariable ?? 0).toLocaleString()}원)
                   </span>
                 )}
@@ -599,48 +610,51 @@ export default function Dashboard() {
 
             {/* 테이블 */}
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden mb-6">
-              <table className="w-full text-sm text-left">
-                <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
-                  <tr>
-                    <th className="px-4 py-3">결제일</th>
-                    <th className="px-4 py-3">카테고리</th>
-                    <th className="px-4 py-3">항목명</th>
-                    <th className="px-4 py-3">설명</th>
-                    <th className="px-4 py-3 text-center">유형</th>
-                    <th className="px-4 py-3 text-right">금액</th>
-                    <th className="px-4 py-3 text-center">관리</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {expensesLoading ? (
-                    <tr><td colSpan={7} className="p-8 text-center text-slate-400">로딩 중...</td></tr>
-                  ) : expenseItems.length === 0 ? (
-                    <tr><td colSpan={7} className="p-8 text-center text-slate-400">등록된 운영비 내역이 없습니다.</td></tr>
-                  ) : (
-                    expenseItems.map(([id, item]) => (
-                      <tr key={id} className="hover:bg-slate-50 group">
-                        <td className="px-4 py-3 text-slate-500 text-xs">{item.paymentDate}</td>
-                        <td className="px-4 py-3"><span className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-xs font-medium"><Tag size={10} /> {getCategoryLabel(item.category)}</span></td>
-                        <td className="px-4 py-3 font-medium text-slate-700">{item.name}</td>
-                        <td className="px-4 py-3 text-slate-500 text-xs">
-                          <div className="max-w-[160px] truncate" title={item.description}>
-                            {item.description || '-'}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          <button onClick={() => toggleItemType(id, item.type)} className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-colors ${item.type === 'fixed' ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' : 'bg-orange-50 text-orange-700 border border-orange-200'}`}>
-                            {item.type === 'fixed' ? '🔄 고정비' : '⚡ 변동비'}
-                          </button>
-                        </td>
-                        <td className="px-4 py-3 text-right font-mono text-slate-600">{item.amount.toLocaleString()}원</td>
-                        <td className="px-4 py-3 text-center">
-                          <button onClick={() => setDeleteConfirmId(id)} className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors" title="삭제"><Trash2 size={16} /></button>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+              <div className="responsive-table-shell">
+                <table className="w-full min-w-[760px] text-sm text-left">
+                  <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
+                    <tr>
+                      <th className="px-4 py-3 whitespace-nowrap">결제일</th>
+                      <th className="px-4 py-3 whitespace-nowrap">카테고리</th>
+                      <th className="px-4 py-3 whitespace-nowrap">항목명</th>
+                      <th className="px-4 py-3 whitespace-nowrap">설명</th>
+                      <th className="px-4 py-3 text-center whitespace-nowrap">유형</th>
+                      <th className="px-4 py-3 text-right whitespace-nowrap">금액</th>
+                      <th className="px-4 py-3 text-center whitespace-nowrap">관리</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {expensesLoading ? (
+                      <tr><td colSpan={7} className="p-8 text-center text-slate-400">로딩 중...</td></tr>
+                    ) : expenseItems.length === 0 ? (
+                      <tr><td colSpan={7} className="p-8 text-center text-slate-400">등록된 운영비 내역이 없습니다.</td></tr>
+                    ) : (
+                      expenseItems.map(([id, item]) => (
+                        <tr key={id} className="hover:bg-slate-50 group">
+                          <td className="px-4 py-3 text-slate-500 text-xs whitespace-nowrap">{item.paymentDate}</td>
+                          <td className="px-4 py-3 whitespace-nowrap"><span className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-xs font-medium"><Tag size={10} /> {getCategoryLabel(item.category)}</span></td>
+                          <td className="px-4 py-3 font-medium text-slate-700 whitespace-nowrap">{item.name}</td>
+                          <td className="px-4 py-3 text-slate-500 text-xs">
+                            <div className="max-w-[160px] truncate" title={item.description}>
+                              {item.description || '-'}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-center whitespace-nowrap">
+                            <button onClick={() => toggleItemType(id, item.type)} className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-colors ${item.type === 'fixed' ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' : 'bg-orange-50 text-orange-700 border border-orange-200'}`}>
+                              {item.type === 'fixed' ? '🔄 고정비' : '⚡ 변동비'}
+                            </button>
+                          </td>
+                          <td className="px-4 py-3 text-right font-mono text-slate-600 whitespace-nowrap">{item.amount.toLocaleString()}원</td>
+                          <td className="px-4 py-3 text-center whitespace-nowrap">
+                            <button onClick={() => setDeleteConfirmId(id)} className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors" title="삭제"><Trash2 size={16} /></button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              <p className="responsive-table-hint px-4 py-3 sm:hidden">표는 좌우로 밀어서 확인할 수 있습니다.</p>
             </div>
 
             {/* 입력 폼 */}
@@ -674,9 +688,9 @@ export default function Dashboard() {
               <div className="flex flex-col md:flex-row gap-3">
                 <div className="flex-1">
                   <label className="block text-xs font-medium text-slate-500 mb-1">카테고리</label>
-                  <div className="flex gap-2">
+                  <div className="flex flex-col sm:flex-row gap-2">
                     {showNewCategory ? (
-                      <div className="flex-1 flex gap-2">
+                      <div className="flex-1 flex flex-col sm:flex-row gap-2">
                         <input type="text" placeholder="새 카테고리 입력" value={customCategory} onChange={e => setCustomCategory(e.target.value)} onKeyDown={e => e.key === 'Enter' && addCustomCategory()} className="flex-1 p-2 border border-blue-300 rounded-lg text-sm focus:outline-none focus:border-blue-500 text-slate-900 shadow-sm" autoFocus />
                         <button onClick={addCustomCategory} className="px-3 py-2 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700">확인</button>
                         <button
@@ -716,7 +730,7 @@ export default function Dashboard() {
                 </div>
               </div>
               <div className="flex justify-end">
-                <button onClick={addExpenseItem} disabled={addingItem || !newName || !newAmount} className="px-5 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-sm font-bold flex items-center gap-2 disabled:opacity-50 transition-all shadow-md active:scale-95">
+                <button onClick={addExpenseItem} disabled={addingItem || !newName || !newAmount} className="w-full sm:w-auto px-5 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-50 transition-all shadow-md active:scale-95">
                   <Plus size={16} />{addingItem ? '저장 중...' : '항목 등록'}
                 </button>
               </div>
