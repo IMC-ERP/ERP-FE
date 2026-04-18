@@ -9,6 +9,7 @@ import { FileText, PlusCircle, Search, Filter, RotateCcw, Calendar, Clock, X, Al
 import { dailySalesApi, recipeCostApi, transactionsApi, manualSalesApi, hourlySalesApi } from '../services/api';
 import type { HourlyTransaction, HourlyOCRResponse } from '../services/api';
 import type { RecipeCost, OCRSalesResponse, SaleItem, ManualSaleRequest } from '../types';
+import SpotlightTour from '../components/SpotlightTour';
 
 // Order State Mapping for UI (Korean translation)
 const ORDER_STATE_MAP: Record<string, { label: string; color: string }> = {
@@ -203,8 +204,8 @@ const HistoryView = () => {
 
     return (
         <div className="space-y-4 animate-fade-in relative">
-            {/* Advanced Filter Panel */}
-            <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm">
+            {/* Advanced Filter Panel - Tour Step 1 target */}
+            <div id="tour-date-filter" className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm">
                 <div className="mb-6 flex flex-col gap-3 border-b border-slate-100 pb-4 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex items-center gap-2 text-slate-800 font-black">
                         <Filter size={18} className="text-indigo-600" />
@@ -324,7 +325,7 @@ const HistoryView = () => {
             </div>
 
             {/* Data Table Container */}
-            <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex flex-col relative min-h-[400px]">
+            <div id="tour-transaction-list" className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex flex-col relative min-h-[400px]">
                 {/* Header Info */}
                 <div className="px-5 py-4 bg-white border-b border-slate-100 flex flex-col gap-2 sm:px-8 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex items-center gap-3">
@@ -500,7 +501,7 @@ const HistoryView = () => {
             <div className="flex justify-between items-center px-4">
                 <span className="text-[11px] font-bold text-slate-400">* 최대 30개의 거래 행을 기준으로 스크롤이 제공됩니다.</span>
                 {!editingId && transactions.length > 0 && (
-                    <span className="text-[11px] font-bold text-slate-400">행을 더블클릭하여 상세 정보를 수정할 수 있습니다.</span>
+                    <span id="tour-row-edit-hint" className="text-[11px] font-bold text-slate-400">행을 더블클릭하여 상세 정보를 수정할 수 있습니다.</span>
                 )}
             </div>
 
@@ -1010,7 +1011,7 @@ const DailySalesAddView = () => {
                 )}
 
                 {!isOcrLoading && !isHourlyLoading && (
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div id="tour-sales-add-options" className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         {/* OCR Scan Card - 메뉴별 */}
                         <div className="bg-white p-8 rounded-2xl border border-slate-200 hover:border-blue-500 hover:shadow-xl transition-all group relative overflow-hidden">
                             <div className="absolute top-0 right-0 w-32 h-32 bg-blue-50 rounded-bl-full -mr-10 -mt-10 transition-transform group-hover:scale-110"></div>
@@ -1547,7 +1548,7 @@ const DailySalesAddView = () => {
 
                     {/* --- 장바구니 리스트 --- */}
                     <div className="space-y-3">
-                        <div className="grid grid-cols-12 gap-3 text-xs font-bold text-slate-500 px-3 uppercase tracking-wide">
+                        <div className="hidden sm:grid sm:grid-cols-12 gap-3 text-xs font-bold text-slate-500 px-3 uppercase tracking-wide">
                             <div className="col-span-4">메뉴</div>
                             <div className="col-span-2 text-right">단가</div>
                             <div className="col-span-2 text-center">수량</div>
@@ -1565,86 +1566,106 @@ const DailySalesAddView = () => {
 
                             return (
                                 <div key={index} className="relative">
-                                    <div className="grid grid-cols-12 gap-3 items-center bg-slate-50 p-3 rounded-xl hover:bg-slate-100 transition-colors">
-                                        {/* 메뉴 검색 */}
-                                        <div className="col-span-4 relative">
-                                            <input
-                                                type="text"
-                                                value={item.menu}
-                                                onChange={(e) => {
-                                                    const updated = [...manualItems];
-                                                    updated[index].menu = e.target.value;
-                                                    updated[index].menuId = '';
-                                                    updated[index].selling_price = 0;
-                                                    updated[index].totalCost = 0;
-                                                    setManualItems(updated);
-                                                }}
-                                                onFocus={() => setActiveMenuIndex(index)}
-                                                onMouseDown={(e) => e.stopPropagation()}
-                                                placeholder="메뉴 검색..."
-                                                className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm"
-                                            />
-                                            {showDropdown && (
-                                                <div
-                                                    className="absolute z-20 w-full mt-1 bg-white border border-slate-300 rounded-xl shadow-xl max-h-56 overflow-y-auto"
+                                    <div className="flex flex-col sm:grid sm:grid-cols-12 gap-3 sm:items-center bg-slate-50 p-4 rounded-xl hover:bg-slate-100 transition-colors">
+                                        
+                                        {/* 모바일 상단: 메뉴 및 삭제 버튼 */}
+                                        <div className="flex items-center justify-between gap-3 sm:contents">
+                                            {/* 메뉴 검색 */}
+                                            <div className="flex-1 relative sm:col-span-4">
+                                                <input
+                                                    type="text"
+                                                    value={item.menu}
+                                                    onChange={(e) => {
+                                                        const updated = [...manualItems];
+                                                        updated[index].menu = e.target.value;
+                                                        updated[index].menuId = '';
+                                                        updated[index].selling_price = 0;
+                                                        updated[index].totalCost = 0;
+                                                        setManualItems(updated);
+                                                    }}
+                                                    onFocus={() => setActiveMenuIndex(index)}
                                                     onMouseDown={(e) => e.stopPropagation()}
-                                                >
-                                                    {(manualMenuStr.length === 0 ? recipes : filteredRecipes).map((recipe) => (
-                                                        <button
-                                                            key={recipe.menuId}
-                                                            type="button"
-                                                            onClick={() => handleMenuSelect(index, recipe)}
-                                                            className="w-full text-left px-4 py-2.5 hover:bg-blue-50 text-sm flex justify-between items-center border-b border-slate-50 last:border-none"
-                                                        >
-                                                            <span className="font-medium text-slate-800">{recipe.name}</span>
-                                                            <span className="text-xs text-blue-600 font-bold">{recipe.price.toLocaleString()}원</span>
-                                                        </button>
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        {/* 단가 (읽기 전용) */}
-                                        <div className="col-span-2 text-right text-sm font-mono text-blue-600 font-bold">
-                                            {item.selling_price > 0 ? `${item.selling_price.toLocaleString()}원` : '-'}
-                                        </div>
-
-                                        {/* 수량 (+/-) */}
-                                        <div className="col-span-2 flex items-center justify-center gap-1">
-                                            <button
-                                                onClick={() => handleQuantityChange(index, Math.max(1, item.quantity - 1))}
-                                                className="w-8 h-8 rounded-lg bg-slate-200 hover:bg-slate-300 flex items-center justify-center text-slate-700 font-bold transition-colors"
-                                            >
-                                                -
-                                            </button>
-                                            <input
-                                                type="number"
-                                                min="1"
-                                                value={item.quantity}
-                                                onChange={(e) => handleQuantityChange(index, parseInt(e.target.value) || 1)}
-                                                className="w-12 text-center p-1 border border-slate-300 rounded-lg text-sm font-bold"
-                                            />
-                                            <button
-                                                onClick={() => handleQuantityChange(index, item.quantity + 1)}
-                                                className="w-8 h-8 rounded-lg bg-blue-100 hover:bg-blue-200 flex items-center justify-center text-blue-700 font-bold transition-colors"
-                                            >
-                                                +
-                                            </button>
-                                        </div>
-
-                                        {/* 소계 */}
-                                        <div className="col-span-3 text-right font-bold text-slate-800 text-sm">
-                                            {(item.selling_price * item.quantity).toLocaleString()}원
-                                        </div>
-
-                                        {/* 삭제 */}
-                                        <div className="col-span-1 flex justify-end">
+                                                    placeholder="메뉴 검색..."
+                                                    className="w-full p-3 sm:p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm"
+                                                />
+                                                {showDropdown && (
+                                                    <div
+                                                        className="absolute z-20 w-full mt-1 bg-white border border-slate-300 rounded-xl shadow-xl max-h-56 overflow-y-auto"
+                                                        onMouseDown={(e) => e.stopPropagation()}
+                                                    >
+                                                        {(manualMenuStr.length === 0 ? recipes : filteredRecipes).map((recipe) => (
+                                                            <button
+                                                                key={recipe.menuId}
+                                                                type="button"
+                                                                onClick={() => handleMenuSelect(index, recipe)}
+                                                                className="w-full text-left px-4 py-3 sm:py-2.5 hover:bg-blue-50 text-sm flex justify-between items-center border-b border-slate-50 last:border-none"
+                                                            >
+                                                                <span className="font-medium text-slate-800">{recipe.name}</span>
+                                                                <span className="text-xs text-blue-600 font-bold">{recipe.price.toLocaleString()}원</span>
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                            
+                                            {/* 모바일 전용 삭제 버튼 */}
                                             <button
                                                 onClick={() => handleDeleteRow(index)}
-                                                className="text-slate-400 hover:text-red-500 transition-colors p-1 rounded-lg hover:bg-red-50"
+                                                className="sm:hidden text-slate-400 hover:text-red-500 transition-colors p-2 rounded-lg hover:bg-red-50"
                                             >
-                                                <Trash2 size={16} />
+                                                <Trash2 size={18} />
                                             </button>
+                                        </div>
+
+                                        {/* 모바일 하단: 단가, 수량, 소계 */}
+                                        <div className="flex items-center justify-between sm:contents mt-2 sm:mt-0 pt-2 sm:pt-0 border-t sm:border-0 border-slate-200">
+                                            {/* 단가 (읽기 전용 - 모바일에선 숨김 처리 후 소계 윗줄에 표시) */}
+                                            <div className="hidden sm:block sm:col-span-2 text-right text-sm font-mono text-blue-600 font-bold">
+                                                {item.selling_price > 0 ? `${item.selling_price.toLocaleString()}원` : '-'}
+                                            </div>
+
+                                            {/* 수량 (+/-) */}
+                                            <div className="flex items-center gap-2 sm:col-span-2 sm:justify-center">
+                                                <button
+                                                    onClick={() => handleQuantityChange(index, Math.max(1, item.quantity - 1))}
+                                                    className="w-10 h-10 sm:w-8 sm:h-8 rounded-lg bg-slate-200 hover:bg-slate-300 flex items-center justify-center text-slate-700 font-bold transition-colors"
+                                                >
+                                                    -
+                                                </button>
+                                                <input
+                                                    type="number"
+                                                    min="1"
+                                                    value={item.quantity}
+                                                    onChange={(e) => handleQuantityChange(index, parseInt(e.target.value) || 1)}
+                                                    className="w-14 sm:w-12 text-center p-2 sm:p-1 border border-slate-300 rounded-lg text-sm font-bold"
+                                                />
+                                                <button
+                                                    onClick={() => handleQuantityChange(index, item.quantity + 1)}
+                                                    className="w-10 h-10 sm:w-8 sm:h-8 rounded-lg bg-blue-100 hover:bg-blue-200 flex items-center justify-center text-blue-700 font-bold transition-colors"
+                                                >
+                                                    +
+                                                </button>
+                                            </div>
+
+                                            {/* 소계 영역 (모바일: 단가 + 소계 묶음) */}
+                                            <div className="flex flex-col items-end sm:contents">
+                                                <div className="text-[10px] text-slate-400 sm:hidden mb-0.5">
+                                                    {item.selling_price > 0 ? `@ ${item.selling_price.toLocaleString()}원` : ''}
+                                                </div>
+                                                <div className="sm:col-span-3 text-right font-bold text-slate-800 text-base sm:text-sm">
+                                                    {(item.selling_price * item.quantity).toLocaleString()}원
+                                                </div>
+                                            </div>
+
+                                            {/* 데스크탑 전용 삭제 버튼 */}
+                                            <div className="hidden sm:flex sm:col-span-1 justify-end">
+                                                <button
+                                                    onClick={() => handleDeleteRow(index)}
+                                                    className="text-slate-400 hover:text-red-500 transition-colors p-1 rounded-lg hover:bg-red-50"
+                                                >
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -1723,6 +1744,7 @@ export default function TransactionManager() {
                     매출 등록
                 </button>
                 <button
+                    id="tour-tab-history"
                     onClick={() => setActiveTab("history")}
                     className={`flex items-center gap-2 px-6 py-3 text-sm font-bold rounded-t-lg transition-colors whitespace-nowrap ${activeTab === "history"
                         ? "bg-white text-blue-600 border-b-2 border-blue-600"
@@ -1738,8 +1760,48 @@ export default function TransactionManager() {
             <div className="mt-4">
                 {activeTab === "dailySalesAdd" && <DailySalesAddView />}
                 {activeTab === "history" && <HistoryView />}
-
             </div>
+
+            <SpotlightTour
+                tourKey="transaction_manager_page"
+                steps={[
+                    {
+                        targetId: 'tour-sales-add-options',
+                        title: '📥 매출 등록 방식 선택',
+                        content: '영수증 사진 스캔(메뉴별/시간대별) 또는 직접 입력을 통해 매출을 손쉽게 등록할 수 있습니다.',
+                        placement: 'top',
+                    },
+                    {
+                        targetId: 'tour-tab-history',
+                        title: '📁 거래 내역 확인',
+                        content: '등록된 거래 내역은 옆 탭에서 언제든지 확인하고 수정할 수 있습니다.',
+                        placement: 'bottom',
+                    },
+                    {
+                        targetId: 'tour-date-filter',
+                        title: '🔍 상세 검색 필터',
+                        content: '원하는 기간이나 카테고리, 메뉴명을 입력하여 거래 내역을 정밀하게 검색할 수 있습니다.',
+                        placement: 'bottom',
+                    },
+                    {
+                        targetId: 'tour-transaction-list',
+                        title: '📋 거래 내역 리스트',
+                        content: '검색된 모든 거래 내역이 리스트로 표시됩니다. 수량, 단가, 총 금액과 현재 처리 상태를 확인하세요.',
+                        placement: 'top',
+                    },
+                ]}
+                autoStart={true}
+                showIntro={false}
+                onStepChange={(newIdx) => {
+                    // Step 3 (index 2) onwards are about 'History' tab
+                    if (newIdx >= 2) {
+                        setActiveTab("history");
+                    } else {
+                        // Option to go back to registration tab if going back in the tour
+                        setActiveTab("dailySalesAdd");
+                    }
+                }}
+            />
         </div>
     );
 }

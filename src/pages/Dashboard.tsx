@@ -16,6 +16,7 @@ import { ChevronDown, ChevronRight, Info, Calendar, Plus, Trash2, Tag, TrendingU
 import {
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
 } from 'recharts';
+import SpotlightTour from '../components/SpotlightTour';
 
 // ==================== 상수 ====================
 
@@ -205,12 +206,13 @@ export default function Dashboard() {
   const momProfitTrend = (summary as any)?.profitTrend;
 
   const isPositive = netProfit >= 0;
+  // 부드럽고 눈이 편안한 파스텔톤 계열로 완화 (Muted Sage Green / Muted Clay Red)
   const theme = {
-    gradient: isPositive ? 'bg-gradient-to-r from-emerald-500 to-teal-600' : 'bg-gradient-to-r from-rose-500 to-red-600',
-    textMain: isPositive ? 'text-emerald-600' : 'text-rose-600',
-    textSub: isPositive ? 'text-emerald-500' : 'text-rose-500',
-    iconColor: isPositive ? 'text-emerald-200' : 'text-rose-200',
-    subTitleColor: isPositive ? 'text-emerald-100' : 'text-rose-100',
+    gradient: isPositive ? 'bg-gradient-to-r from-[#448b71] to-[#3a7560]' : 'bg-gradient-to-r from-[#bd5f68] to-[#ab525a]',
+    textMain: isPositive ? 'text-[#3a7560]' : 'text-[#ab525a]',
+    textSub: isPositive ? 'text-[#448b71]' : 'text-[#bd5f68]',
+    iconColor: isPositive ? 'text-[#aee0cd]' : 'text-[#f0b1b7]',
+    subTitleColor: isPositive ? 'text-[#d6f0e4]' : 'text-[#fbe0e3]',
   };
 
   // --- 차트 데이터 ---
@@ -335,65 +337,73 @@ export default function Dashboard() {
     <div className="max-w-4xl mx-auto space-y-6 animate-fade-in overflow-visible">
 
       {/* ==================== 1. 수익성 분석 카드 ==================== */}
-      <div className="bg-white rounded-2xl shadow-lg border border-slate-200">
+      <div id="tour-dashboard-profit" className="bg-white rounded-2xl shadow-lg border border-slate-200">
         <div className={`relative ${theme.gradient} p-5 sm:p-8 text-white transition-colors duration-500 rounded-t-2xl ${!showProfitDetails ? 'rounded-b-2xl' : ''}`}>
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2 mb-2">
-                <span className={`${theme.subTitleColor} font-medium text-sm`}>실시간 수익성 분석</span>
-                <div className="group relative">
-                  <Info size={16} className={`${theme.iconColor} cursor-help`} />
-                  <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block w-[min(18rem,calc(100vw-3rem))] p-3 bg-slate-800 text-xs text-slate-200 rounded-lg shadow-xl z-[60] pointer-events-none">
-                    {profitData ? `${profitData.period.start_date} ~ ${profitData.period.end_date} 기간의 stats_daily + expenses 실제 데이터 기반` : '데이터 로딩 중...'}
-                    <div className="absolute left-1.5 top-full w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-slate-800" />
+              <button type="button" className="flex items-center gap-2 mb-2 group cursor-help w-max focus:outline-none" onClick={(e) => { e.currentTarget.focus(); }}>
+                <span className={`${theme.subTitleColor} font-bold tracking-wide text-sm`}>실시간 수익성 분석</span>
+                <div className="relative flex items-center justify-center">
+                  <Info size={16} className={`${theme.iconColor} opacity-80`} />
+                  <div className="absolute left-1/2 -translate-x-[32px] top-full mt-3 opacity-0 translate-y-2 group-hover:opacity-100 group-focus:opacity-100 group-hover:translate-y-0 group-focus:translate-y-0 transition-all duration-300 ease-out w-[min(18rem,calc(100vw-3rem))] p-4 bg-slate-800/95 backdrop-blur-sm text-xs text-slate-200 rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.2)] z-[60] pointer-events-none border border-slate-700/50 leading-relaxed font-medium text-left">
+                    {profitData ? `${profitData.period.start_date} ~ ${profitData.period.end_date} 기간의 실제 판매량 및 등록된 운영비 데이터를 바탕으로 계산됩니다.` : '데이터 로딩 중...'}
+                    <div className="absolute left-[32px] -translate-x-1/2 bottom-full w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-b-[8px] border-b-slate-800/95" />
                   </div>
                 </div>
-              </div>
-              <div className="flex min-h-[48px] flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+              </button>
+              <div className="flex min-h-[48px] w-full flex-row items-end justify-between gap-4 mt-2">
                 {profitLoading ? (
                   <div className="flex items-center gap-3 text-white/70">
                     <Loader2 className="animate-spin" size={24} />
-                    <h1 className="text-2xl font-light">데이터를 불러오는 중...</h1>
+                    <h1 className="text-xl sm:text-2xl font-light">데이터를 불러오는 중...</h1>
                   </div>
                 ) : (
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-                    <h1 className="text-2xl font-light leading-tight sm:text-3xl">
-                      <span className="opacity-90">{selectedMonth.split('-')[1]}월</span> 수익률은 <span className="font-bold text-4xl sm:text-5xl">{profitMargin.toFixed(1)}%</span> 입니다.
+                  <div className="flex flex-col gap-2 sm:gap-3 sm:flex-row sm:items-end">
+                    <h1 className="text-xl sm:text-3xl font-light leading-snug sm:leading-tight break-keep">
+                      <span className="opacity-90">{selectedMonth.split('-')[1]}월</span> 수익률은 <br className="sm:hidden" />
+                      <span className="font-bold text-4xl sm:text-5xl ml-1 sm:ml-0">{profitMargin.toFixed(1)}%</span> 입니다.
                     </h1>
                     {/* 전월 대비 비교 지표 */}
-                    {momProfitTrend === null || momProfitTrend === undefined ? (
-                      <span className="inline-flex self-start items-center whitespace-nowrap gap-1 rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-bold leading-none text-slate-100 sm:px-3 sm:py-1 sm:text-base">
-                        <span className="text-[9px] font-normal opacity-80 sm:text-xs">이전 데이터 없음</span>
-                      </span>
-                    ) : momProfitTrend > 0 ? (
-                      <span className="inline-flex self-start items-center whitespace-nowrap gap-0.5 rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-bold leading-none text-emerald-100 sm:gap-1 sm:px-3 sm:py-1 sm:text-base">
-                        ▲ {momProfitTrend}%
-                      </span>
-                    ) : momProfitTrend < 0 ? (
-                      <span className="inline-flex self-start items-center whitespace-nowrap gap-0.5 rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-bold leading-none text-rose-100 sm:gap-1 sm:px-3 sm:py-1 sm:text-base">
-                        ▼ {Math.abs(momProfitTrend)}%
-                      </span>
-                    ) : (
-                      <span className="inline-flex self-start items-center whitespace-nowrap gap-0.5 rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-bold leading-none text-slate-100 sm:gap-1 sm:px-3 sm:py-1 sm:text-base">
-                        0%
-                      </span>
-                    )}
+                    <div className="mt-1 sm:mt-0 sm:mb-2">
+                      {momProfitTrend === null || momProfitTrend === undefined ? (
+                        <span className="inline-flex items-center whitespace-nowrap gap-1 rounded-full bg-white/20 px-2.5 py-1 text-[11px] font-bold leading-none text-slate-100 sm:px-3 sm:py-1.5 sm:text-sm">
+                          이전 데이터 없음
+                        </span>
+                      ) : momProfitTrend > 0 ? (
+                        <span className="inline-flex items-center whitespace-nowrap gap-0.5 rounded-full bg-white/20 px-2.5 py-1 text-[11px] font-bold leading-none text-emerald-100 sm:gap-1 sm:px-3 sm:py-1.5 sm:text-sm">
+                          ▲ {momProfitTrend}%
+                        </span>
+                      ) : momProfitTrend < 0 ? (
+                        <span className="inline-flex items-center whitespace-nowrap gap-0.5 rounded-full bg-white/20 px-2.5 py-1 text-[11px] font-bold leading-none text-rose-100 sm:gap-1 sm:px-3 sm:py-1.5 sm:text-sm">
+                          ▼ {Math.abs(momProfitTrend)}%
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center whitespace-nowrap gap-0.5 rounded-full bg-white/20 px-2.5 py-1 text-[11px] font-bold leading-none text-slate-100 sm:gap-1 sm:px-3 sm:py-1.5 sm:text-sm">
+                          0%
+                        </span>
+                      )}
+                    </div>
                   </div>
                 )}
-                <button onClick={() => setShowProfitDetails(!showProfitDetails)} className="self-end rounded-full p-1 hover:bg-white/20 transition-colors sm:mb-1 sm:ml-4 sm:self-auto">
-                  {showProfitDetails ? <ChevronDown size={28} /> : <ChevronRight size={28} />}
+                <button
+                  id="tour-dashboard-expand"
+                  onClick={() => setShowProfitDetails(!showProfitDetails)}
+                  className="shrink-0 rounded-full p-1.5 hover:bg-white/20 transition-colors focus:outline-none sm:mb-2 sm:ml-2"
+                >
+                  <div className={`transition-transform duration-500 ease-[cubic-bezier(0.87,0,0.13,1)] ${showProfitDetails ? 'rotate-180' : 'rotate-0'}`}>
+                    <ChevronDown size={28} className="sm:w-8 sm:h-8" />
+                  </div>
                 </button>
               </div>
             </div>
           </div>
         </div>
 
-        {showProfitDetails && (
-          <div className="p-8 bg-slate-50 border-t border-slate-100 rounded-b-2xl">
-            {/* 상단 옵션 영역 제거 (토글 이동됨) */}
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              {/* 매출 분석 (원래 우측에 있던 것 -> 좌측으로) */}
+        <div className={`grid transition-all duration-500 ease-[cubic-bezier(0.87,0,0.13,1)] ${showProfitDetails ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
+          <div className="overflow-hidden">
+            <div className="p-8 bg-slate-50 border-t border-slate-100 rounded-b-2xl">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {/* 매출 분석 (원래 우측에 있던 것 -> 좌측으로) */}
               <div className="flex flex-col h-full">
                 <div className="flex justify-between items-center mb-3 min-h-[28px]">
                   <h3 className="text-slate-500 font-semibold text-sm uppercase tracking-wider">매출 분석</h3>
@@ -473,11 +483,12 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
-        )}
+          </div>
+        </div>
       </div>
 
       {/* ==================== 2. 차트 카드 2종 ==================== */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div id="tour-dashboard-charts" className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* 차트 A: 매출 대비 비용 -> 수익 구조 분석 */}
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
           <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-4">수익 구조 분석</h3>
@@ -572,7 +583,7 @@ export default function Dashboard() {
       </div>
 
       {/* ==================== 3. 매장 운영비 관리 ==================== */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+      <div id="tour-dashboard-manage" className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="p-5 sm:p-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between cursor-pointer hover:bg-slate-50 transition-colors" onClick={() => setShowExpenseDetails(!showExpenseDetails)}>
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
@@ -583,14 +594,17 @@ export default function Dashboard() {
               <p className="text-xs text-slate-500">운영비 항목 추가, 수정 및 삭제</p>
             </div>
           </div>
-          <button className="self-end p-2 rounded-full hover:bg-slate-200 text-slate-400 transition-colors sm:self-auto">
-            {showExpenseDetails ? <ChevronDown size={24} /> : <ChevronRight size={24} />}
+          <button className="self-end p-2 rounded-full hover:bg-slate-200 text-slate-400 transition-colors focus:outline-none sm:self-auto">
+            <div className={`transition-transform duration-500 ease-[cubic-bezier(0.87,0,0.13,1)] ${showExpenseDetails ? 'rotate-180' : 'rotate-0'}`}>
+              <ChevronDown size={24} />
+            </div>
           </button>
         </div>
 
-        {showExpenseDetails && (
-          <div className="border-t border-slate-100 bg-slate-50/50 p-6 animate-fade-in">
-            {/* 월 선택 */}
+        <div className={`grid transition-all duration-500 ease-[cubic-bezier(0.87,0,0.13,1)] ${showExpenseDetails ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
+          <div className="overflow-hidden">
+            <div className="border-t border-slate-100 bg-slate-50/50 p-6">
+              {/* 월 선택 */}
             <div className="mb-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <div className="relative">
                 <Calendar className="absolute left-3 top-2.5 text-slate-400" size={16} />
@@ -610,8 +624,8 @@ export default function Dashboard() {
 
             {/* 테이블 */}
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden mb-6">
-              <div className="responsive-table-shell">
-                <table className="w-full min-w-[760px] text-sm text-left">
+              <div className="overflow-x-auto w-full">
+                <table className="w-full min-w-[800px] text-sm text-left">
                   <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
                     <tr>
                       <th className="px-4 py-3 whitespace-nowrap">결제일</th>
@@ -736,7 +750,8 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
-        )}
+          </div>
+        </div>
       </div>
 
       {/* ==================== 삭제 확인 모달 ==================== */}
@@ -768,6 +783,37 @@ export default function Dashboard() {
         </div>
       )}
 
+      <SpotlightTour
+        tourKey="dashboard_page"
+        steps={[
+          {
+            targetId: 'tour-dashboard-profit',
+            title: '💰 실시간 수익성 분석',
+            content: '이번 달 매장의 실제 수익률과 순수익을 한눈에 파악할 수 있는 가장 중요한 공간입니다.',
+            placement: 'bottom',
+          },
+          {
+            targetId: 'tour-dashboard-expand',
+            title: '🔍 상세 내역 보기',
+            content: '이 버튼을 누르면 매출과 비용의 상세 내역을 포함한 심층 분석 리포트가 펼쳐집니다.',
+            placement: 'bottom',
+          },
+          {
+            targetId: 'tour-dashboard-charts',
+            title: '📊 지출 구조 시각화',
+            content: '임대료, 인건비 등 비중이 높은 지출 항목을 차트로 분석하여 고정비를 줄일 수 있는 포인트를 찾아보세요.',
+            placement: 'top',
+          },
+          {
+            targetId: 'tour-dashboard-manage',
+            title: '🛠️ 운영비 직접 관리',
+            content: '매달 발생하는 운영비를 직접 입력하고 관리하세요. 입력된 정보는 수익성 분석에 즉시 반영됩니다.',
+            placement: 'top',
+          },
+        ]}
+        autoStart={true}
+        showIntro={false}
+      />
     </div>
   );
 }

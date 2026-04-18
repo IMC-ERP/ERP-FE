@@ -3,7 +3,7 @@
  * GCP-ERP 스타일 적용 + Google 로그인 + 멀티유저 대응
  */
 
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { DataProvider } from './contexts/DataContext';
 import { AuthProvider } from './contexts/AuthContext';
 import Layout from './components/Layout/Layout';
@@ -23,54 +23,133 @@ import CostRecipeManager from './pages/CostRecipeManager';
 import Home from './pages/Home';
 import SettingsPage from './pages/SettingsPage';
 import InvitePage from './pages/InvitePage';
+import { startSpotlightTour } from './components/SpotlightTour';
 import './index.css';
 
 // HomePage 삭제됨 (Home.tsx로 대체)
 
-const HelpPage = () => (
-  <div className="max-w-3xl mx-auto space-y-4 animate-fade-in">
-    <section className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 sm:p-8">
-      <div className="flex flex-col items-center gap-4 text-center sm:flex-row sm:items-start sm:text-left">
-        <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-50 text-4xl">
-          📖
-        </div>
-        <div className="space-y-2">
-          <h2 className="text-2xl font-bold text-slate-800">도움말 및 가이드</h2>
-          <p className="max-w-xl text-sm leading-relaxed text-slate-500 sm:text-base">
-            자주 쓰는 흐름만 빠르게 정리했습니다. 모바일에서는 먼저 메뉴 입력, 거래 조회, 재고 확인, 설정 순서로 점검하면 대부분 바로 해결됩니다.
-          </p>
-        </div>
-      </div>
+const HelpPage = () => {
+  const navigate = useNavigate();
 
-      <div className="mt-6 grid gap-3 sm:grid-cols-2">
-        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-          <h3 className="text-sm font-bold text-slate-800">빠른 시작</h3>
-          <p className="mt-2 text-sm leading-relaxed text-slate-500">
-            홈에서 지표를 확인하고, 매출 입력과 거래 데이터 관리에서 데이터 상태를 먼저 검증하세요.
-          </p>
+  const handleStartTour = (path: string, tourKey: string) => {
+    navigate(path);
+    // 내비게이션 후 컴포넌트 마운트 및 데이터 로딩 시간을 벌기 위해 충분한 지연 후 이벤트 발송
+    setTimeout(() => {
+      startSpotlightTour(tourKey);
+    }, 400);
+  };
+
+  return (
+    <div className="max-w-3xl mx-auto space-y-6 animate-fade-in pb-12">
+      <section className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 sm:p-8">
+        <div className="flex flex-col items-center gap-4 text-center sm:flex-row sm:items-start sm:text-left">
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-50 text-4xl">
+            📖
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-2xl font-bold text-slate-800">도움말 및 가이드</h2>
+            <p className="max-w-xl text-sm leading-relaxed text-slate-500 sm:text-base">
+              자주 쓰는 흐름만 빠르게 정리했습니다. 서비스 이용 중 궁금한 점이 있다면 아래 가이드 투어를 다시 실행해 보세요.
+            </p>
+          </div>
         </div>
-        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-          <h3 className="text-sm font-bold text-slate-800">원가/재고 점검</h3>
-          <p className="mt-2 text-sm leading-relaxed text-slate-500">
-            재고 관리에서 입고와 재고를 확인하고, 원가/레시피 관리에서 원가율과 재료 단가를 맞추면 됩니다.
-          </p>
+
+        <div className="mt-8">
+          <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+            ✨ 핵심 기능 가이드 다시 보기
+          </h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <button
+              onClick={() => handleStartTour('/', 'home_page')}
+              className="flex items-center gap-4 p-4 rounded-xl border border-slate-200 hover:border-blue-500 hover:bg-blue-50 transition-all text-left group bg-white shadow-sm"
+            >
+              <div className="w-12 h-12 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center text-xl group-hover:scale-110 transition-transform shadow-sm">🏠</div>
+              <div>
+                <div className="font-bold text-slate-800">홈 대시보드</div>
+                <div className="text-xs text-slate-500">전체 경영 현황 파악</div>
+              </div>
+            </button>
+            <button
+              onClick={() => handleStartTour('/dashboard', 'dashboard_page')}
+              className="flex items-center gap-4 p-4 rounded-xl border border-slate-200 hover:border-amber-500 hover:bg-amber-50 transition-all text-left group bg-white shadow-sm"
+            >
+              <div className="w-12 h-12 rounded-lg bg-amber-100 text-amber-600 flex items-center justify-center text-xl group-hover:scale-110 transition-transform shadow-sm">💰</div>
+              <div>
+                <div className="font-bold text-slate-800">경영 현황 분석</div>
+                <div className="text-xs text-slate-500">수익성 및 지출 관리</div>
+              </div>
+            </button>
+            <button
+              onClick={() => handleStartTour('/inventory', 'inventory_onboarding')}
+              className="flex items-center gap-4 p-4 rounded-xl border border-slate-200 hover:border-orange-500 hover:bg-orange-50 transition-all text-left group bg-white shadow-sm"
+            >
+              <div className="w-12 h-12 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center text-xl group-hover:scale-110 transition-transform shadow-sm">📦</div>
+              <div>
+                <div className="font-bold text-slate-800">재고 실무 가이드</div>
+                <div className="text-xs text-slate-500">입고 및 재고 실사 방법</div>
+              </div>
+            </button>
+            <button
+              onClick={() => handleStartTour('/sales', 'sales_onboarding')}
+              className="flex items-center gap-4 p-4 rounded-xl border border-slate-200 hover:border-blue-600 hover:bg-blue-50 transition-all text-left group bg-white shadow-sm"
+            >
+              <div className="w-12 h-12 rounded-lg bg-blue-600/10 text-blue-600 flex items-center justify-center text-xl group-hover:scale-110 transition-transform shadow-sm">🛒</div>
+              <div>
+                <div className="font-bold text-slate-800">매출 등록 내역</div>
+                <div className="text-xs text-slate-500">수기 입력 및 데이터 조회</div>
+              </div>
+            </button>
+            <button
+              onClick={() => handleStartTour('/period', 'sales_analysis_page')}
+              className="flex items-center gap-4 p-4 rounded-xl border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50 transition-all text-left group bg-white shadow-sm"
+            >
+              <div className="w-12 h-12 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center text-xl group-hover:scale-110 transition-transform shadow-sm">📈</div>
+              <div>
+                <div className="font-bold text-slate-800">매출 심층 분석</div>
+                <div className="text-xs text-slate-500">기간별/요일별 추이 분석</div>
+              </div>
+            </button>
+            <button
+              onClick={() => handleStartTour('/transactions', 'transaction_manager_page')}
+              className="flex items-center gap-4 p-4 rounded-xl border border-slate-200 hover:border-indigo-500 hover:bg-indigo-50 transition-all text-left group bg-white shadow-sm"
+            >
+              <div className="w-12 h-12 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center text-xl group-hover:scale-110 transition-transform shadow-sm">🧾</div>
+              <div>
+                <div className="font-bold text-slate-800">거래 데이터 관리</div>
+                <div className="text-xs text-slate-500">영수증 스캔 및 거래 검증</div>
+              </div>
+            </button>
+            <button
+              onClick={() => handleStartTour('/cost-recipe', 'cost_recipe_page')}
+              className="flex items-center gap-4 p-4 rounded-xl border border-slate-200 hover:border-purple-500 hover:bg-purple-50 transition-all text-left group bg-white shadow-sm"
+            >
+              <div className="w-12 h-12 rounded-lg bg-purple-100 text-purple-600 flex items-center justify-center text-xl group-hover:scale-110 transition-transform shadow-sm">🥘</div>
+              <div>
+                <div className="font-bold text-slate-800">원가/레시피 관리</div>
+                <div className="text-xs text-slate-500">메뉴별 수익성 최적화</div>
+              </div>
+            </button>
+          </div>
         </div>
-        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-          <h3 className="text-sm font-bold text-slate-800">모바일 사용 팁</h3>
-          <p className="mt-2 text-sm leading-relaxed text-slate-500">
-            표가 좁으면 좌우로 밀어 보고, 상단의 글자 크기와 화면 모드 버튼으로 가독성을 먼저 맞추세요.
-          </p>
+
+        <div className="mt-8 grid gap-3 sm:grid-cols-2">
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <h3 className="text-sm font-bold text-slate-800">빠른 시작 팁</h3>
+            <p className="mt-2 text-sm leading-relaxed text-slate-500">
+              홈에서 지표를 확인하고, 매출 입력과 거래 데이터 관리에서 데이터 상태를 먼저 검증하세요.
+            </p>
+          </div>
+          <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4">
+            <h3 className="text-sm font-bold text-blue-800">추가 문의</h3>
+            <p className="mt-2 text-sm leading-relaxed text-blue-700">
+              권한, 데이터 동기화, 계정 문제는 관리자 또는 매장 대표 계정에서 설정 화면을 확인해 주세요.
+            </p>
+          </div>
         </div>
-        <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4">
-          <h3 className="text-sm font-bold text-blue-800">추가 문의</h3>
-          <p className="mt-2 text-sm leading-relaxed text-blue-700">
-            권한, 데이터 동기화, 계정 문제는 관리자 또는 매장 대표 계정에서 설정 화면을 확인해 주세요.
-          </p>
-        </div>
-      </div>
-    </section>
-  </div>
-);
+      </section>
+    </div>
+  );
+};
 
 function App() {
   return (

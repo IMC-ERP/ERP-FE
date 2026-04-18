@@ -4,10 +4,12 @@
  */
 
 import { useState, useMemo, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ChevronDown, ChevronRight, Plus, Trash2, DollarSign, Calculator, Archive, AlertCircle, ArrowUp, ArrowDown, X, Save } from 'lucide-react';
 import { recipeCostApi, inventoryApi, type InventoryUsageImpact } from '../services/api';
 import { supabase } from '../supabase';
 import { useAuth } from '../contexts/AuthContext';
+import SpotlightTour from '../components/SpotlightTour';
 import { RecipeIngredientsTable } from './cost-recipe/RecipeIngredientsTable';
 import {
     buildRecipePayload,
@@ -516,8 +518,30 @@ const MaterialTable = ({ materials, dirtyMaterialIds, onUpdate, onDelete, onSave
 
 // --- Main Component ---
 
+const COST_RECIPE_TOUR_STEPS = [
+    {
+        targetId: 'tour-cost-add-btn',
+        title: '🍔 새 메뉴 레시피 등록',
+        content: '판매 중인 메뉴의 판매가와 들어가는 재료들을 입력하여 실시간 원가를 계산할 수 있습니다.',
+        placement: 'bottom' as const,
+    },
+    {
+        targetId: 'tour-cost-tab-material',
+        title: '📊 원재료 시세 모니터링',
+        content: '재고에 등록된 원재료들의 최근 입고가를 기준으로 현재 메뉴 원가가 어떻게 변하고 있는지 확인하세요.',
+        placement: 'bottom' as const,
+    },
+    {
+        targetId: 'tour-cost-recipe-container',
+        title: '📖 메뉴 레시피 리스트',
+        content: '등록된 모든 메뉴의 레시피와 실시간 원가를 이곳에서 한눈에 관리할 수 있습니다.',
+        placement: 'top' as const,
+    },
+];
+
 export default function CostRecipeManager() {
     const { userProfile } = useAuth();
+    const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState<'recipe' | 'material'>('recipe');
     const [materials, setMaterials] = useState<RawMaterial[]>([]);
     const [recipes, setRecipes] = useState<MenuRecipe[]>([]);
@@ -1060,15 +1084,22 @@ export default function CostRecipeManager() {
                 <div className="flex w-full sm:w-auto gap-2">
                     {activeTab === 'recipe' ? (
                         <button
+                            id="tour-cost-add-btn"
                             onClick={handleAddRecipe}
                             className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg font-bold shadow hover:bg-indigo-700 transition-colors"
                         >
                             <Plus size={18} /> 새 메뉴 추가
                         </button>
                     ) : (
-                        <div className="flex-1 sm:flex-none rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-medium text-slate-500">
-                            원재료 추가는 재고 관리 탭에서 진행합니다.
-                        </div>
+                        <button
+                            onClick={() => navigate('/inventory', { state: { openAddModal: true } })}
+                            className="flex-1 sm:flex-none flex items-center justify-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 px-4 py-2 text-sm font-bold text-indigo-700 transition-colors cursor-pointer group"
+                            title="재고 관리 탭으로 이동하여 원재료 추가"
+                        >
+                            <Plus size={16} />
+                            <span>원재료 추가는 <span className="underline decoration-indigo-300 underline-offset-2">재고 관리 탭</span>에서 진행합니다</span>
+                            <span className="ml-1 group-hover:translate-x-1 transition-transform">→</span>
+                        </button>
                     )}
                 </div>
             </header>
@@ -1086,6 +1117,7 @@ export default function CostRecipeManager() {
                     원가 및 레시피 관리
                 </button>
                 <button
+                    id="tour-cost-tab-material"
                     onClick={() => setActiveTab('material')}
                     className={`flex shrink-0 items-center gap-2 px-4 sm:px-6 py-3 text-xs sm:text-sm font-bold rounded-t-lg transition-colors whitespace-nowrap ${activeTab === 'material'
                         ? "bg-white text-indigo-600 border-b-2 border-indigo-600"
@@ -1098,7 +1130,7 @@ export default function CostRecipeManager() {
             </div>
 
             {/* Content */}
-            <div className="min-h-[500px]">
+            <div id="tour-cost-recipe-container" className="min-h-[500px]">
                 {isLoading && (
                     <div className="rounded-xl border border-slate-200 bg-white px-6 py-12 text-center text-slate-400">
                         원가 및 레시피 데이터를 불러오는 중입니다.
@@ -1121,7 +1153,10 @@ export default function CostRecipeManager() {
                     <div className="space-y-4">
                         {/* Danger Section (Cost Ratio >= 33%) */}
                         {dangerRecipes.length > 0 && (
-                            <div className="mb-8 bg-red-50 rounded-xl border border-red-200 shadow-sm overflow-hidden">
+                            <div
+                                id="tour-cost-risk-section"
+                                className="mb-8 bg-red-50 rounded-xl border border-red-200 shadow-sm overflow-hidden"
+                            >
                                 <div
                                     onClick={() => setIsDangerSectionExpanded(!isDangerSectionExpanded)}
                                     className="px-4 sm:px-6 py-4 flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center cursor-pointer hover:bg-red-100/50 transition-colors"
@@ -1254,6 +1289,13 @@ export default function CostRecipeManager() {
                     )
                 )}
             </div >
+
+            <SpotlightTour 
+                tourKey="cost_recipe_page"
+                steps={COST_RECIPE_TOUR_STEPS}
+                autoStart={true}
+                showIntro={false}
+            />
         </div >
     );
 }
