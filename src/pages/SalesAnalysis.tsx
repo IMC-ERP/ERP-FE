@@ -12,6 +12,7 @@ import {
 } from 'recharts';
 import { Info, Loader2, Calendar } from 'lucide-react';
 import { analyticsApi, storeHoursApi, type SalesAnalyticsResponse } from '../services/api';
+import SpotlightTour from '../components/SpotlightTour';
 
 // ==================== 유틸리티 ====================
 
@@ -117,17 +118,27 @@ export default function SalesAnalysis() {
 
     // Quick 필터
     const quickFilters = [
-        { label: '1주일', days: 7 },
-        { label: '1개월', days: 30 },
-        { label: '3개월', days: 90 },
-        { label: '6개월', days: 180 },
-        { label: '1년', days: 360 },
+        { label: '1주일', type: 'week', val: 1 },
+        { label: '1개월', type: 'month', val: 1 },
+        { label: '3개월', type: 'month', val: 3 },
+        { label: '6개월', type: 'month', val: 6 },
+        { label: '1년', type: 'year', val: 1 },
     ];
 
-    const handleQuick = (label: string, days: number) => {
+    const handleQuick = (label: string, type: string, val: number) => {
         const end = new Date(yesterday);
         const start = new Date(yesterday);
-        start.setDate(end.getDate() - days + 1);
+        
+        if (type === 'week') {
+            start.setDate(end.getDate() - (val * 7) + 1);
+        } else if (type === 'month') {
+            start.setMonth(end.getMonth() - val);
+            start.setDate(start.getDate() + 1);
+        } else if (type === 'year') {
+            start.setFullYear(end.getFullYear() - val);
+            start.setDate(start.getDate() + 1);
+        }
+        
         setStartDate(toYMD(start));
         setEndDate(toYMD(end));
         setActiveQuick(label);
@@ -150,9 +161,7 @@ export default function SalesAnalysis() {
 
     // Tooltip
     const tooltipText = useMemo(() => {
-        const exEnd = new Date(yesterday);
-        const exStart = new Date(yesterday); exStart.setDate(exEnd.getDate() - 6);
-        return `Quick 필터는 어제를 기준으로 역산합니다 (예: 1주일 = ${exStart.getMonth() + 1}.${exStart.getDate()}~${exEnd.getMonth() + 1}.${exEnd.getDate()})`;
+        return `조회 기간은 시작일과 종료일을 모두 포함하여 계산됩니다. Quick 필터 적용 시 어제를 기준으로 실제 달력의 월/년도 일수에 맞춰 정확히 역산됩니다.`;
     }, []);
 
     // --------- 시간대별 필터 (storeHours 기반) ---------
@@ -186,7 +195,7 @@ export default function SalesAnalysis() {
 
     const hourlyYDomain = useMemo(() => smartYDomain(filteredHourly.map(h => h.sales)), [filteredHourly]);
     const hourlyTickInterval = useMemo(
-        () => (isMobile ? Math.max(Math.ceil(filteredHourly.length / 6) - 1, 0) : 0),
+        () => (isMobile ? Math.max(Math.ceil(filteredHourly.length / 4) - 1, 0) : 0),
         [filteredHourly.length, isMobile],
     );
 
@@ -197,40 +206,42 @@ export default function SalesAnalysis() {
     }, [data]);
 
     // ==================== Render ====================
-    if (loading && !data) {
-        return (
-            <div className="flex items-center justify-center min-h-[400px]">
-                <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
-            </div>
-        );
-    }
-    if (!data) return null;
-
-
     return (
         <div className="max-w-6xl mx-auto space-y-6 animate-fade-in">
-
-            {/* ===== 페이지 타이틀 ===== */}
+            {/* ===== 페이지 타이틀 (상시 노출로 부드러운 전환 유도) ===== */}
             <div className="flex flex-col gap-2">
                 <h2 className="text-2xl font-black text-slate-800 tracking-tight">매출 분석</h2>
             </div>
 
-            <>
-                {/* ===== 기간 설정 + 통합 Hero Card (같은 행) ===== */}
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+            {loading && !data ? (
+                <div className="flex items-center justify-center min-h-[60vh]">
+                    <Loader2 className="w-10 h-10 animate-spin text-indigo-500" />
+                </div>
+            ) : !data ? (
+                <div className="flex items-center justify-center min-h-[60vh] text-slate-500">
+                    데이터를 불러올 수 없습니다.
+                </div>
+            ) : (
+                <>
+
+            {/* ===== 기간 설정 + 통합 Hero Card (같은 행) ===== */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
 
                     {/* 기간 설정 카드 */}
-                    <div className="lg:col-span-4 bg-white rounded-2xl shadow-sm border border-slate-200 p-5 flex flex-col">
+                    <div id="tour-sales-period" className="lg:col-span-4 bg-white rounded-2xl shadow-sm border border-slate-200 p-5 flex flex-col">
                         <div className="flex items-center gap-2 mb-3">
                             <Calendar size={16} className="text-slate-500" />
                             <span className="text-sm font-semibold text-slate-700">조회 기간</span>
-                            <div className="group relative ml-auto">
-                                <Info size={14} className="text-slate-400 cursor-help" />
-                                <div className="absolute right-0 bottom-full mb-2 hidden group-hover:block w-[min(18rem,calc(100vw-2rem))] p-3 bg-slate-800 text-xs text-slate-200 rounded-lg shadow-xl z-50 pointer-events-none">
+                            <button 
+                                type="button"
+                                className="group relative ml-auto p-1.5 -mr-1.5 rounded-full hover:bg-slate-100 focus:outline-none focus:bg-slate-100 transition-colors"
+                            >
+                                <Info size={16} className="text-slate-400" />
+                                <div className="absolute right-0 bottom-full mb-2 hidden group-hover:block group-focus:block w-[min(20rem,calc(100vw-2rem))] p-4 bg-slate-800 text-xs text-slate-200 rounded-xl shadow-xl z-50 pointer-events-none text-left leading-relaxed font-medium">
                                     {tooltipText}
-                                    <div className="absolute right-2 top-full w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-slate-800" />
+                                    <div className="absolute right-2.5 top-full w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-slate-800" />
                                 </div>
-                            </div>
+                            </button>
                         </div>
 
                         {/* 달력 입력 */}
@@ -259,7 +270,7 @@ export default function SalesAnalysis() {
                             {quickFilters.map(q => (
                                 <button
                                     key={q.label}
-                                    onClick={() => handleQuick(q.label, q.days)}
+                                    onClick={() => handleQuick(q.label, q.type, q.val)}
                                     className={`px-3 py-1 text-xs font-medium rounded-full border transition-all ${activeQuick === q.label
                                         ? 'bg-slate-800 text-white border-slate-800'
                                         : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
@@ -282,7 +293,7 @@ export default function SalesAnalysis() {
                     </div>
 
                     {/* 병합된 총 매출 카드 */}
-                    <div className="lg:col-span-8 bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col justify-center relative overflow-hidden">
+                    <div id="tour-sales-summary" className="lg:col-span-8 bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col justify-center relative overflow-hidden">
                         <div className="absolute top-0 right-0 w-32 h-32 bg-blue-50 rounded-bl-full -z-10 opacity-50" />
                         <div className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-2">기간 내 총 매출</div>
                         <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
@@ -306,14 +317,14 @@ export default function SalesAnalysis() {
                 </div>
 
                 {/* ===== 차트 그리드 ===== */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div id="tour-sales-charts" className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
                     {/* 1. 요일별 매출 (Bar Chart) */}
                     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
                         <div className="flex items-center justify-between mb-4">
                             <h3 className="font-bold text-slate-800">요일별 매출</h3>
                             <label className="flex items-center gap-2 text-xs text-slate-500 cursor-pointer">
-                                <span>금요일 주말 포함</span>
+                                <span>금요일을 주말로 분류</span>
                                 <button
                                     onClick={() => setFridayWeekend(!fridayWeekend)}
                                     className={`relative w-8 h-4 rounded-full transition-colors ${fridayWeekend ? 'bg-indigo-500' : 'bg-slate-300'}`}
@@ -328,6 +339,7 @@ export default function SalesAnalysis() {
                                 <XAxis dataKey="weekday" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
                                 <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} tickFormatter={v => `${(Number(v) / 10000).toFixed(0)}만`} axisLine={false} tickLine={false} />
                                 <Tooltip
+                                    position={{ y: 0 }}
                                     formatter={(v: any) => [`${(Number(v) / 10000).toFixed(0)}만`, '매출']}
                                     contentStyle={{ borderRadius: 10, border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', fontSize: 13 }}
                                     cursor={{ fill: '#f8fafc' }}
@@ -359,11 +371,12 @@ export default function SalesAnalysis() {
                             )}
                         </div>
                         <ResponsiveContainer width="100%" height={260}>
-                            <LineChart data={filteredHourly} margin={{ top: 5, right: 10, left: isMobile ? 0 : 20, bottom: 5 }}>
+                            <LineChart data={filteredHourly} margin={{ top: 5, right: 10, left: isMobile ? -5 : 20, bottom: isMobile ? 15 : 5 }}>
                                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                                <XAxis dataKey="hour" tick={{ fontSize: isMobile ? 9 : 10, fill: '#64748b' }} tickFormatter={h => `${h}시`} axisLine={false} tickLine={false} interval={hourlyTickInterval} minTickGap={12} />
-                                <YAxis domain={hourlyYDomain} tick={{ fontSize: isMobile ? 9 : 10, fill: '#94a3b8' }} tickFormatter={v => isMobile ? `${Math.round(Number(v) / 10000)}만` : `${fmt(Number(v))}원`} axisLine={false} tickLine={false} width={isMobile ? 48 : 80} />
+                                <XAxis dataKey="hour" tick={{ fontSize: isMobile ? 9 : 10, fill: '#64748b' }} tickFormatter={h => `${h}시`} axisLine={false} tickLine={false} interval={hourlyTickInterval} minTickGap={isMobile ? 24 : 12} tickMargin={isMobile ? 8 : 4} />
+                                <YAxis domain={hourlyYDomain} tick={{ fontSize: isMobile ? 9 : 10, fill: '#94a3b8' }} tickFormatter={v => isMobile ? `${Math.round(Number(v) / 10000)}만` : `${fmt(Number(v))}원`} axisLine={false} tickLine={false} width={isMobile ? 36 : 80} />
                                 <Tooltip
+                                    position={{ y: 0 }}
                                     formatter={(v: any) => [`${fmt(Number(v))}원`, '매출']}
                                     labelFormatter={h => `${h}시`}
                                     contentStyle={{ borderRadius: 10, border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', fontSize: 13 }}
@@ -388,9 +401,9 @@ export default function SalesAnalysis() {
                                 />
                             </LineChart>
                         </ResponsiveContainer>
-                        <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-slate-500">
-                            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block" /> 피크 타임</span>
-                            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block" /> 최저 시간</span>
+                        <div className="mt-4 sm:mt-2 flex flex-wrap items-center gap-3 text-xs text-slate-500">
+                            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block" /> 최고 매출 시간</span>
+                            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block" /> 최저 매출 시간</span>
                         </div>
                     </div>
 
@@ -428,12 +441,39 @@ export default function SalesAnalysis() {
                     </div>
                 </div>
             </>
+        )}
 
-            {loading && (
-                <div className="fixed inset-0 bg-black/10 flex items-center justify-center z-50 pointer-events-none">
-                    <Loader2 className="w-8 h-8 animate-spin text-white" />
-                </div>
-            )}
-        </div>
-    );
+        {loading && data && (
+            <div className="fixed inset-0 bg-black/10 flex items-center justify-center z-50 pointer-events-none">
+                <Loader2 className="w-8 h-8 animate-spin text-white" />
+            </div>
+        )}
+
+        <SpotlightTour
+            tourKey="sales_analysis_page"
+            steps={[
+                {
+                    targetId: 'tour-sales-period',
+                    title: '📅 조회 기간 설정',
+                    content: '분석하고 싶은 기간을 자유롭게 설정하세요. 1주일, 1개월 등 퀵 필터를 사용하면 더 빠릅니다.',
+                    placement: 'bottom',
+                },
+                {
+                    targetId: 'tour-sales-summary',
+                    title: '💰 매출 요약 요약',
+                    content: '조회된 기간의 총 매출과 지난 동기 대비 변화율입니다. 성장이 지속되고 있는지 확인하세요.',
+                    placement: 'bottom',
+                },
+                {
+                    targetId: 'tour-sales-charts',
+                    title: '📈 요일/시간대 트렌드',
+                    content: '매출 추이를 분석하여 매장의 피크 타임을 파악하고 효율적인 운영 전략을 세워보세요.',
+                    placement: 'top',
+                },
+            ]}
+            autoStart={true}
+            showIntro={false}
+        />
+    </div>
+);
 }

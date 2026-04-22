@@ -10,6 +10,7 @@ import {
 import {
     AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from 'recharts';
+import SpotlightTour from '../components/SpotlightTour';
 
 export default function Home() {
     const { userProfile } = useAuth();
@@ -18,6 +19,7 @@ export default function Home() {
     const [loading, setLoading] = useState(true);
     const [updated_at, setLastUpdated] = useState<Date | null>(null);
     const [showRevenue, setShowRevenue] = useState(false);
+    const [tourReady, setTourReady] = useState(false);
 
     const fetchHomeData = useCallback(async (isSilent = false) => {
         try {
@@ -42,73 +44,107 @@ export default function Home() {
         return () => clearInterval(interval);
     }, [fetchHomeData]);
 
-    if (loading && !data) {
-        return (
-            <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
-                <Loader2 className="animate-spin text-blue-600" size={48} />
-                <p className="text-slate-500 font-medium">오늘의 매장 정보를 분석 중입니다...</p>
-            </div>
-        );
-    }
+    // 투어: 데이터 로드 완료 후 시작
+    useEffect(() => {
+        if (!loading && data) {
+            const t = setTimeout(() => setTourReady(true), 1000); // 1초 뒤 시작
+            return () => clearTimeout(t);
+        }
+    }, [loading, data]);
 
-    if (!data) {
-        return (
-            <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
-                <AlertTriangle className="text-amber-500" size={48} />
-                <p className="text-slate-500 font-medium">데이터를 불러오는데 실패했습니다. (백엔드 미연결)</p>
-                <button
-                    onClick={() => fetchHomeData()}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition"
-                >
-                    다시 시도
-                </button>
-            </div>
-        );
-    }
+    const MAIN_DASHBOARD_TOUR = [
+        {
+            targetId: 'tour-kpi-cards',
+            title: '📊 매장 현황 한눈에',
+            content: '사장님, 오늘 하루의 매장 현황을 한눈에 파악하세요. 방문 수, 판매 수 등 매장의 핵심 수치를 보여드립니다.',
+            placement: 'bottom' as const,
+            scrollOffset: 0.1, // 최상단에 가깝게 배치하여 말풍선 공간 확보
+        },
+        {
+            targetId: 'tour-stock-warning',
+            title: '⚠️ 긴급 재고 알림',
+            content: '안전 재고가 부족해진 품목이 있으면 여기서 바로 알려드립니다. 늦지 않게 발주를 확인하세요!',
+            placement: 'top' as const,
+        },
+        {
+            targetId: 'tour-sidebar-nav',
+            title: '📂 매장 관리의 모든 것',
+            content: '매출 분석부터 AI 수요 예측까지, 사장님의 매장 관리를 위한 모든 도구가 왼쪽 사이드바에 있습니다. 지금 바로 시작해 보세요!',
+            placement: 'right' as const,
+        },
+    ];
 
-    const { summary, hourlySales, topMenus, stockWarnings, openHour, closeHour } = data;
+    const { summary, hourlySales, topMenus, stockWarnings, openHour, closeHour } = data || {};
 
-    const filteredHourly = hourlySales.filter(h => {
+    const filteredHourly = hourlySales?.filter(h => {
         const hr = parseInt(h.hour);
-        return hr >= openHour && hr <= closeHour;
-    });
+        return hr >= (openHour ?? 0) && hr <= (closeHour ?? 24);
+    }) || [];
 
+    // 만약 오늘 주문이 0이라면 프론트엔드 레벨에서 판매 개수 및 인기 메뉴도 0/없음으로 보정
+    const hasNoOrders = summary?.todayOrders === 0;
+    
     // 오늘 판매된 총 개수 (백엔드에서 daily_sale_items SUM 집계)
-    const itemsSold = (summary as any)?.todayItemsSold ?? topMenus.reduce((acc, menu) => acc + menu.qty, 0);
+    const itemsSold = hasNoOrders ? 0 : ((summary as any)?.todayItemsSold ?? topMenus?.reduce((acc: number, menu: any) => acc + menu.qty, 0) ?? 0);
+    
+    const displayTopMenus = hasNoOrders ? [] : (topMenus || []);
 
     return (
         <div className="flex flex-col space-y-8 animate-fade-in pb-12 w-full max-w-full overflow-hidden">
-            {/* 🔹 헤더 인삿말 */}
-            <div className="flex w-full flex-col gap-3 md:flex-row md:items-end md:justify-between">
-                <div className="min-w-0">
-                    <h1 className="text-2xl font-bold leading-tight text-slate-800 md:text-3xl">
-                        {userProfile?.name} 사장님, {storeProfile.store_name}의 오늘 현황입니다.
-                    </h1>
-                    <p className="mt-1 text-sm text-slate-500 md:text-base">오늘 하루도 힘내세요! 실시간으로 매장을 모니터링 중입니다.</p>
+            {loading && !data ? (
+                <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
+                    <Loader2 className="animate-spin text-blue-600" size={48} />
+                    <p className="text-slate-500 font-medium">오늘의 매장 정보를 분석 중입니다...</p>
                 </div>
-                <div className="flex flex-wrap items-center gap-2 md:justify-end">
-                    <div className="flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-400 shadow-sm">
-                        <RefreshCcw size={12} className={loading ? 'animate-spin' : ''} />
-                        <span>최종 업데이트: {updated_at?.toLocaleTimeString()}</span>
-                    </div>
+            ) : !data ? (
+                <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
+                    <AlertTriangle className="text-amber-500" size={48} />
+                    <p className="text-slate-500 font-medium">데이터를 불러오는데 실패했습니다. (백엔드 미연결)</p>
                     <button
+                        onClick={() => fetchHomeData()}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition"
+                    >
+                        다시 시도
+                    </button>
+                </div>
+            ) : (
+                <>
+
+            {/* 🔹 헤더 인삿말 */}
+            <div className="flex w-full flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                <div className="min-w-0">
+                    <h1 className="text-xl sm:text-2xl font-bold leading-tight text-slate-800 md:text-3xl break-keep">
+                        {userProfile?.name} 사장님, <br className="hidden sm:block md:hidden" /> {storeProfile.name || '우리 매장'}의 오늘 현황입니다.
+                    </h1>
+                    <p className="mt-1.5 text-sm text-slate-500 md:text-base break-keep">오늘 하루도 힘내세요! 실시간으로 매장 상태를 모니터링 중입니다.</p>
+                </div>
+                <div className="flex w-full items-center justify-between gap-2 md:w-auto md:justify-end">
+                    <button 
+                        onClick={() => fetchHomeData(false)}
+                        className="flex min-w-0 flex-1 sm:flex-none items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-500 shadow-sm hover:bg-slate-50 transition-colors cursor-pointer focus:outline-none"
+                    >
+                        <RefreshCcw size={12} className={`shrink-0 ${loading ? 'animate-spin text-blue-600' : ''}`} />
+                        <span className="truncate">업데이트: {updated_at?.toLocaleTimeString()}</span>
+                    </button>
+                    <button
+                        id="tour-privacy-toggle"
                         onClick={() => setShowRevenue(!showRevenue)}
-                        className={`shrink-0 flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors shadow-sm ${showRevenue
+                        className={`shrink-0 flex items-center justify-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors shadow-sm w-[90px] ${showRevenue
                             ? 'bg-rose-50 text-rose-600 border-rose-200 hover:bg-rose-100'
                             : 'bg-indigo-50 text-indigo-600 border-indigo-200 hover:bg-indigo-100'
                             }`}
                         title={showRevenue ? "총매출/순수익을 숨깁니다" : "총매출/순수익을 숨김 해제합니다"}
                     >
-                        {showRevenue ? <EyeOff size={14} /> : <Eye size={14} />}
-                        {showRevenue ? "금액 숨기기" : "금액 보기"}
+                        {showRevenue ? <EyeOff size={14} className="shrink-0" /> : <Eye size={14} className="shrink-0" />}
+                        <span className="truncate">{showRevenue ? "숨기기" : "금액 보기"}</span>
                     </button>
                 </div>
             </div>
 
             {/* 🔹 최상단 KPI & 숨김 패널 그룹 (공백 최적화) */}
             <div className="flex flex-col w-full">
-                {/* 🔹 상단 요약 칩 */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full">
+                {/* 🔹 상단 요약 칩 - Tour Step 1 target */}
+                <div id="tour-kpi-cards" className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full">
                     <SummaryCard
                         title="오늘 방문(주문) 건수"
                         value={summary.todayOrders}
@@ -161,7 +197,7 @@ export default function Home() {
                         오늘의 인기 메뉴
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        {topMenus.map((menu, idx) => (
+                        {displayTopMenus.map((menu, idx) => (
                             <div key={idx} className="flex items-center gap-4 p-5 rounded-xl bg-slate-50 border border-slate-100 transition-all hover:shadow-md hover:-translate-y-1">
                                 <div className="w-12 h-12 min-w-[48px] rounded-lg bg-blue-600 text-white flex items-center justify-center font-black text-xl shadow-sm">
                                     #{idx + 1}
@@ -174,7 +210,7 @@ export default function Home() {
                                 </div>
                             </div>
                         ))}
-                        {topMenus.length === 0 && <p className="col-span-3 text-center text-slate-400 py-6 italic font-medium">아직 집계된 판매 내역이 없습니다.</p>}
+                        {displayTopMenus.length === 0 && <p className="col-span-3 text-center text-slate-400 py-6 italic font-medium">아직 집계된 판매 내역이 없습니다.</p>}
                     </div>
                 </div>
             </div>
@@ -183,29 +219,31 @@ export default function Home() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 w-full items-start">
                 {/* 좌측: 액션 카드 리스트 */}
                 <div className="flex flex-col space-y-6">
-                    <ActionCard
-                        title="긴급 재고 부족"
-                        icon={Package}
-                        count={stockWarnings.length}
-                        type="negative"
-                    >
-                        {stockWarnings.length > 0 ? (
-                            <ul className="divide-y divide-slate-100">
-                                {stockWarnings.map(item => (
-                                    <li key={item.id} className="py-3 flex justify-between items-center">
-                                        <div className="pr-4">
-                                            <span className="font-semibold text-slate-700 block">{item.name}</span>
-                                            <p className="text-xs text-slate-400 mt-0.5">현재: {item.current}{item.unit} / 안전재고: {item.safety}{item.unit}</p>
-                                        </div>
-                                        <span className="text-xs font-bold px-2 py-1 bg-red-50 text-red-600 rounded border border-red-100 whitespace-nowrap">발주 필요</span>
-                                    </li>
-                                ))}
-                            </ul>
-                        ) : (
-                            <EmptyState message="모든 재고가 충분합니다." />
-                        )}
-                    </ActionCard>
-
+                    {/* 긴급 재고 부족 - Tour Step 2 target */}
+                    <div id="tour-stock-warning">
+                        <ActionCard
+                            title="긴급 재고 부족"
+                            icon={Package}
+                            count={stockWarnings.length}
+                            type="negative"
+                        >
+                            {stockWarnings.length > 0 ? (
+                                <ul className="divide-y divide-slate-100">
+                                    {stockWarnings.map(item => (
+                                        <li key={item.id} className="py-3 flex justify-between items-center">
+                                            <div className="pr-4">
+                                                <span className="font-semibold text-slate-700 block">{item.name}</span>
+                                                <p className="text-xs text-slate-400 mt-0.5">현재: {item.current}{item.unit} / 안전재고: {item.safety}{item.unit}</p>
+                                            </div>
+                                            <span className="text-xs font-bold px-2 py-1 bg-red-50 text-red-600 rounded border border-red-100 whitespace-nowrap">발주 필요</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            ) : (
+                                <EmptyState message="모든 재고가 충분합니다." />
+                            )}
+                        </ActionCard>
+                    </div>
                 </div>
 
                 {/* 우측: 매출 차트 */}
@@ -255,9 +293,25 @@ export default function Home() {
                     </div>
                 </div>
             </div>
+        </>
+    )}
 
-
-        </div>
+    {/* 스포트라이트 투어 (단일 컴포넌트로 상시 마운트 유지) */}
+    <SpotlightTour 
+        steps={MAIN_DASHBOARD_TOUR} 
+        tourKey="home_page"
+        autoStart={tourReady} 
+        onStepChange={(idx) => {
+            // 스텝 3(index 2) 진입 시 대시보드 및 사이드바 제어
+            if (idx === 2) {
+                // 1. 매출 상세 패널 펼침
+                setShowRevenue(true);
+                // 2. 모바일/태블릿 등에서 사이드바(좌측 메뉴) 강제 오픈
+                window.dispatchEvent(new CustomEvent('erp:sidebar:open'));
+            }
+        }}
+    />
+</div>
     );
 }
 
