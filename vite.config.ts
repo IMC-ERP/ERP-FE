@@ -10,8 +10,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'icons/apple-touch-icon.png', 'robots.txt'],
       manifest: {
-        name: 'IMC Coffee ERP',
-        short_name: 'IMC ERP',
+        name: '가게살림',
+        short_name: '가게살림',
         description: '카페 매출·재고·레시피·수익성을 통합 관리하는 ERP 시스템',
         theme_color: '#1e3a5f',
         background_color: '#ffffff',
