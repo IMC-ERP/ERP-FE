@@ -8,7 +8,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'icons/apple-touch-icon.png'],
+      includeAssets: ['favicon.ico', 'icons/apple-touch-icon.png', 'robots.txt'],
       manifest: {
         name: 'IMC Coffee ERP',
         short_name: 'IMC ERP',
