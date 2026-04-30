@@ -1,5 +1,17 @@
 {
   "rewrites": [
-    { "source": "/(.*)", "destination": "/" }
+    {
+      "source": "/((?!api/|assets/|icons/|\\.well-known/|robots\\.txt|manifest\\.webmanifest|sw\\.js|workbox-.*|favicon\\.ico|registerSW\\.js|.*\\.(?:png|jpg|jpeg|svg|webp|ico|json|js|css|woff2?|ttf|map)).*)",
+      "destination": "/"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/.well-known/assetlinks.json",
+      "headers": [
+        { "key": "Content-Type", "value": "application/json" },
+        { "key": "Cache-Control", "value": "public, max-age=300" }
+      ]
+    }
   ]
 }
