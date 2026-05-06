@@ -23,6 +23,8 @@ import CostRecipeManager from './pages/CostRecipeManager';
 import Home from './pages/Home';
 import SettingsPage from './pages/SettingsPage';
 import InvitePage from './pages/InvitePage';
+import PrivacyPolicy from './pages/PrivacyPolicy';
+import AccountDeletion from './pages/AccountDeletion';
 import { startSpotlightTour } from './components/SpotlightTour';
 import './index.css';
 
@@ -169,6 +171,10 @@ function App() {
 
             {/* 초대 페이지 */}
             <Route path="/invite" element={<InvitePage />} />
+
+            {/* 공개 페이지 (Play Store 등록용, 인증 없이 접근) */}
+            <Route path="/privacy" element={<PrivacyPolicy />} />
+            <Route path="/account-deletion" element={<AccountDeletion />} />
 
             {/* 온보딩 (회원가입 후 초기 설정) */}
             <Route path="/onboarding" element={
