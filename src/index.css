@@ -8,6 +8,12 @@
 
 :root {
   --mobile-header-offset: 56px;
+  /* TWA(Play Store)에서 시스템 다크모드를 따라가지 않도록 라이트 강제 */
+  color-scheme: light;
+}
+
+html {
+  background-color: #ffffff;
 }
 
 * {
