@@ -1,0 +1,12 @@
+User-agent: *
+Allow: /
+
+# 인증/관리자 경로는 크롤링 차단
+Disallow: /login
+Disallow: /register
+Disallow: /onboarding
+Disallow: /invite
+Disallow: /settings
+Disallow: /api/
+
+Sitemap: https://imc-erp.vercel.app/sitemap.xml

@@ -1,5 +1,26 @@
 {
   "rewrites": [
-    { "source": "/(.*)", "destination": "/" }
+    { "source": "/privacy", "destination": "/privacy.html" },
+    { "source": "/account-deletion", "destination": "/account-deletion.html" },
+    {
+      "source": "/((?!api/|assets/|icons/|\\.well-known/|robots\\.txt|manifest\\.webmanifest|sw\\.js|workbox-.*|favicon\\.ico|registerSW\\.js|privacy\\.html|account-deletion\\.html|.*\\.(?:png|jpg|jpeg|svg|webp|ico|json|js|css|woff2?|ttf|map|html)).*)",
+      "destination": "/"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/.well-known/assetlinks.json",
+      "headers": [
+        { "key": "Content-Type", "value": "application/json" },
+        { "key": "Cache-Control", "value": "public, max-age=300" }
+      ]
+    },
+    {
+      "source": "/(privacy|account-deletion)(\\.html)?",
+      "headers": [
+        { "key": "Content-Type", "value": "text/html; charset=utf-8" },
+        { "key": "X-Robots-Tag", "value": "all" }
+      ]
+    }
   ]
 }

@@ -327,18 +327,19 @@ export default function RecipeSetupStep({ onNext }: any) {
       </div>
 
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm" style={{ overflow: 'visible' }}>
-        <div className="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
-          <h3 className="font-bold text-slate-800 flex items-center gap-2"><span>📋</span> 레시피 구성 (원재료) <span className="text-xs font-normal text-slate-500 ml-2">재료비 자동 계산</span></h3>
+        <div className="p-4 bg-slate-50 border-b border-slate-200 flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center">
+          <h3 className="font-bold text-slate-800 flex flex-wrap items-center gap-2"><span>📋</span> 레시피 구성 (원재료) <span className="text-xs font-normal text-slate-500 sm:ml-2">재료비 자동 계산</span></h3>
           <button 
             onClick={handleAddIngredient}
-            className="text-sm text-blue-600 font-medium px-3 py-1.5 border border-blue-200 rounded-lg hover:bg-blue-50 transition bg-white"
+            className="w-full sm:w-auto text-sm text-blue-600 font-medium px-3 py-1.5 border border-blue-200 rounded-lg hover:bg-blue-50 transition bg-white"
           >
             + 원재료 추가
           </button>
         </div>
         
         <div className="p-0" style={{ overflow: 'visible' }}>
-          <table className="w-full text-left text-sm min-w-[700px]">
+          <div className="responsive-table-shell">
+          <table className="w-full text-left text-sm min-w-[760px]">
             <thead className="bg-white border-b border-slate-200 text-slate-500 uppercase text-xs">
               <tr>
                 <th className="px-4 py-3 w-10 text-center">#</th>
@@ -444,7 +445,9 @@ export default function RecipeSetupStep({ onNext }: any) {
               )}
             </tbody>
           </table>
+          </div>
         </div>
+        <p className="responsive-table-hint px-4 py-3 sm:hidden">표는 좌우로 밀어서 확인할 수 있습니다.</p>
         
         {/* Real-time Summary Bar */}
         <div className="p-5 bg-gradient-to-r from-slate-800 to-slate-900 text-white flex flex-col md:flex-row items-center justify-between gap-4 rounded-b-xl">
@@ -483,7 +486,7 @@ export default function RecipeSetupStep({ onNext }: any) {
             </h4>
             
             {/* Category Tabs */}
-            <div className="flex gap-1 border-b border-slate-200 overflow-x-auto pb-px">
+            <div className="flex gap-1 border-b border-slate-200 overflow-x-auto pb-px scrollbar-hide">
                {['전체', ...categories].map(cat => (
                  <button
                    key={cat}
@@ -496,7 +499,8 @@ export default function RecipeSetupStep({ onNext }: any) {
             </div>
 
             <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
-              <table className="w-full text-left text-sm whitespace-nowrap">
+              <div className="responsive-table-shell">
+              <table className="w-full min-w-[540px] text-left text-sm whitespace-nowrap">
                 <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-100">
                   <tr>
                     <th className="px-6 py-4">메뉴 이름</th>
@@ -538,6 +542,7 @@ export default function RecipeSetupStep({ onNext }: any) {
                   )}
                 </tbody>
               </table>
+              </div>
             </div>
          </div>
       )}

@@ -4,9 +4,16 @@
  * Global CSS
  * Tailwind v4 + 커스텀 스타일
  */
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
 
 :root {
   --mobile-header-offset: 56px;
+  /* TWA(Play Store)에서 시스템 다크모드를 따라가지 않도록 라이트 강제 */
+  color-scheme: light;
+}
+
+html {
+  background-color: #ffffff;
 }
 
 * {
@@ -22,7 +29,7 @@ body,
 
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   -webkit-text-size-adjust: 100%;
@@ -152,7 +159,10 @@ textarea {
 .mobile-header-actions {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 8px;
+  min-width: max-content;
+  flex-shrink: 0;
 }
 
 .desktop-utility-btn,
@@ -202,10 +212,12 @@ textarea {
   max-width: 100%;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
 }
 
 .responsive-table-shell > table {
   min-width: 640px;
+  width: max(100%, 640px);
 }
 
 .responsive-table-hint {
@@ -263,9 +275,10 @@ textarea {
   height: 56px;
   background: white;
   border-bottom: 1px solid #e2e8f0;
-  display: flex;
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
+  gap: 8px;
   padding: 0 12px;
   z-index: 45;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
@@ -296,7 +309,7 @@ textarea {
   gap: 8px;
   flex: 1;
   min-width: 0;
-  justify-content: center;
+  justify-content: flex-start;
   padding: 0 8px;
   font-weight: 700;
   font-size: 0.95rem;
@@ -318,10 +331,70 @@ textarea {
 }
 
 .mobile-header-utility-btn {
-  min-width: 36px;
-  min-height: 36px;
-  padding: 0 10px;
-  font-size: 0.8rem;
+  min-width: 34px;
+  min-height: 34px;
+  padding: 0 8px;
+  font-size: 0.78rem;
+  flex-shrink: 0;
+}
+
+@media (max-width: 480px) {
+  .mobile-top-header {
+    gap: 4px;
+    padding: 0 8px;
+  }
+
+  .mobile-header-title {
+    justify-content: center;
+    padding: 0;
+  }
+
+  .mobile-header-title span {
+    display: none;
+  }
+
+  .mobile-header-actions {
+    gap: 4px;
+  }
+
+  .mobile-header-utility-btn {
+    padding: 0 7px;
+  }
+}
+
+@media (max-width: 390px) {
+  .mobile-top-header {
+    grid-template-columns: 36px minmax(0, 1fr) auto;
+    gap: 3px;
+    padding: 0 6px;
+  }
+
+  .mobile-hamburger-btn {
+    width: 36px;
+    height: 36px;
+  }
+
+  .mobile-header-title {
+    gap: 6px;
+  }
+
+  .mobile-header-actions {
+    gap: 3px;
+  }
+
+  .mobile-header-utility-btn {
+    min-width: 32px;
+    min-height: 32px;
+    padding: 0 6px;
+  }
+
+  .mobile-font-btn {
+    padding: 0;
+  }
+
+  .mobile-font-token {
+    display: none;
+  }
 }
 
 html[data-font-size="small"] {
@@ -388,28 +461,32 @@ html[data-theme="dark"] .bg-slate-100\/50 {
   background-color: #1e293b !important;
 }
 
-html[data-theme="dark"] .text-slate-800 {
-  color: #f8fafc !important;
+html[data-theme="dark"] .text-slate-900 {
+  color: #f1f5f9 !important;
 }
 
-html[data-theme="dark"] .text-slate-700 {
+html[data-theme="dark"] .text-slate-800 {
   color: #e2e8f0 !important;
 }
 
-html[data-theme="dark"] .text-slate-600 {
+html[data-theme="dark"] .text-slate-700 {
   color: #cbd5e1 !important;
 }
 
-html[data-theme="dark"] .text-slate-500 {
+html[data-theme="dark"] .text-slate-600 {
   color: #94a3b8 !important;
 }
 
-html[data-theme="dark"] .text-slate-400 {
+html[data-theme="dark"] .text-slate-500 {
   color: #64748b !important;
 }
 
-html[data-theme="dark"] .text-slate-300 {
+html[data-theme="dark"] .text-slate-400 {
   color: #475569 !important;
+}
+
+html[data-theme="dark"] .text-slate-300 {
+  color: #334155 !important;
 }
 
 html[data-theme="dark"] .border-slate-50,
@@ -462,6 +539,93 @@ html[data-theme="dark"] .bg-blue-100 {
 
 html[data-theme="dark"] .text-blue-700 {
   color: #93c5fd !important;
+}
+
+/* ========== Inventory Dark Mode Overrides ========== */
+html[data-theme="dark"] .inventory-card-new,
+html[data-theme="dark"] .category-group {
+  background-color: #0f172a;
+  border-color: #334155;
+}
+
+html[data-theme="dark"] .inventory-card-new:hover,
+html[data-theme="dark"] .category-header:hover {
+  background-color: #1e293b;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+html[data-theme="dark"] .item-name,
+html[data-theme="dark"] .category-name,
+html[data-theme="dark"] .percentage-badge,
+html[data-theme="dark"] .reorder-header h3 {
+  color: #f8fafc;
+}
+
+html[data-theme="dark"] .reorder-section {
+  background-color: #3f1a07;
+  border-color: #78350f;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
+}
+
+html[data-theme="dark"] .reorder-count {
+  background-color: #78350f;
+  color: #fcd34d;
+}
+
+html[data-theme="dark"] .category-items-badge {
+  background-color: #7f1d1d;
+  color: #fca5a5;
+}
+
+html[data-theme="dark"] .category-content {
+  border-top-color: #334155;
+}
+
+/* Inventory Receiving / History Overrides */
+html[data-theme="dark"] .intake-table-container,
+html[data-theme="dark"] .manual-input-view {
+  background-color: #0f172a;
+  border-color: #334155;
+}
+
+html[data-theme="dark"] .intake-header-inline,
+html[data-theme="dark"] .intake-table thead {
+  background: linear-gradient(135deg, #065f46 0%, #064e3b 100%);
+  color: #f8fafc;
+}
+
+html[data-theme="dark"] .intake-table tbody tr {
+  border-bottom-color: #334155;
+}
+
+html[data-theme="dark"] .intake-table tbody tr:hover {
+  background-color: #1e293b;
+}
+
+html[data-theme="dark"] .intake-header-copy {
+  color: #cbd5e1;
+}
+
+html[data-theme="dark"] .total-cell {
+  color: #34d399;
+}
+
+html[data-theme="dark"] .total-amount {
+  background-color: #064e3b;
+  color: #6ee7b7;
+}
+
+html[data-theme="dark"] .table-input,
+html[data-theme="dark"] .table-select {
+  background-color: #1e293b;
+  color: #e2e8f0;
+  border-color: #475569;
+}
+
+html[data-theme="dark"] .table-input:focus,
+html[data-theme="dark"] .table-select:focus {
+  border-color: #10b981;
+  background-color: #0f172a;
 }
 
 /* safe-area 대응 (iPhone 노치 등) */

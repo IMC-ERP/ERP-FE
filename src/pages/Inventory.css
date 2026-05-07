@@ -48,7 +48,9 @@
   margin-bottom: 12px;
   border-bottom: 2px solid #e2e8f0;
   padding-bottom: 0;
+  overflow-x: auto;
   scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
 }
 
 .tab-navigation::-webkit-scrollbar {

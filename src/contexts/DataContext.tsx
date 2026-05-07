@@ -91,14 +91,15 @@ export const DataProvider = ({ children }: { children?: ReactNode }) => {
         // <html> 요소에 테마 반영
         const html = document.documentElement;
 
-        // 1) 테마 색상
-        html.setAttribute('data-theme', appSettings.themeColor);
-
-        // 2) 다크모드
+        // 1) 다크모드 / 라이트모드 (data-theme)
         if (appSettings.darkMode) {
+            html.setAttribute('data-theme', 'dark');
             html.classList.add('dark');
+            html.style.colorScheme = 'dark';
         } else {
+            html.setAttribute('data-theme', 'light');
             html.classList.remove('dark');
+            html.style.colorScheme = 'light';
         }
 
         // 3) 폰트 사이즈
