@@ -7,7 +7,7 @@ import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useData } from '../contexts/DataContext';
 import { FileText, PlusCircle, Search, Filter, RotateCcw, Calendar, Clock, X, AlertTriangle, ArrowRight, Check, Camera, Upload, Trash2, Plus, Loader2 } from 'lucide-react';
 import { dailySalesApi, recipeCostApi, transactionsApi, manualSalesApi, hourlySalesApi } from '../services/api';
-import type { HourlyTransaction, HourlyOCRResponse } from '../services/api';
+import type { DailySales, HourlyTransaction, HourlyOCRResponse, HourlySalesRecord } from '../services/api';
 import type { RecipeCost, OCRSalesResponse, SaleItem, ManualSaleRequest } from '../types';
 
 // Order State Mapping for UI (Korean translation)
@@ -590,6 +590,243 @@ const HistoryView = () => {
                     </div>
                 </div>
             )}
+        </div>
+    );
+};
+
+
+const OcrMenuSalesHistoryView = () => {
+    const today = new Date().toISOString().split('T')[0];
+    const [records, setRecords] = useState<DailySales[]>([]);
+    const [startDate, setStartDate] = useState(today);
+    const [endDate, setEndDate] = useState(today);
+    const [loading, setLoading] = useState(false);
+    const [errorMessage, setErrorMessage] = useState('');
+
+    const fetchRecords = useCallback(async () => {
+        if (startDate && endDate && startDate > endDate) {
+            setErrorMessage('시작 날짜가 종료 날짜보다 이후입니다.');
+            setRecords([]);
+            return;
+        }
+
+        try {
+            setLoading(true);
+            setErrorMessage('');
+            const res = await dailySalesApi.getAll();
+            const filtered = res.data.filter(item =>
+                (!startDate || item.date >= startDate) &&
+                (!endDate || item.date <= endDate)
+            );
+            setRecords(filtered);
+        } catch (error: any) {
+            console.error('메뉴별 OCR 매출 내역 조회 실패:', error);
+            setErrorMessage(error?.response?.data?.detail || '메뉴별 매출 내역 조회 중 오류가 발생했습니다.');
+            setRecords([]);
+        } finally {
+            setLoading(false);
+        }
+    }, [startDate, endDate]);
+
+    useEffect(() => {
+        fetchRecords();
+    }, []);
+
+    const rows = useMemo(() => records.flatMap(record =>
+        record.sales_by_menu.map(item => ({
+            date: record.date,
+            menu: item.menu,
+            quantity: item.quantity,
+            salesAmount: item.sales_amount || 0,
+        }))
+    ), [records]);
+
+    const totalAmount = records.reduce((sum, record) => sum + (record.total_amount || 0), 0);
+    const totalQuantity = rows.reduce((sum, row) => sum + (row.quantity || 0), 0);
+
+    return (
+        <div className="space-y-4 animate-fade-in">
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                <div className="flex flex-col lg:flex-row lg:items-end gap-4 justify-between">
+                    <div>
+                        <h3 className="text-lg font-black text-slate-800">메뉴별 매출 내역</h3>
+                        <p className="text-xs text-slate-500 mt-1">메뉴별 매출 스캔으로 저장한 데이터입니다.</p>
+                    </div>
+                    <div className="flex flex-wrap items-end gap-2">
+                        <div>
+                            <label className="block text-[11px] font-black text-slate-400 mb-1">시작일</label>
+                            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold" />
+                        </div>
+                        <div>
+                            <label className="block text-[11px] font-black text-slate-400 mb-1">종료일</label>
+                            <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold" />
+                        </div>
+                        <button onClick={fetchRecords} disabled={loading} className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-black hover:bg-blue-700 disabled:opacity-50">
+                            {loading ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />}
+                            조회
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-white p-4 rounded-2xl border border-slate-200">
+                    <p className="text-xs font-bold text-slate-400">저장 일수</p>
+                    <p className="text-2xl font-black text-slate-800 mt-1">{records.length}일</p>
+                </div>
+                <div className="bg-white p-4 rounded-2xl border border-slate-200">
+                    <p className="text-xs font-bold text-slate-400">판매 수량</p>
+                    <p className="text-2xl font-black text-slate-800 mt-1">{totalQuantity.toLocaleString()}개</p>
+                </div>
+                <div className="bg-white p-4 rounded-2xl border border-slate-200">
+                    <p className="text-xs font-bold text-slate-400">총 매출</p>
+                    <p className="text-2xl font-black text-blue-600 mt-1">{totalAmount.toLocaleString()}원</p>
+                </div>
+            </div>
+
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div className="overflow-auto max-h-[700px]">
+                    <table className="w-full min-w-[640px] text-sm">
+                        <thead className="bg-slate-50 text-slate-400 text-[10px] uppercase tracking-widest sticky top-0">
+                            <tr>
+                                <th className="px-6 py-4 text-left">날짜</th>
+                                <th className="px-6 py-4 text-left">메뉴명</th>
+                                <th className="px-6 py-4 text-right">수량</th>
+                                <th className="px-6 py-4 text-right">매출</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-50">
+                            {errorMessage ? (
+                                <tr><td colSpan={4} className="p-12 text-center text-sm font-bold text-amber-600">{errorMessage}</td></tr>
+                            ) : loading ? (
+                                <tr><td colSpan={4} className="p-16 text-center text-slate-400"><Loader2 className="inline animate-spin mr-2" size={18} />데이터를 불러오는 중입니다...</td></tr>
+                            ) : rows.length === 0 ? (
+                                <tr><td colSpan={4} className="p-16 text-center text-sm font-bold text-slate-400">메뉴별 매출 내역이 없습니다.</td></tr>
+                            ) : rows.map((row, idx) => (
+                                <tr key={`${row.date}-${row.menu}-${idx}`} className="hover:bg-slate-50/70">
+                                    <td className="px-6 py-4 font-bold text-slate-700">{row.date}</td>
+                                    <td className="px-6 py-4 font-bold text-slate-800">{row.menu}</td>
+                                    <td className="px-6 py-4 text-right font-mono text-slate-600">{row.quantity.toLocaleString()}</td>
+                                    <td className="px-6 py-4 text-right font-mono font-black text-slate-900">{row.salesAmount.toLocaleString()}원</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+
+const OcrHourlySalesHistoryView = () => {
+    const today = new Date().toISOString().split('T')[0];
+    const [records, setRecords] = useState<HourlySalesRecord[]>([]);
+    const [startDate, setStartDate] = useState(today);
+    const [endDate, setEndDate] = useState(today);
+    const [loading, setLoading] = useState(false);
+    const [errorMessage, setErrorMessage] = useState('');
+
+    const fetchRecords = useCallback(async () => {
+        if (startDate && endDate && startDate > endDate) {
+            setErrorMessage('시작 날짜가 종료 날짜보다 이후입니다.');
+            setRecords([]);
+            return;
+        }
+
+        try {
+            setLoading(true);
+            setErrorMessage('');
+            const res = await hourlySalesApi.getAll({ start_date: startDate, end_date: endDate });
+            setRecords(Array.isArray(res.data) ? res.data : []);
+        } catch (error: any) {
+            console.error('시간대별 OCR 매출 내역 조회 실패:', error);
+            setErrorMessage(error?.response?.data?.detail || '시간대별 매출 내역 조회 중 오류가 발생했습니다.');
+            setRecords([]);
+        } finally {
+            setLoading(false);
+        }
+    }, [startDate, endDate]);
+
+    useEffect(() => {
+        fetchRecords();
+    }, []);
+
+    const totalAmount = records
+        .filter(record => record.orderState !== 'CANCELLED')
+        .reduce((sum, record) => sum + (record.amount || 0), 0);
+    const completedCount = records.filter(record => record.orderState !== 'CANCELLED').length;
+
+    return (
+        <div className="space-y-4 animate-fade-in">
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                <div className="flex flex-col lg:flex-row lg:items-end gap-4 justify-between">
+                    <div>
+                        <h3 className="text-lg font-black text-slate-800">시간대별 매출 내역</h3>
+                        <p className="text-xs text-slate-500 mt-1">시간대별 매출 스캔으로 저장한 건별 데이터입니다.</p>
+                    </div>
+                    <div className="flex flex-wrap items-end gap-2">
+                        <div>
+                            <label className="block text-[11px] font-black text-slate-400 mb-1">시작일</label>
+                            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold" />
+                        </div>
+                        <div>
+                            <label className="block text-[11px] font-black text-slate-400 mb-1">종료일</label>
+                            <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold" />
+                        </div>
+                        <button onClick={fetchRecords} disabled={loading} className="flex items-center gap-2 px-5 py-2.5 bg-purple-600 text-white rounded-xl text-sm font-black hover:bg-purple-700 disabled:opacity-50">
+                            {loading ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />}
+                            조회
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-white p-4 rounded-2xl border border-slate-200">
+                    <p className="text-xs font-bold text-slate-400">전체 건수</p>
+                    <p className="text-2xl font-black text-slate-800 mt-1">{records.length.toLocaleString()}건</p>
+                </div>
+                <div className="bg-white p-4 rounded-2xl border border-slate-200">
+                    <p className="text-xs font-bold text-slate-400">완료 거래</p>
+                    <p className="text-2xl font-black text-slate-800 mt-1">{completedCount.toLocaleString()}건</p>
+                </div>
+                <div className="bg-white p-4 rounded-2xl border border-slate-200">
+                    <p className="text-xs font-bold text-slate-400">총 매출</p>
+                    <p className="text-2xl font-black text-purple-600 mt-1">{totalAmount.toLocaleString()}원</p>
+                </div>
+            </div>
+
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div className="overflow-auto max-h-[700px]">
+                    <table className="w-full min-w-[640px] text-sm">
+                        <thead className="bg-slate-50 text-slate-400 text-[10px] uppercase tracking-widest sticky top-0">
+                            <tr>
+                                <th className="px-6 py-4 text-left">날짜</th>
+                                <th className="px-6 py-4 text-left">시간</th>
+                                <th className="px-6 py-4 text-center">상태</th>
+                                <th className="px-6 py-4 text-right">매출금액</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-50">
+                            {errorMessage ? (
+                                <tr><td colSpan={4} className="p-12 text-center text-sm font-bold text-amber-600">{errorMessage}</td></tr>
+                            ) : loading ? (
+                                <tr><td colSpan={4} className="p-16 text-center text-slate-400"><Loader2 className="inline animate-spin mr-2" size={18} />데이터를 불러오는 중입니다...</td></tr>
+                            ) : records.length === 0 ? (
+                                <tr><td colSpan={4} className="p-16 text-center text-sm font-bold text-slate-400">시간대별 매출 내역이 없습니다.</td></tr>
+                            ) : records.map((record) => (
+                                <tr key={record.id} className="hover:bg-slate-50/70">
+                                    <td className="px-6 py-4 font-bold text-slate-700">{record.date}</td>
+                                    <td className="px-6 py-4 font-mono text-slate-700">{record.time}</td>
+                                    <td className="px-6 py-4 text-center">{ORDER_STATE_MAP[record.orderState]?.label || record.orderState || '-'}</td>
+                                    <td className="px-6 py-4 text-right font-mono font-black text-slate-900">{record.amount.toLocaleString()}원</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
     );
 };
@@ -1726,12 +1963,34 @@ export default function TransactionManager() {
                     <FileText size={16} />
                     거래 내역
                 </button>
+                <button
+                    onClick={() => setActiveTab("menuSalesHistory")}
+                    className={`flex items-center gap-2 px-6 py-3 text-sm font-bold rounded-t-lg transition-colors whitespace-nowrap ${activeTab === "menuSalesHistory"
+                        ? "bg-white text-blue-600 border-b-2 border-blue-600"
+                        : "text-slate-500 hover:text-slate-800 hover:bg-slate-50"
+                        }`}
+                >
+                    <Camera size={16} />
+                    메뉴별 매출 내역
+                </button>
+                <button
+                    onClick={() => setActiveTab("hourlySalesHistory")}
+                    className={`flex items-center gap-2 px-6 py-3 text-sm font-bold rounded-t-lg transition-colors whitespace-nowrap ${activeTab === "hourlySalesHistory"
+                        ? "bg-white text-blue-600 border-b-2 border-blue-600"
+                        : "text-slate-500 hover:text-slate-800 hover:bg-slate-50"
+                        }`}
+                >
+                    <Clock size={16} />
+                    시간대별 매출 내역
+                </button>
 
             </div>
 
             <div className="mt-4">
                 {activeTab === "dailySalesAdd" && <DailySalesAddView />}
                 {activeTab === "history" && <HistoryView />}
+                {activeTab === "menuSalesHistory" && <OcrMenuSalesHistoryView />}
+                {activeTab === "hourlySalesHistory" && <OcrHourlySalesHistoryView />}
 
             </div>
         </div>

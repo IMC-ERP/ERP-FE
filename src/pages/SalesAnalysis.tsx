@@ -52,9 +52,8 @@ const smartYDomain = (data: number[]): [number, number] => {
 export default function SalesAnalysis() {
     const now = new Date();
     const yesterday = new Date(now); yesterday.setDate(now.getDate() - 1);
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
-    const [startDate, setStartDate] = useState(toYMD(monthStart));
+    const [startDate, setStartDate] = useState(toYMD(now));
     const [endDate, setEndDate] = useState(toYMD(now));
     const [data, setData] = useState<SalesAnalyticsResponse | null>(null);
     const [loading, setLoading] = useState(true);

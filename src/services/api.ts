@@ -869,6 +869,14 @@ export interface HourlySaveResponse {
   previousCount: number;
 }
 
+export interface HourlySalesRecord {
+  id: string;
+  date: string;
+  time: string;
+  amount: number;
+  orderState: string;
+}
+
 export const hourlySalesApi = {
   preview: (files: FileList | File[]) => {
     const formData = new FormData();
@@ -883,6 +891,8 @@ export const hourlySalesApi = {
   },
   save: (data: { date: string; transactions: HourlyTransaction[] }) =>
     api.post<HourlySaveResponse>('/sales/ocr-hourly/save', data),
+  getAll: (params?: { start_date?: string; end_date?: string }) =>
+    api.get<HourlySalesRecord[]>('/sales/ocr-hourly', { params }),
 };
 
 // ==================== Transactions API ====================
