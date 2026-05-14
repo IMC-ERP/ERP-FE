@@ -2600,7 +2600,7 @@ export default function Inventory() {
         )}
       </div>
 
-      <SpotlightTour 
+      <SpotlightTour
         steps={[
           {
             targetId: 'tour-inv-tab-overview',
@@ -2639,10 +2639,10 @@ export default function Inventory() {
             content: '원재료를 조합해 직접 만드는 소스, 청 등의 레시피와 생산 로그를 체계적으로 관리하세요.',
             placement: 'bottom' as const,
           }
-        ]} 
-        tourKey="inventory_onboarding" 
-        autoStart={true} 
-        showIntro={false} 
+        ]}
+        tourKey="inventory_onboarding"
+        autoStart={true}
+        showIntro={false}
         onStepChange={(newIdx) => {
           switch(newIdx) {
             case 0: setActiveTab('overview'); break;

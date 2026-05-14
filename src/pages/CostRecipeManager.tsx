@@ -1290,7 +1290,7 @@ export default function CostRecipeManager() {
                 )}
             </div >
 
-            <SpotlightTour 
+            <SpotlightTour
                 tourKey="cost_recipe_page"
                 steps={COST_RECIPE_TOUR_STEPS}
                 autoStart={true}

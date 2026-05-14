@@ -299,11 +299,11 @@ export default function Sales() {
         <Camera size={28} className="group-hover:rotate-12 transition-transform" />
       </button>
 
-      <SpotlightTour 
-        steps={SALES_TOUR} 
-        tourKey="sales_onboarding" 
-        autoStart={true} 
-        showIntro={false} 
+      <SpotlightTour
+        steps={SALES_TOUR}
+        tourKey="sales_onboarding"
+        autoStart={true}
+        showIntro={false}
       />
     </div>
   );

@@ -334,7 +334,7 @@ export default function SpotlightTour({
                     // 개별 스텝의 scrollOffset 사용 (없으면 기본값 0.3)
                     const offset = step.scrollOffset !== undefined ? step.scrollOffset : 0.3;
                     const targetScrollTop = absoluteTop - (window.innerHeight * offset);
-                    
+
                     window.scrollTo({
                         top: Math.max(0, targetScrollTop),
                         behavior: 'smooth'
@@ -347,7 +347,7 @@ export default function SpotlightTour({
     // 1. 초기 상태 설정 (localStorage 확인)
     useEffect(() => {
         if (!autoStart) return;
-        
+
         const isDone = localStorage.getItem(`tour_done_${tourKey}`);
 
         if (!isDone) {

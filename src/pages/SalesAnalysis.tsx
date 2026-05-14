@@ -53,9 +53,8 @@ const smartYDomain = (data: number[]): [number, number] => {
 export default function SalesAnalysis() {
     const now = new Date();
     const yesterday = new Date(now); yesterday.setDate(now.getDate() - 1);
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
-    const [startDate, setStartDate] = useState(toYMD(monthStart));
+    const [startDate, setStartDate] = useState(toYMD(now));
     const [endDate, setEndDate] = useState(toYMD(now));
     const [data, setData] = useState<SalesAnalyticsResponse | null>(null);
     const [loading, setLoading] = useState(true);
@@ -128,7 +127,7 @@ export default function SalesAnalysis() {
     const handleQuick = (label: string, type: string, val: number) => {
         const end = new Date(yesterday);
         const start = new Date(yesterday);
-        
+
         if (type === 'week') {
             start.setDate(end.getDate() - (val * 7) + 1);
         } else if (type === 'month') {
@@ -138,7 +137,7 @@ export default function SalesAnalysis() {
             start.setFullYear(end.getFullYear() - val);
             start.setDate(start.getDate() + 1);
         }
-        
+
         setStartDate(toYMD(start));
         setEndDate(toYMD(end));
         setActiveQuick(label);
@@ -232,7 +231,7 @@ export default function SalesAnalysis() {
                         <div className="flex items-center gap-2 mb-3">
                             <Calendar size={16} className="text-slate-500" />
                             <span className="text-sm font-semibold text-slate-700">조회 기간</span>
-                            <button 
+                            <button
                                 type="button"
                                 className="group relative ml-auto p-1.5 -mr-1.5 rounded-full hover:bg-slate-100 focus:outline-none focus:bg-slate-100 transition-colors"
                             >

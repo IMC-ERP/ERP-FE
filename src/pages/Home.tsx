@@ -83,10 +83,10 @@ export default function Home() {
 
     // 만약 오늘 주문이 0이라면 프론트엔드 레벨에서 판매 개수 및 인기 메뉴도 0/없음으로 보정
     const hasNoOrders = summary?.todayOrders === 0;
-    
+
     // 오늘 판매된 총 개수 (백엔드에서 daily_sale_items SUM 집계)
     const itemsSold = hasNoOrders ? 0 : ((summary as any)?.todayItemsSold ?? topMenus?.reduce((acc: number, menu: any) => acc + menu.qty, 0) ?? 0);
-    
+
     const displayTopMenus = hasNoOrders ? [] : (topMenus || []);
 
     return (
@@ -119,7 +119,7 @@ export default function Home() {
                     <p className="mt-1.5 text-sm text-slate-500 md:text-base break-keep">오늘 하루도 힘내세요! 실시간으로 매장 상태를 모니터링 중입니다.</p>
                 </div>
                 <div className="flex w-full items-center justify-between gap-2 md:w-auto md:justify-end">
-                    <button 
+                    <button
                         onClick={() => fetchHomeData(false)}
                         className="flex min-w-0 flex-1 sm:flex-none items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-500 shadow-sm hover:bg-slate-50 transition-colors cursor-pointer focus:outline-none"
                     >
@@ -297,10 +297,10 @@ export default function Home() {
     )}
 
     {/* 스포트라이트 투어 (단일 컴포넌트로 상시 마운트 유지) */}
-    <SpotlightTour 
-        steps={MAIN_DASHBOARD_TOUR} 
+    <SpotlightTour
+        steps={MAIN_DASHBOARD_TOUR}
         tourKey="home_page"
-        autoStart={tourReady} 
+        autoStart={tourReady}
         onStepChange={(idx) => {
             // 스텝 3(index 2) 진입 시 대시보드 및 사이드바 제어
             if (idx === 2) {
