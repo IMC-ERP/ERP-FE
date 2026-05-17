@@ -2194,3 +2194,195 @@ html[data-theme="dark"] .intake-footer {
   border-color: #334155;
   color: #e2e8f0;
 }
+
+/* Compact intermediate recipe accordion */
+.intermediate-recipe-row-header {
+  padding: 8px 12px !important;
+}
+
+.intermediate-recipe-row-header p {
+  margin: 0;
+  line-height: 1.25;
+}
+
+.intermediate-recipe-detail {
+  padding: 12px !important;
+}
+
+.intermediate-compact-grid {
+  gap: 8px !important;
+}
+
+.intermediate-compact-block {
+  margin-top: 8px !important;
+}
+
+.intermediate-compact-label {
+  margin-bottom: 4px !important;
+  font-size: 0.74rem !important;
+  line-height: 1.2;
+}
+
+.intermediate-recipe-detail .detail-form-input {
+  min-height: 34px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 0.86rem;
+}
+
+.intermediate-ingredient-panel {
+  margin-top: 10px !important;
+  padding: 10px !important;
+  border-radius: 10px !important;
+}
+
+.intermediate-ingredient-header {
+  margin-bottom: 8px !important;
+}
+
+.intermediate-ingredient-list {
+  display: grid;
+  gap: 8px;
+}
+
+.intermediate-ingredient-row {
+  padding: 8px !important;
+  gap: 8px !important;
+  border-radius: 10px !important;
+}
+
+.intermediate-uom-hint {
+  margin-top: 4px !important;
+  line-height: 1.2;
+}
+
+.intermediate-detail-actions {
+  margin-top: 10px !important;
+}
+
+.intermediate-detail-actions .btn,
+.intermediate-ingredient-header .btn {
+  min-height: 34px;
+  padding: 7px 12px;
+  font-size: 0.82rem;
+}
+
+.intermediate-icon-button {
+  width: 34px;
+  height: 34px;
+  padding: 0 !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.intermediate-read-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.intermediate-read-summary div {
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.intermediate-read-summary span {
+  display: block;
+  margin-bottom: 2px;
+  color: #64748b;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.intermediate-read-summary strong {
+  display: block;
+  overflow: hidden;
+  color: #0f172a;
+  font-size: 0.86rem;
+  font-weight: 800;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.intermediate-note-line {
+  margin: 0 0 8px 0;
+  padding: 7px 10px;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.intermediate-ingredient-table-wrap {
+  overflow-x: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+}
+
+.intermediate-ingredient-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #ffffff;
+  font-size: 0.82rem;
+}
+
+.intermediate-ingredient-table th,
+.intermediate-ingredient-table td {
+  padding: 7px 10px;
+  border-bottom: 1px solid #f1f5f9;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.intermediate-ingredient-table th {
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.intermediate-ingredient-table tr:last-child td {
+  border-bottom: none;
+}
+
+.intermediate-ingredient-table td:nth-child(2),
+.intermediate-ingredient-table td:nth-child(3) {
+  width: 96px;
+  color: #334155;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.intermediate-ingredient-table strong {
+  display: block;
+  color: #0f172a;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.intermediate-ingredient-table span {
+  display: block;
+  margin-top: 2px;
+  color: #94a3b8;
+  font-size: 0.72rem;
+  line-height: 1.1;
+}
+
+@media (max-width: 640px) {
+  .intermediate-read-summary {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (min-width: 768px) {
+  .intermediate-ingredient-row {
+    align-items: end;
+  }
+}

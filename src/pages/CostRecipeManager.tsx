@@ -3,9 +3,9 @@
  * GCP-ERP 스타일 원가 및 레시피 관리 - Migrated from GCP-ERP-web-build-2.0-main
  */
 
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef, useId } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronDown, ChevronRight, Plus, Trash2, DollarSign, Calculator, Archive, AlertCircle, ArrowUp, ArrowDown, X, Save } from 'lucide-react';
+import { ChevronDown, ChevronRight, Plus, Trash2, DollarSign, Calculator, Archive, AlertCircle, ArrowUp, ArrowDown, X, Save, Search } from 'lucide-react';
 import { recipeCostApi, inventoryApi, type InventoryUsageImpact } from '../services/api';
 import { supabase } from '../supabase';
 import { useAuth } from '../contexts/AuthContext';
@@ -49,10 +49,30 @@ const AddRecipeModal = ({
     const [category, setCategory] = useState(existingCategories[0] || '');
     const [newCategoryName, setNewCategoryName] = useState('');
     const [menuName, setMenuName] = useState('');
+    const [temperature, setTemperature] = useState<'ICE' | 'HOT' | 'UNIFIED'>('UNIFIED');
     const [salePrice, setSalePrice] = useState<number | ''>('');
     const [ingredients, setIngredients] = useState<RecipeIngredient[]>([]);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const [isSaving, setIsSaving] = useState(false);
+
+    useEffect(() => {
+        if (!isOpen) {
+            return;
+        }
+
+        if (existingCategories.length === 0) {
+            setMode('new');
+            setCategory('');
+            return;
+        }
+
+        setMode('existing');
+        setCategory((current) => (
+            current.trim() && existingCategories.includes(current)
+                ? current
+                : existingCategories[0]
+        ));
+    }, [isOpen, existingCategories]);
 
     if (!isOpen) return null;
 
@@ -82,11 +102,16 @@ const AddRecipeModal = ({
     const handleSave = async () => {
         const finalCategory = mode === 'new'
             ? (newCategoryName.trim() || 'Uncategorized')
-            : category;
+            : (category.trim() || existingCategories[0] || '');
+
+        const trimmedName = menuName.trim();
+        const finalName = temperature === 'UNIFIED'
+            ? trimmedName
+            : `${trimmedName}_${temperature}`;
 
         const newRecipe: Omit<MenuRecipe, 'id'> = {
             category: finalCategory,
-            name: menuName.trim(),
+            name: finalName,
             salePrice: Number(salePrice),
             ingredients: ingredients
         };
@@ -111,6 +136,7 @@ const AddRecipeModal = ({
         setCategory(existingCategories[0] || '');
         setNewCategoryName('');
         setMenuName('');
+        setTemperature('UNIFIED');
         setSalePrice('');
         setIngredients([]);
         onClose();
@@ -137,7 +163,11 @@ const AddRecipeModal = ({
                                 <input
                                     type="radio"
                                     checked={mode === 'existing'}
-                                    onChange={() => setMode('existing')}
+                                    onChange={() => {
+                                        setMode('existing');
+                                        setCategory((current) => current.trim() || existingCategories[0] || '');
+                                    }}
+                                    disabled={existingCategories.length === 0}
                                     className="text-indigo-600 focus:ring-indigo-500"
                                 />
                                 <span className="text-sm text-slate-700 group-hover:text-indigo-600 transition-colors">기존 카테고리</span>
@@ -197,6 +227,42 @@ const AddRecipeModal = ({
                         </div>
                     </div>
 
+                    {/* Temperature (ICE/HOT/통합) */}
+                    <div>
+                        <label className="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide">온도 구분</label>
+                        <div className="grid grid-cols-3 gap-2">
+                            {([
+                                { value: 'ICE', label: 'ICE', suffix: '_ICE', activeClass: 'bg-sky-50 border-sky-400 text-sky-700' },
+                                { value: 'HOT', label: 'HOT', suffix: '_HOT', activeClass: 'bg-rose-50 border-rose-400 text-rose-700' },
+                                { value: 'UNIFIED', label: '통합', suffix: '(접미사 없음)', activeClass: 'bg-indigo-50 border-indigo-400 text-indigo-700' },
+                            ] as const).map((option) => {
+                                const isActive = temperature === option.value;
+                                return (
+                                    <button
+                                        key={option.value}
+                                        type="button"
+                                        onClick={() => setTemperature(option.value)}
+                                        className={`px-3 py-2.5 rounded-lg text-sm font-bold border transition-colors ${isActive
+                                            ? option.activeClass
+                                            : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
+                                            }`}
+                                    >
+                                        <div>{option.label}</div>
+                                        <div className="text-[10px] font-medium text-slate-400 mt-0.5">{option.suffix}</div>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                        {menuName.trim() && (
+                            <p className="mt-2 text-xs text-slate-500">
+                                저장될 이름:{' '}
+                                <span className="font-mono font-semibold text-slate-700">
+                                    {temperature === 'UNIFIED' ? menuName.trim() : `${menuName.trim()}_${temperature}`}
+                                </span>
+                            </p>
+                        )}
+                    </div>
+
                     {/* Ingredients Section */}
                     <div>
                         <label className="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide">레시피 구성</label>
@@ -245,6 +311,7 @@ const AddRecipeModal = ({
 interface RecipeRowProps {
     recipe: MenuRecipe;
     materials: RawMaterial[];
+    categoryOptions: string[];
     expandedRecipeId: string | null;
     setExpandedRecipeId: (id: string | null) => void;
     onDelete: (id: string) => void;
@@ -260,6 +327,7 @@ interface RecipeRowProps {
 const RecipeRow = ({
     recipe,
     materials,
+    categoryOptions,
     expandedRecipeId,
     setExpandedRecipeId,
     onDelete,
@@ -275,6 +343,7 @@ const RecipeRow = ({
     const totalCost = getResolvedRecipeCost(recipe, materials);
     const cogsRatio = getResolvedRecipeCostRatio(recipe, materials);
     const missingIngredients = recipe.ingredients.filter((ing) => !materials.some((material) => material.id === ing.materialId));
+    const categoryDatalistId = useId();
 
     let statusColor = "bg-green-100 text-green-700 border-green-200";
     if (cogsRatio >= 30) statusColor = "bg-red-100 text-red-700 border-red-200";
@@ -326,6 +395,22 @@ const RecipeRow = ({
                                 onChange={(e) => onUpdateMeta(recipe.id, 'name', e.target.value)}
                                 className="w-full p-2 border border-slate-300 rounded text-sm"
                             />
+                        </div>
+                        <div className="w-full sm:w-56">
+                            <label className="block text-xs font-bold text-slate-500 mb-1">카테고리 수정</label>
+                            <input
+                                type="text"
+                                list={categoryDatalistId}
+                                value={recipe.category}
+                                onChange={(e) => onUpdateMeta(recipe.id, 'category', e.target.value)}
+                                className="w-full p-2 border border-slate-300 rounded text-sm"
+                                placeholder="카테고리 입력"
+                            />
+                            <datalist id={categoryDatalistId}>
+                                {categoryOptions.map((category) => (
+                                    <option key={category} value={category} />
+                                ))}
+                            </datalist>
                         </div>
                         <div className="w-full sm:w-48">
                             <label className="block text-xs font-bold text-slate-500 mb-1">판매가 (원)</label>
@@ -476,7 +561,9 @@ const MaterialTable = ({ materials, dirtyMaterialIds, onUpdate, onDelete, onSave
                                     <td className="px-6 py-3 text-right font-mono text-blue-600 bg-blue-50/30 font-bold whitespace-nowrap">
                                         <div className="space-y-1">
                                             <div>{formatUnitCost(getUnitPrice(mat), mat.unit)}</div>
-                                            <div className="text-[11px] font-medium text-slate-400 whitespace-nowrap">구매가/용량 기준</div>
+                                            <div className="text-[11px] font-medium text-slate-400 whitespace-nowrap">
+                                                {mat.itemType?.toLowerCase() === 'prep' ? '중간재 단가 기준' : '구매가/용량 기준'}
+                                            </div>
                                         </div>
                                     </td>
                                     <td className="px-6 py-3 text-right text-slate-600 whitespace-nowrap">
@@ -585,7 +672,8 @@ export default function CostRecipeManager() {
                 purchaseUnitQty: (item.purchase_unit_qty ?? 0) > 0 ? Number(item.purchase_unit_qty) : 1,
                 unitCost: Number(item.unit_cost ?? 0),
                 unit: item.uom || 'ea',
-                currentStock: item.quantity_on_hand
+                currentStock: item.quantity_on_hand,
+                itemType: item.item_type ?? null,
             }));
             setMaterials((prev) => {
                 const dirtyIds = dirtyMaterialIdsRef.current;
@@ -642,6 +730,7 @@ export default function CostRecipeManager() {
     }, []);
 
     const [sortConfig, setSortConfig] = useState<{ key: 'name' | 'cogs'; direction: 'asc' | 'desc' }>({ key: 'name', direction: 'asc' });
+    const [recipeSearch, setRecipeSearch] = useState('');
     const [expandedRecipeId, setExpandedRecipeId] = useState<string | null>(null);
     const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
 
@@ -738,6 +827,9 @@ export default function CostRecipeManager() {
         });
     };
 
+    const normalizedRecipeSearch = recipeSearch.trim().toLocaleLowerCase('ko-KR');
+    const hasRecipeSearch = normalizedRecipeSearch.length > 0;
+
     const groupedRecipes = useMemo(() => {
         const sorted = [...recipes].sort((a, b) => {
             if (sortConfig.key === 'name') {
@@ -754,15 +846,30 @@ export default function CostRecipeManager() {
             }
         });
 
+        const filtered = hasRecipeSearch
+            ? sorted.filter(recipe => {
+                const ingredientNames = recipe.ingredients
+                    .map(ing => materials.find(m => m.id === ing.materialId)?.name ?? ing.materialId)
+                    .join(' ');
+                const haystack = `${recipe.name} ${recipe.category} ${ingredientNames}`.toLocaleLowerCase('ko-KR');
+                return haystack.includes(normalizedRecipeSearch);
+            })
+            : sorted;
+
         const groups: Record<string, MenuRecipe[]> = {};
-        sorted.forEach(recipe => {
+        filtered.forEach(recipe => {
             const cat = recipe.category || 'Uncategorized';
             if (!groups[cat]) groups[cat] = [];
             groups[cat].push(recipe);
         });
 
         return groups;
-    }, [recipes, materials, sortConfig]);
+    }, [recipes, materials, sortConfig, normalizedRecipeSearch, hasRecipeSearch]);
+
+    const filteredRecipeCount = useMemo(
+        () => Object.values(groupedRecipes).reduce((sum, list) => sum + list.length, 0),
+        [groupedRecipes],
+    );
 
     // --- Handlers: Materials ---
     const handleUpdateMaterial = (id: string, field: keyof RawMaterial, value: string | number) => {
@@ -779,15 +886,25 @@ export default function CostRecipeManager() {
 
         try {
             setSavingMaterialId(material.id);
-            await inventoryApi.update(material.id, {
-                id: material.name.trim(),
-                category: material.category.trim(),
-                quantity_on_hand: material.currentStock,
-                uom: material.unit,
-                unit_cost: getUnitPrice(material),
-                purchase_price: material.purchasePrice,
-                purchase_unit_qty: material.purchaseUnitQty,
-            });
+            const payload = material.itemType?.toLowerCase() === 'prep'
+                ? {
+                    id: material.name.trim(),
+                    category: material.category.trim(),
+                    quantity_on_hand: material.currentStock,
+                    uom: material.unit,
+                    unit_cost: getUnitPrice(material),
+                }
+                : {
+                    id: material.name.trim(),
+                    category: material.category.trim(),
+                    quantity_on_hand: material.currentStock,
+                    uom: material.unit,
+                    unit_cost: getUnitPrice(material),
+                    purchase_price: material.purchasePrice,
+                    purchase_unit_qty: material.purchaseUnitQty,
+                };
+
+            await inventoryApi.update(material.id, payload);
             clearMaterialDirty(material.id);
             await fetchData({ silent: true });
             alert("원재료 정보가 저장되었습니다.");
@@ -919,6 +1036,7 @@ export default function CostRecipeManager() {
             await recipeCostApi.update(recipe.id, buildRecipePayload(recipe, materials));
             alert(`'${recipe.name}' 레시피가 저장되었습니다.`);
             clearRecipeDirty(recipe.id);
+            setExpandedCategories((prev) => new Set(prev).add(recipe.category.trim() || 'Uncategorized'));
             await fetchData({ silent: true });
             setExpandedRecipeId(recipe.name);
         } catch (error) {
@@ -1179,6 +1297,7 @@ export default function CostRecipeManager() {
                                                 key={`danger-${recipe.id}`}
                                                 recipe={recipe}
                                                 materials={materials}
+                                                categoryOptions={uniqueRecipeCategories}
                                                 expandedRecipeId={expandedRecipeId}
                                                 setExpandedRecipeId={setExpandedRecipeId}
                                                 onDelete={handleDeleteRecipe}
@@ -1195,6 +1314,26 @@ export default function CostRecipeManager() {
                                 )}
                             </div>
                         )}
+
+                        {/* Search */}
+                        <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                            <label className="relative block w-full sm:max-w-sm">
+                                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                <input
+                                    type="text"
+                                    className="w-full rounded-lg border border-slate-300 bg-white pr-3 py-2 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                                    style={{ paddingLeft: '2.25rem' }}
+                                    placeholder="메뉴/카테고리/원재료명 검색"
+                                    value={recipeSearch}
+                                    onChange={(e) => setRecipeSearch(e.target.value)}
+                                />
+                            </label>
+                            {hasRecipeSearch && (
+                                <span className="text-xs font-semibold text-slate-500">
+                                    {filteredRecipeCount}/{recipes.length}개 일치
+                                </span>
+                            )}
+                        </div>
 
                         {/* Sort Controls */}
                         <div className="flex flex-wrap justify-end gap-2 mb-2">
@@ -1220,7 +1359,7 @@ export default function CostRecipeManager() {
                         </div>
 
                         {Object.entries(groupedRecipes).map(([category, categoryRecipes]) => {
-                            const isCategoryExpanded = expandedCategories.has(category);
+                            const isCategoryExpanded = hasRecipeSearch ? true : expandedCategories.has(category);
 
                             return (
                                 <div key={category} className="mb-4 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
@@ -1244,6 +1383,7 @@ export default function CostRecipeManager() {
                                                     key={recipe.id}
                                                     recipe={recipe}
                                                     materials={materials}
+                                                    categoryOptions={uniqueRecipeCategories}
                                                     expandedRecipeId={expandedRecipeId}
                                                     setExpandedRecipeId={setExpandedRecipeId}
                                                     onDelete={handleDeleteRecipe}
@@ -1262,11 +1402,15 @@ export default function CostRecipeManager() {
                             );
                         })}
                         {
-                            recipes.length === 0 && (
+                            recipes.length === 0 ? (
                                 <div className="text-center p-12 bg-slate-50 rounded-xl border border-dashed border-slate-300 text-slate-400">
                                     등록된 메뉴가 없습니다. 우측 상단 버튼을 눌러 메뉴를 추가하세요.
                                 </div>
-                            )
+                            ) : hasRecipeSearch && filteredRecipeCount === 0 ? (
+                                <div className="text-center p-12 bg-slate-50 rounded-xl border border-dashed border-slate-300 text-slate-400">
+                                    "{recipeSearch}"와(과) 일치하는 메뉴가 없습니다.
+                                </div>
+                            ) : null
                         }
                     </div >
                 )}
