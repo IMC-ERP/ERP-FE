@@ -13,7 +13,6 @@ import OnboardingLayout from './pages/onboarding/OnboardingLayout';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import Dashboard from './pages/Dashboard';
-import Sales from './pages/Sales';
 import Inventory from './pages/Inventory';
 import Recipes from './pages/Recipes';
 import AIAssistant from './pages/AIAssistant';
@@ -92,16 +91,6 @@ const HelpPage = () => {
               </div>
             </button>
             <button
-              onClick={() => handleStartTour('/sales', 'sales_onboarding')}
-              className="flex items-center gap-4 p-4 rounded-xl border border-slate-200 hover:border-blue-600 hover:bg-blue-50 transition-all text-left group bg-white shadow-sm"
-            >
-              <div className="w-12 h-12 rounded-lg bg-blue-600/10 text-blue-600 flex items-center justify-center text-xl group-hover:scale-110 transition-transform shadow-sm">🛒</div>
-              <div>
-                <div className="font-bold text-slate-800">매출 등록 내역</div>
-                <div className="text-xs text-slate-500">수기 입력 및 데이터 조회</div>
-              </div>
-            </button>
-            <button
               onClick={() => handleStartTour('/period', 'sales_analysis_page')}
               className="flex items-center gap-4 p-4 rounded-xl border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50 transition-all text-left group bg-white shadow-sm"
             >
@@ -138,7 +127,7 @@ const HelpPage = () => {
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
             <h3 className="text-sm font-bold text-slate-800">빠른 시작 팁</h3>
             <p className="mt-2 text-sm leading-relaxed text-slate-500">
-              홈에서 지표를 확인하고, 매출 입력과 거래 데이터 관리에서 데이터 상태를 먼저 검증하세요.
+              홈에서 지표를 확인하고, 거래 데이터 관리에서 데이터 상태를 먼저 검증하세요.
             </p>
           </div>
           <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4">
@@ -195,7 +184,7 @@ function App() {
               <Route path="dashboard" element={<Dashboard />} />
               <Route path="period" element={<SalesAnalysis />} />
               <Route path="transactions" element={<TransactionManager />} />
-              <Route path="sales" element={<Sales />} />
+              <Route path="sales" element={<Navigate to="/" replace />} />
               <Route path="inventory" element={<Inventory />} />
               <Route path="cost-recipe" element={<CostRecipeManager />} />
               <Route path="recipes" element={<Recipes />} />

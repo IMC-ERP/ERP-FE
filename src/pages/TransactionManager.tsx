@@ -3,7 +3,7 @@
  * GCP-ERP 스타일 거래 데이터 관리 - Migrated from GCP-ERP-web-build-2.0-main
  */
 
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { Fragment, useState, useMemo, useEffect, useCallback } from 'react';
 import { useData } from '../contexts/DataContext';
 import { FileText, PlusCircle, Search, Filter, RotateCcw, Calendar, Clock, X, AlertTriangle, ArrowRight, Check, Camera, Upload, Trash2, Plus, Loader2 } from 'lucide-react';
 import { dailySalesApi, recipeCostApi, transactionsApi, manualSalesApi, hourlySalesApi } from '../services/api';
@@ -20,6 +20,18 @@ const ORDER_STATE_MAP: Record<string, { label: string; color: string }> = {
     'UNDEFINED': { label: '알 수 없음', color: 'bg-slate-100 text-slate-700 border-slate-200' }
 };
 
+const toLocalDateInputValue = (date: Date) =>
+    `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+
+const getCurrentMonthDateRange = () => {
+    const today = new Date();
+    const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+    return {
+        start: toLocalDateInputValue(firstDay),
+        end: toLocalDateInputValue(today),
+    };
+};
+
 // --- Sub-component: Transaction History ---
 const HistoryView = () => {
     const { updateSale } = useData();
@@ -30,8 +42,9 @@ const HistoryView = () => {
     const [errorMessage, setErrorMessage] = useState<string>('');
 
     // Filter States
-    const [startDate, setStartDate] = useState<string>(new Date().toISOString().split('T')[0]); // Default Today
-    const [endDate, setEndDate] = useState<string>(new Date().toISOString().split('T')[0]);   // Default Today
+    const defaultDateRange = useMemo(() => getCurrentMonthDateRange(), []);
+    const [startDate, setStartDate] = useState<string>(defaultDateRange.start);
+    const [endDate, setEndDate] = useState<string>(defaultDateRange.end);
     const [startTime, setStartTime] = useState<string>('');
     const [endTime, setEndTime] = useState<string>('');
     const [selectedCategory, setSelectedCategory] = useState<string>('All');
@@ -93,11 +106,11 @@ const HistoryView = () => {
 
     // Auto-refresh Logic (1 minute interval if viewing today)
     useEffect(() => {
-        const todayStr = new Date().toISOString().split('T')[0];
-        const isToday = startDate === todayStr && endDate === todayStr;
+        const todayStr = toLocalDateInputValue(new Date());
+        const includesToday = endDate === todayStr;
 
         let interval: any = null;
-        if (isToday && !loading) {
+        if (includesToday && !loading) {
             interval = setInterval(() => {
                 console.log('[TransactionManager] Auto-refreshing today\'s data...');
                 fetchTransactions();
@@ -123,9 +136,9 @@ const HistoryView = () => {
     };
 
     const handleReset = () => {
-        const today = new Date().toISOString().split('T')[0];
-        setStartDate(today);
-        setEndDate(today);
+        const currentMonthRange = getCurrentMonthDateRange();
+        setStartDate(currentMonthRange.start);
+        setEndDate(currentMonthRange.end);
         setStartTime('');
         setEndTime('');
         setSelectedCategory('All');
@@ -597,10 +610,10 @@ const HistoryView = () => {
 
 
 const OcrMenuSalesHistoryView = () => {
-    const today = new Date().toISOString().split('T')[0];
+    const defaultDateRange = useMemo(() => getCurrentMonthDateRange(), []);
     const [records, setRecords] = useState<DailySales[]>([]);
-    const [startDate, setStartDate] = useState(today);
-    const [endDate, setEndDate] = useState(today);
+    const [startDate, setStartDate] = useState(defaultDateRange.start);
+    const [endDate, setEndDate] = useState(defaultDateRange.end);
     const [loading, setLoading] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
 
@@ -721,10 +734,10 @@ const OcrMenuSalesHistoryView = () => {
 
 
 const OcrHourlySalesHistoryView = () => {
-    const today = new Date().toISOString().split('T')[0];
+    const defaultDateRange = useMemo(() => getCurrentMonthDateRange(), []);
     const [records, setRecords] = useState<HourlySalesRecord[]>([]);
-    const [startDate, setStartDate] = useState(today);
-    const [endDate, setEndDate] = useState(today);
+    const [startDate, setStartDate] = useState(defaultDateRange.start);
+    const [endDate, setEndDate] = useState(defaultDateRange.end);
     const [loading, setLoading] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
 
@@ -839,6 +852,8 @@ const DailySalesAddView = () => {
     const [mode, setMode] = useState<'select' | 'ocr' | 'manual' | 'hourly'>('select');
     const [ocrResult, setOcrResult] = useState<OCRSalesResponse | null>(null);
     const [isOcrLoading, setIsOcrLoading] = useState(false);
+    const [isOcrSaving, setIsOcrSaving] = useState(false);
+    const [isOcrDragging, setIsOcrDragging] = useState(false);
     const [recipes, setRecipes] = useState<RecipeCost[]>([]);
     const [date, setDate] = useState<string>(new Date().toISOString().split('T')[0]);
     const [manualItems, setManualItems] = useState<Array<{ menu: string; menuId: string; quantity: number; selling_price: number; totalCost: number }>>([
@@ -852,6 +867,8 @@ const DailySalesAddView = () => {
     // 시간대별 매출 OCR state
     const [hourlyResult, setHourlyResult] = useState<HourlyOCRResponse | null>(null);
     const [isHourlyLoading, setIsHourlyLoading] = useState(false);
+    const [isHourlySaving, setIsHourlySaving] = useState(false);
+    const [isHourlyDragging, setIsHourlyDragging] = useState(false);
     const [hourlyDate, setHourlyDate] = useState<string>(new Date().toISOString().split('T')[0]);
 
     // Load recipes on mount
@@ -862,6 +879,15 @@ const DailySalesAddView = () => {
             console.error('레시피 조회 실패:', err);
         });
     }, []);
+
+    const getRecipeDisplayName = (recipe: any) => recipe.name || recipe.menu_name || '';
+    const getRecipePrice = (recipe: any) => Number(recipe.price ?? recipe.selling_price ?? 0);
+    const normalizeMenuName = (value: string) => value.trim().toLowerCase();
+    const findRecipeByMenu = (menuName: string) => {
+        const normalizedMenuName = normalizeMenuName(menuName || '');
+        if (!normalizedMenuName) return undefined;
+        return recipes.find((recipe: any) => normalizeMenuName(getRecipeDisplayName(recipe)) === normalizedMenuName);
+    };
 
     // 외부 클릭 시 드롭다운 닫기
     useEffect(() => {
@@ -913,11 +939,11 @@ const DailySalesAddView = () => {
             } else {
                 // 인식 성공
                 const matchedSales = data.sales_by_menu.map((item: any) => {
-                    const matchedRecipe = recipes.find(r => r.name === item.menu);
+                    const matchedRecipe = findRecipeByMenu(item.menu);
                     if (matchedRecipe) {
                         return {
                             ...item,
-                            sales_amount: matchedRecipe.price * item.quantity
+                            sales_amount: getRecipePrice(matchedRecipe) * item.quantity
                         };
                     }
                     // 매칭 실패 시 기존 값(OCR이 준 값, 보통 0) 유지
@@ -943,6 +969,12 @@ const DailySalesAddView = () => {
         }
     };
 
+    const handleOcrDrop = (event: React.DragEvent<HTMLDivElement>) => {
+        event.preventDefault();
+        setIsOcrDragging(false);
+        void handleOcrFileChange(event.dataTransfer.files);
+    };
+
     // OCR 결과 수정
     const handleOcrResultChange = (index: number, field: 'menu' | 'quantity', value: string | number) => {
         if (!ocrResult) return;
@@ -956,11 +988,11 @@ const DailySalesAddView = () => {
         if (field === 'quantity') newQuantity = Number(value);
 
         // 레시피 매칭 및 가격 업데이트
-        const matchedRecipe = recipes.find(r => r.name === newMenu);
+        const matchedRecipe = findRecipeByMenu(newMenu);
         let newSalesAmount = currentItem.sales_amount || 0;
 
         if (matchedRecipe) {
-            newSalesAmount = matchedRecipe.price * newQuantity;
+            newSalesAmount = getRecipePrice(matchedRecipe) * newQuantity;
         } else {
             // 매칭되지 않은 경우, 기존 단가(있다면)를 유지하며 수량에 따라 계산
             const existingUnitPrice = currentItem.quantity > 0 ? (currentItem.sales_amount || 0) / currentItem.quantity : 0;
@@ -971,7 +1003,9 @@ const DailySalesAddView = () => {
             ...currentItem,
             menu: newMenu,
             quantity: newQuantity,
-            sales_amount: newSalesAmount
+            sales_amount: newSalesAmount,
+            matched: matchedRecipe ? true : false,
+            original_name: matchedRecipe ? null : (currentItem.original_name || newMenu)
         };
         setOcrResult(updated);
     };
@@ -983,7 +1017,9 @@ const DailySalesAddView = () => {
         updated.sales_by_menu.push({
             menu: '',
             quantity: 1,
-            sales_amount: 0
+            sales_amount: 0,
+            matched: false,
+            original_name: ''
         });
         setOcrResult(updated);
     };
@@ -1003,20 +1039,50 @@ const DailySalesAddView = () => {
         const currentItem = updated.sales_by_menu[index];
 
         updated.sales_by_menu[index] = {
-            menu: recipe.name,
+            menu: getRecipeDisplayName(recipe),
             quantity: currentItem.quantity,
-            sales_amount: recipe.price * currentItem.quantity
+            sales_amount: getRecipePrice(recipe) * currentItem.quantity,
+            matched: true,
+            original_name: null
         };
 
         setOcrResult(updated);
         setActiveMenuIndex(null);
     };
 
+    const getOcrRowStatus = (item: any) => {
+        const registeredRecipe = findRecipeByMenu(item.menu);
+        const isUnregistered = item.matched === false && !registeredRecipe;
+        const originalName = item.original_name || '';
+        const isAutoMatched = !isUnregistered && Boolean(originalName) && originalName !== item.menu;
+
+        if (isUnregistered) {
+            return {
+                kind: 'unregistered',
+                rowClass: 'bg-rose-50/80 border-rose-100',
+                messageClass: 'bg-rose-50 border-rose-200 text-rose-700',
+                message: `"${item.menu || originalName || '빈 메뉴'}"은(는) 아직 원가/레시피 관리에 등록되지 않은 메뉴입니다. 저장하려면 등록된 메뉴로 선택하거나 먼저 메뉴를 등록해주세요.`
+            };
+        }
+
+        if (isAutoMatched) {
+            return {
+                kind: 'auto-matched',
+                rowClass: 'bg-amber-50/80 border-amber-100',
+                messageClass: 'bg-amber-50 border-amber-200 text-amber-700',
+                message: `OCR에서 "${originalName}"로 인식했고, 등록 메뉴 "${item.menu}"로 자동 매칭했습니다. 맞는 메뉴인지 확인해주세요.`
+            };
+        }
+
+        return null;
+    };
+
     // OCR 데이터 저장 → daily_sales 테이블 (메뉴별 매출 메인 데이터)
     const handleSaveOcrData = async () => {
-        if (!ocrResult) return;
+        if (!ocrResult || isOcrSaving) return;
 
         try {
+            setIsOcrSaving(true);
             const salesDate = ocrResult.date || date;
             const salesByMenu = ocrResult.sales_by_menu.map((item: any) => ({
                 menu: item.menu,
@@ -1039,6 +1105,8 @@ const DailySalesAddView = () => {
             setOcrResult(null);
         } catch (error: any) {
             showAlert('저장 실패: ' + (error.response?.data?.detail || error.message), 'error');
+        } finally {
+            setIsOcrSaving(false);
         }
     };
 
@@ -1147,6 +1215,12 @@ const DailySalesAddView = () => {
         }
     };
 
+    const handleHourlyDrop = (event: React.DragEvent<HTMLDivElement>) => {
+        event.preventDefault();
+        setIsHourlyDragging(false);
+        void handleHourlyOcrUpload(event.dataTransfer.files);
+    };
+
     const handleHourlyResultChange = (index: number, field: 'time' | 'amount', value: string | number) => {
         if (!hourlyResult) return;
         const updated = { ...hourlyResult };
@@ -1184,9 +1258,10 @@ const DailySalesAddView = () => {
     };
 
     const handleSaveHourlyData = async () => {
-        if (!hourlyResult || hourlyResult.transactions.length === 0) return;
+        if (!hourlyResult || hourlyResult.transactions.length === 0 || isHourlySaving) return;
 
         try {
+            setIsHourlySaving(true);
             const response = await hourlySalesApi.save({
                 date: hourlyDate,
                 transactions: hourlyResult.transactions,
@@ -1204,6 +1279,8 @@ const DailySalesAddView = () => {
             setHourlyResult(null);
         } catch (error: any) {
             showAlert('저장 실패: ' + (error.response?.data?.detail || error.message), 'error');
+        } finally {
+            setIsHourlySaving(false);
         }
     };
 
@@ -1264,22 +1341,13 @@ const DailySalesAddView = () => {
                                     자동으로 매출 목록을 생성합니다.
                                 </p>
 
-                                <div className="relative">
-                                    <input
-                                        type="file"
-                                        accept="image/*"
-                                        multiple
-                                        onChange={(e) => handleOcrFileChange(e.target.files)}
-                                        className="hidden"
-                                        id="ocr-upload"
-                                    />
-                                    <label
-                                        htmlFor="ocr-upload"
-                                        className="block w-full py-3 bg-blue-600 text-white font-bold text-center rounded-xl hover:bg-blue-700 cursor-pointer transition-colors shadow-lg shadow-blue-200"
-                                    >
-                                        스캔 시작하기
-                                    </label>
-                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setMode('ocr')}
+                                    className="block w-full py-3 bg-blue-600 text-white font-bold text-center rounded-xl hover:bg-blue-700 transition-colors shadow-lg shadow-blue-200"
+                                >
+                                    스캔 시작하기
+                                </button>
                             </div>
                         </div>
 
@@ -1298,22 +1366,13 @@ const DailySalesAddView = () => {
                                     시간대별 매출 데이터를 등록합니다.
                                 </p>
 
-                                <div className="relative">
-                                    <input
-                                        type="file"
-                                        accept="image/*"
-                                        multiple
-                                        onChange={(e) => handleHourlyOcrUpload(e.target.files)}
-                                        className="hidden"
-                                        id="hourly-ocr-upload"
-                                    />
-                                    <label
-                                        htmlFor="hourly-ocr-upload"
-                                        className="block w-full py-3 bg-purple-600 text-white font-bold text-center rounded-xl hover:bg-purple-700 cursor-pointer transition-colors shadow-lg shadow-purple-200"
-                                    >
-                                        스캔 시작하기
-                                    </label>
-                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setMode('hourly')}
+                                    className="block w-full py-3 bg-purple-600 text-white font-bold text-center rounded-xl hover:bg-purple-700 transition-colors shadow-lg shadow-purple-200"
+                                >
+                                    스캔 시작하기
+                                </button>
                             </div>
                         </div>
 
@@ -1364,13 +1423,26 @@ const DailySalesAddView = () => {
                     </button>
                 </div>
 
-                {!ocrResult && (
-                    <div className="bg-white p-8 rounded-2xl border-2 border-dashed border-slate-300 hover:border-blue-400 transition-colors">
+                {!ocrResult && !isOcrLoading && (
+                    <div
+                        className={`bg-white p-8 rounded-2xl border-2 border-dashed transition-colors ${isOcrDragging ? 'border-blue-500 bg-blue-50' : 'border-slate-300 hover:border-blue-400'}`}
+                        onDragOver={(event) => {
+                            event.preventDefault();
+                            setIsOcrDragging(true);
+                        }}
+                        onDragLeave={() => setIsOcrDragging(false)}
+                        onDrop={handleOcrDrop}
+                    >
                         <div className="flex flex-col items-center text-center space-y-4">
-                            <Upload className="text-slate-400" size={48} />
-                            <p className="text-sm text-slate-500">
-                                사진을 이곳에 끌어다 놓거나 클릭하세요
-                            </p>
+                            <Upload className={isOcrDragging ? 'text-blue-500' : 'text-slate-400'} size={48} />
+                            <div>
+                                <p className="text-sm font-bold text-slate-700 mb-1">
+                                    메뉴별 매출 사진을 이곳에 끌어다 놓으세요
+                                </p>
+                                <p className="text-xs text-slate-500">
+                                    드롭하면 바로 이미지 인식이 시작됩니다. JPG, PNG 이미지를 여러 장 올릴 수 있습니다.
+                                </p>
+                            </div>
                             <input
                                 type="file"
                                 accept="image/jpeg,image/png"
@@ -1383,7 +1455,7 @@ const DailySalesAddView = () => {
                                 htmlFor="ocr-file-input"
                                 className="px-6 py-3 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 cursor-pointer transition-colors"
                             >
-                                파일 선택
+                                파일 업로드
                             </label>
                         </div>
                     </div>
@@ -1399,10 +1471,16 @@ const DailySalesAddView = () => {
 
                 {ocrResult && !isOcrLoading && (
                     <div className="bg-white p-6 rounded-2xl border border-slate-200 space-y-4">
-                        {ocrResult.warnings.length > 0 && (
+                        {ocrResult.warnings.filter((warning: string) => (
+                            !warning.includes('아직 등록되지 않은 메뉴입니다')
+                            && !warning.includes('로 매칭했습니다')
+                        )).length > 0 && (
                             <div className="bg-amber-50 border border-amber-200 p-4 rounded-lg">
                                 <p className="text-sm font-bold text-amber-800 mb-2">⚠️ 경고</p>
-                                {ocrResult.warnings.map((warning: string, i: number) => (
+                                {ocrResult.warnings.filter((warning: string) => (
+                                    !warning.includes('아직 등록되지 않은 메뉴입니다')
+                                    && !warning.includes('로 매칭했습니다')
+                                )).map((warning: string, i: number) => (
                                     <p key={i} className="text-xs text-amber-700">{warning}</p>
                                 ))}
                             </div>
@@ -1432,65 +1510,82 @@ const DailySalesAddView = () => {
                             <tbody>
                                 {ocrResult.sales_by_menu.map((item: any, index: number) => {
                                     const menuStr = item.menu || '';
+                                    const rowStatus = getOcrRowStatus(item);
                                     const filteredRecipes = recipes.filter(r =>
-                                        (r.name || '').toLowerCase().includes(menuStr.toLowerCase())
+                                        getRecipeDisplayName(r).toLowerCase().includes(menuStr.toLowerCase())
                                     );
                                     const showDropdown = activeMenuIndex === index &&
                                         (menuStr.length === 0 || filteredRecipes.length > 0);
 
                                     return (
-                                        <tr key={index} className="border-t border-slate-100">
-                                            <td className="p-3 relative">
-                                                <input
-                                                    type="text"
-                                                    value={item.menu}
-                                                    onChange={(e) => handleOcrResultChange(index, 'menu', e.target.value)}
-                                                    onFocus={() => setActiveMenuIndex(index)}
-                                                    onMouseDown={(e) => e.stopPropagation()}
-                                                    placeholder="메뉴 선택"
-                                                    className="w-full p-2 border border-slate-200 rounded"
-                                                />
-                                                {showDropdown && (
-                                                    <div
-                                                        className="absolute z-10 w-full mt-1 bg-white border border-slate-300 rounded-lg shadow-lg max-h-48 overflow-y-auto"
+                                        <Fragment key={`${item.original_name || item.menu || 'ocr-row'}-${index}`}>
+                                            <tr className={`border-t border-slate-100 ${rowStatus?.rowClass || ''}`}>
+                                                <td className="p-3 relative">
+                                                    <input
+                                                        type="text"
+                                                        value={item.menu}
+                                                        onChange={(e) => handleOcrResultChange(index, 'menu', e.target.value)}
+                                                        onFocus={() => setActiveMenuIndex(index)}
                                                         onMouseDown={(e) => e.stopPropagation()}
+                                                        placeholder="메뉴 선택"
+                                                        className={`w-full p-2 border rounded ${rowStatus?.kind === 'unregistered'
+                                                            ? 'border-rose-300 bg-white'
+                                                            : rowStatus?.kind === 'auto-matched'
+                                                                ? 'border-amber-300 bg-white'
+                                                                : 'border-slate-200'
+                                                        }`}
+                                                    />
+                                                    {showDropdown && (
+                                                        <div
+                                                            className="absolute z-10 w-full mt-1 bg-white border border-slate-300 rounded-lg shadow-lg max-h-48 overflow-y-auto"
+                                                            onMouseDown={(e) => e.stopPropagation()}
+                                                        >
+                                                            {(menuStr.length === 0 ? recipes : filteredRecipes).map((recipe) => (
+                                                                <button
+                                                                    key={getRecipeDisplayName(recipe)}
+                                                                    type="button"
+                                                                    onClick={() => handleOcrMenuSelect(index, recipe)}
+                                                                    className="w-full text-left px-3 py-2 hover:bg-blue-50 text-sm"
+                                                                >
+                                                                    {getRecipeDisplayName(recipe)} ({getRecipePrice(recipe).toLocaleString()}원)
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </td>
+                                                <td className="p-3">
+                                                    <input
+                                                        type="number"
+                                                        value={item.quantity}
+                                                        onChange={(e) => handleOcrResultChange(index, 'quantity', e.target.value)}
+                                                        className="w-full p-2 border border-slate-200 rounded text-right"
+                                                    />
+                                                </td>
+                                                <td className="p-3 text-right text-blue-600 font-mono">
+                                                    {item.sales_amount ? (item.sales_amount / item.quantity).toLocaleString() : '0'}원
+                                                </td>
+                                                <td className="p-3 text-right font-bold text-slate-800">
+                                                    {item.sales_amount?.toLocaleString() || '0'}원
+                                                </td>
+                                                <td className="p-3 text-center">
+                                                    <button
+                                                        onClick={() => handleDeleteOcrRow(index)}
+                                                        className="text-slate-400 hover:text-red-500 transition-colors"
                                                     >
-                                                        {(menuStr.length === 0 ? recipes : filteredRecipes).map((recipe) => (
-                                                            <button
-                                                                key={recipe.name}
-                                                                type="button"
-                                                                onClick={() => handleOcrMenuSelect(index, recipe)}
-                                                                className="w-full text-left px-3 py-2 hover:bg-blue-50 text-sm"
-                                                            >
-                                                                {recipe.name} ({recipe.price.toLocaleString()}원)
-                                                            </button>
-                                                        ))}
-                                                    </div>
-                                                )}
-                                            </td>
-                                            <td className="p-3">
-                                                <input
-                                                    type="number"
-                                                    value={item.quantity}
-                                                    onChange={(e) => handleOcrResultChange(index, 'quantity', e.target.value)}
-                                                    className="w-full p-2 border border-slate-200 rounded text-right"
-                                                />
-                                            </td>
-                                            <td className="p-3 text-right text-blue-600 font-mono">
-                                                {item.sales_amount ? (item.sales_amount / item.quantity).toLocaleString() : '0'}원
-                                            </td>
-                                            <td className="p-3 text-right font-bold text-slate-800">
-                                                {item.sales_amount?.toLocaleString() || '0'}원
-                                            </td>
-                                            <td className="p-3 text-center">
-                                                <button
-                                                    onClick={() => handleDeleteOcrRow(index)}
-                                                    className="text-slate-400 hover:text-red-500 transition-colors"
-                                                >
-                                                    <Trash2 size={16} />
-                                                </button>
-                                            </td>
-                                        </tr>
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                            {rowStatus && (
+                                                <tr className={rowStatus.rowClass}>
+                                                    <td colSpan={5} className="px-3 pb-3 pt-0">
+                                                        <div className={`rounded-lg border px-3 py-2 text-xs font-semibold ${rowStatus.messageClass}`}>
+                                                            {rowStatus.message}
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </Fragment>
                                     );
                                 })}
                             </tbody>
@@ -1500,17 +1595,28 @@ const DailySalesAddView = () => {
 
                         <button
                             onClick={handleAddOcrRow}
-                            className="mt-3 flex items-center gap-2 text-sm font-bold text-blue-600 hover:text-blue-700 px-3 py-2 rounded hover:bg-blue-50 transition-colors"
+                            disabled={isOcrSaving}
+                            className="mt-3 flex items-center gap-2 text-sm font-bold text-blue-600 hover:text-blue-700 px-3 py-2 rounded hover:bg-blue-50 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                         >
                             <Plus size={16} /> 항목 추가
                         </button>
 
                         <button
                             onClick={handleSaveOcrData}
-                            className="w-full py-4 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 transition-colors shadow-lg flex items-center justify-center gap-2"
+                            disabled={isOcrSaving}
+                            className="w-full py-4 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 transition-colors shadow-lg flex items-center justify-center gap-2 disabled:cursor-wait disabled:bg-green-400"
                         >
-                            <Check size={20} />
-                            최종 거래 데이터 등록
+                            {isOcrSaving ? (
+                                <>
+                                    <Loader2 size={20} className="animate-spin" />
+                                    최종 거래 데이터 저장 중...
+                                </>
+                            ) : (
+                                <>
+                                    <Check size={20} />
+                                    최종 거래 데이터 등록
+                                </>
+                            )}
                         </button>
                     </div>
                 )}
@@ -1537,13 +1643,21 @@ const DailySalesAddView = () => {
                 </div>
 
                 {!hourlyResult && !isHourlyLoading && (
-                    <div className="bg-white p-8 rounded-2xl border-2 border-dashed border-slate-300 hover:border-purple-400 transition-colors">
+                    <div
+                        className={`bg-white p-8 rounded-2xl border-2 border-dashed transition-colors ${isHourlyDragging ? 'border-purple-500 bg-purple-50' : 'border-slate-300 hover:border-purple-400'}`}
+                        onDragOver={(event) => {
+                            event.preventDefault();
+                            setIsHourlyDragging(true);
+                        }}
+                        onDragLeave={() => setIsHourlyDragging(false)}
+                        onDrop={handleHourlyDrop}
+                    >
                         <div className="flex flex-col items-center text-center space-y-4">
-                            <Clock className="text-slate-400" size={48} />
+                            <Clock className={isHourlyDragging ? 'text-purple-500' : 'text-slate-400'} size={48} />
                             <div>
-                                <p className="text-sm font-bold text-slate-700 mb-1">매출속보(매출상세) 영수증</p>
+                                <p className="text-sm font-bold text-slate-700 mb-1">매출속보(매출상세) 영수증을 이곳에 끌어다 놓으세요</p>
                                 <p className="text-xs text-slate-500">
-                                    건별 시간과 매출금액이 표시된 영수증을 스캔합니다
+                                    드롭하면 바로 시간대별 매출 인식이 시작됩니다. 파일 선택이 필요하면 아래 버튼을 눌러주세요.
                                 </p>
                             </div>
                             <input
@@ -1558,7 +1672,7 @@ const DailySalesAddView = () => {
                                 htmlFor="hourly-file-input"
                                 className="px-6 py-3 bg-purple-600 text-white font-bold rounded-lg hover:bg-purple-700 cursor-pointer transition-colors"
                             >
-                                파일 선택
+                                파일 업로드
                             </label>
                         </div>
                     </div>
@@ -1672,10 +1786,20 @@ const DailySalesAddView = () => {
                         {/* 저장 버튼 */}
                         <button
                             onClick={handleSaveHourlyData}
-                            className="w-full py-4 bg-purple-600 text-white font-bold rounded-xl hover:bg-purple-700 transition-colors shadow-lg flex items-center justify-center gap-2"
+                            disabled={isHourlySaving}
+                            className="w-full py-4 bg-purple-600 text-white font-bold rounded-xl hover:bg-purple-700 transition-colors shadow-lg flex items-center justify-center gap-2 disabled:cursor-wait disabled:bg-purple-400"
                         >
-                            <Check size={20} />
-                            시간대별 매출 등록
+                            {isHourlySaving ? (
+                                <>
+                                    <Loader2 size={20} className="animate-spin" />
+                                    시간대별 매출 저장 중...
+                                </>
+                            ) : (
+                                <>
+                                    <Check size={20} />
+                                    시간대별 매출 등록
+                                </>
+                            )}
                         </button>
                     </div>
                 )}

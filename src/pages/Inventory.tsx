@@ -69,6 +69,7 @@ export default function Inventory() {
   const [originalItemDetailForm, setOriginalItemDetailForm] = useState<ItemDetailFormData | null>(null);
   const [itemDetailMessage, setItemDetailMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [isSavingItemDetail, setIsSavingItemDetail] = useState(false);
+  const [deletingInventoryItemId, setDeletingInventoryItemId] = useState<string | null>(null);
   const selectedItemRequestRef = useRef<string | null>(null);
   const realtimeRefreshTimerRef = useRef<number | null>(null);
   const hasLoadedIntermediateRef = useRef(false);
@@ -129,6 +130,8 @@ export default function Inventory() {
   const [producingIntermediate, setProducingIntermediate] = useState(false);
   const [deletingProductionLogId, setDeletingProductionLogId] = useState<number | null>(null);
   const [deletingIntermediateRecipeId, setDeletingIntermediateRecipeId] = useState<number | null>(null);
+  const pendingNewIntermediateIngredientFocusRef = useRef(false);
+  const lastIntermediateIngredientRef = useRef<HTMLElement | null>(null);
 
   // 자동완성 드롭다운 상태
   const [activeSearchIndex, setActiveSearchIndex] = useState<number | null>(null);
@@ -316,6 +319,7 @@ export default function Inventory() {
     try {
       const newItem: Omit<InventoryItem, 'id'> & { id: string } = {
         id: itemName,
+        name: itemName,
         category,
         quantity_on_hand: formData.quantity_on_hand,
         uom: formData.uom,
@@ -436,6 +440,7 @@ export default function Inventory() {
   };
 
   const handleAddIntermediateIngredient = () => {
+    pendingNewIntermediateIngredientFocusRef.current = true;
     setIntermediateRecipeForm((prev) => ({
       ...prev,
       ingredients: [...prev.ingredients, createIntermediateIngredientDraft()],
@@ -448,6 +453,19 @@ export default function Inventory() {
       ingredients: prev.ingredients.filter((ingredient) => ingredient.row_id !== rowId),
     }));
   };
+
+  useEffect(() => {
+    if (!showIntermediateRecipeModal || !pendingNewIntermediateIngredientFocusRef.current) {
+      return;
+    }
+
+    pendingNewIntermediateIngredientFocusRef.current = false;
+    window.requestAnimationFrame(() => {
+      const row = lastIntermediateIngredientRef.current;
+      row?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      row?.querySelector<HTMLInputElement>('input')?.focus();
+    });
+  }, [showIntermediateRecipeModal, intermediateRecipeForm.ingredients.length]);
 
   const handleIntermediateRecipeDetailOutputChange = (value: string) => {
     setIntermediateRecipeDetailMessage(null);
@@ -830,6 +848,75 @@ export default function Inventory() {
       setItemDetailMessage({ type: 'error', text: errorMsg });
     } finally {
       setIsSavingItemDetail(false);
+    }
+  };
+
+  const formatInventoryDeleteImpact = (usage: {
+    recipe_names?: string[];
+    intermediate_recipe_names?: string[];
+    stock_intake_count?: number;
+  }) => {
+    const messages: string[] = [];
+    const recipeNames = usage.recipe_names ?? [];
+    const intermediateNames = usage.intermediate_recipe_names ?? [];
+    const stockIntakeCount = usage.stock_intake_count ?? 0;
+
+    if (recipeNames.length > 0) {
+      messages.push(`메뉴 레시피 ${recipeNames.length}개: ${recipeNames.slice(0, 5).join(', ')}${recipeNames.length > 5 ? ' 외' : ''}`);
+    }
+
+    if (intermediateNames.length > 0) {
+      messages.push(`중간재 레시피 ${intermediateNames.length}개: ${intermediateNames.slice(0, 5).join(', ')}${intermediateNames.length > 5 ? ' 외' : ''}`);
+    }
+
+    if (stockIntakeCount > 0) {
+      messages.push(`입고 이력 ${stockIntakeCount}건`);
+    }
+
+    return messages.length > 0
+      ? messages.join('\n')
+      : '연결된 레시피나 입고 이력이 없습니다.';
+  };
+
+  const handleDeleteInventoryItem = async (item: InventoryItem) => {
+    if (deletingInventoryItemId) {
+      return;
+    }
+
+    try {
+      setDeletingInventoryItemId(item.id);
+      setItemDetailMessage(null);
+
+      const usageRes = await inventoryApi.getUsageImpact(item.id);
+      const impactText = formatInventoryDeleteImpact(usageRes.data);
+      const hasLinkedUsage = !usageRes.data.can_delete;
+      const confirmMessage = hasLinkedUsage
+        ? `"${item.id}" 품목을 삭제하시겠습니까?\n\n이 품목은 아래 데이터와 연결되어 있습니다.\n${impactText}\n\n삭제 후 연결된 레시피/중간재에서는 누락 재료 경고가 표시될 수 있습니다.`
+        : `"${item.id}" 품목을 삭제하시겠습니까?\n\n${impactText}`;
+
+      if (!window.confirm(confirmMessage)) {
+        return;
+      }
+
+      await inventoryApi.delete(item.id);
+      setInventory((prev) => prev.filter((inventoryItem) => inventoryItem.id !== item.id));
+
+      if (selectedItem?.id === item.id) {
+        handleCloseItemDetail();
+      } else {
+        setItemDetailMessage({ type: 'success', text: '재고 품목이 삭제되었습니다.' });
+      }
+
+      await fetchInventory({ silent: true });
+    } catch (err: any) {
+      const errorMsg = err.response?.data?.detail || '재고 품목 삭제에 실패했습니다.';
+      if (selectedItem?.id === item.id) {
+        setItemDetailMessage({ type: 'error', text: errorMsg });
+      } else {
+        window.alert(errorMsg);
+      }
+    } finally {
+      setDeletingInventoryItemId(null);
     }
   };
 
@@ -1275,19 +1362,50 @@ export default function Inventory() {
     const status = getStockStatus(percentage);
     const categoryColor = getCategoryColor(item.category);
 
+    const isDeleting = deletingInventoryItemId === item.id;
+
     return (
-      <button
+      <article
         key={item.id}
-        type="button"
         className={`inventory-card-new ${status}`}
+        role="button"
+        tabIndex={0}
         onClick={() => void handleOpenItemDetail(item)}
+        onKeyDown={(event) => {
+          if (event.target !== event.currentTarget) {
+            return;
+          }
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            void handleOpenItemDetail(item);
+          }
+        }}
         aria-label={`${item.id} 상세 보기`}
       >
         <div className="card-top">
           <span className="category-badge" style={{ backgroundColor: categoryColor }}>
             {item.category}
           </span>
-          <span className="percentage-badge">{percentage}%</span>
+          <div className="card-top-actions">
+            <span className="percentage-badge">{percentage}%</span>
+            <button
+              type="button"
+              className="inventory-card-delete"
+              disabled={isDeleting}
+              onClick={(event) => {
+                event.stopPropagation();
+                void handleDeleteInventoryItem(item);
+              }}
+              aria-label={`${item.id} 삭제`}
+              title="재고 품목 삭제"
+            >
+              {isDeleting ? (
+                <RefreshCw size={14} className="spin" />
+              ) : (
+                <Trash2 size={14} />
+              )}
+            </button>
+          </div>
         </div>
         <div className="card-content">
           <h4 className="item-name">{item.id}</h4>
@@ -1299,7 +1417,7 @@ export default function Inventory() {
             ></div>
           </div>
         </div>
-      </button>
+      </article>
     );
   };
 
@@ -3149,7 +3267,7 @@ export default function Inventory() {
                 <button
                   type="button"
                   className="btn btn-primary"
-                  disabled={loadingSelectedItem || isSavingItemDetail || (isItemEditMode && !isItemDirty)}
+                  disabled={loadingSelectedItem || isSavingItemDetail || Boolean(deletingInventoryItemId) || (isItemEditMode && !isItemDirty)}
                   onClick={() => {
                     if (isItemEditMode) {
                       if (isItemDirty) {
@@ -3162,6 +3280,14 @@ export default function Inventory() {
                   }}
                 >
                   {detailPrimaryActionLabel}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-danger"
+                  disabled={loadingSelectedItem || isSavingItemDetail || deletingInventoryItemId === selectedItem.id}
+                  onClick={() => void handleDeleteInventoryItem(selectedItem)}
+                >
+                  {deletingInventoryItemId === selectedItem.id ? '삭제 중...' : '삭제하기'}
                 </button>
                 <button
                   type="button"
@@ -3520,18 +3646,22 @@ export default function Inventory() {
                   </div>
                   <button type="button" className="btn btn-secondary" onClick={handleAddIntermediateIngredient}>
                     <Plus size={16} />
-                    재료 추가
+                    재료 추가 ({intermediateRecipeForm.ingredients.length}개)
                   </button>
                 </div>
 
-                <div className="detail-history-list">
+                <div className="intermediate-new-ingredient-list">
                   {intermediateRecipeForm.ingredients.map((ingredient, index) => (
-                    <article key={ingredient.row_id} className="detail-history-item">
-                      <div className="detail-history-meta">
+                    <article
+                      key={ingredient.row_id}
+                      ref={index === intermediateRecipeForm.ingredients.length - 1 ? lastIntermediateIngredientRef : undefined}
+                      className="intermediate-new-ingredient-item"
+                    >
+                      <div className="intermediate-new-ingredient-meta">
                         <strong>재료 {index + 1}</strong>
                         <span>{ingredient.ingredient_uom || '-'}</span>
                       </div>
-                      <div className="detail-form-grid">
+                      <div className="intermediate-new-ingredient-grid">
                         <div className="detail-form-group">
                           <label>원재료 검색</label>
                           <input
@@ -3558,7 +3688,7 @@ export default function Inventory() {
                         </div>
                       </div>
                       {intermediateRecipeForm.ingredients.length > 1 && (
-                        <div className="flex justify-end pt-3">
+                        <div className="intermediate-new-ingredient-actions">
                           <button
                             type="button"
                             className="btn-remove-row"

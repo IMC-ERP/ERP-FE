@@ -131,6 +131,8 @@ export interface DailySalesMenuItem {
     menu: string;
     quantity: number;
     sales_amount?: number;
+    matched?: boolean;
+    original_name?: string | null;
 }
 
 export interface DailySales {

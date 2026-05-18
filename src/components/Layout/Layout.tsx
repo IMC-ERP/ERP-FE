@@ -14,7 +14,6 @@ import {
   Home,
   ClipboardList,
   ChefHat,
-  ScrollText,
   Settings,
   HelpCircle,
   X,
@@ -127,7 +126,6 @@ export default function Layout() {
   const navItems = [
     { id: 'tour-nav-home', to: '/', icon: Home, label: '홈' },
     { id: 'tour-nav-dashboard', to: '/dashboard', icon: LayoutDashboard, label: '경영 현황' },
-    { id: 'tour-nav-sales', to: '/sales', icon: ScrollText, label: '매출 입력' },
     { id: 'tour-nav-analysis', to: '/period', icon: Calendar, label: '매출 분석' },
     { id: 'tour-nav-transactions', to: '/transactions', icon: ClipboardList, label: '거래 데이터 관리' },
     { id: 'tour-nav-inventory', to: '/inventory', icon: Package, label: '재고 관리' },

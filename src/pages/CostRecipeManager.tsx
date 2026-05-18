@@ -54,23 +54,42 @@ const AddRecipeModal = ({
     const [ingredients, setIngredients] = useState<RecipeIngredient[]>([]);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const [isSaving, setIsSaving] = useState(false);
+    const wasOpenRef = useRef(false);
 
     useEffect(() => {
         if (!isOpen) {
+            wasOpenRef.current = false;
             return;
         }
 
-        if (existingCategories.length === 0) {
-            setMode('new');
-            setCategory('');
+        const justOpened = !wasOpenRef.current;
+        wasOpenRef.current = true;
+
+        if (justOpened) {
+            if (existingCategories.length === 0) {
+                setMode('new');
+                setCategory('');
+                return;
+            }
+
+            setMode('existing');
+            setCategory((current) => (
+                current.trim() && existingCategories.includes(current)
+                    ? current
+                    : existingCategories[0]
+            ));
             return;
         }
 
-        setMode('existing');
+        setMode((currentMode) => (
+            currentMode === 'existing' && existingCategories.length === 0
+                ? 'new'
+                : currentMode
+        ));
         setCategory((current) => (
             current.trim() && existingCategories.includes(current)
                 ? current
-                : existingCategories[0]
+                : existingCategories[0] || ''
         ));
     }, [isOpen, existingCategories]);
 

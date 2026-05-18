@@ -497,6 +497,13 @@
   justify-content: space-between;
   align-items: center;
   margin-bottom: 8px;
+  gap: 8px;
+}
+
+.card-top-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .category-badge {
@@ -513,6 +520,38 @@
   font-size: 0.95rem;
   font-weight: 700;
   color: #1e293b;
+}
+
+.inventory-card-delete {
+  width: 28px;
+  height: 28px;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  background: #fff7f7;
+  color: #dc2626;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s, border-color 0.2s, transform 0.2s;
+}
+
+.inventory-card-delete:hover {
+  background: #fee2e2;
+  border-color: #fca5a5;
+  color: #991b1b;
+  transform: translateY(-1px);
+}
+
+.inventory-card-delete:focus-visible {
+  outline: 3px solid rgba(220, 38, 38, 0.18);
+  outline-offset: 2px;
+}
+
+.inventory-card-delete:disabled {
+  opacity: 0.65;
+  cursor: wait;
+  transform: none;
 }
 
 .card-content {
@@ -540,12 +579,14 @@
 /* ========== 품목 상세 모달 ========== */
 .detail-modal-content {
   max-width: 760px;
+  max-height: 92vh;
 }
 
 .detail-modal-body {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 14px;
+  overflow-y: auto;
 }
 
 .detail-hero {
@@ -629,7 +670,7 @@
 .detail-form-section {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
 }
 
 .detail-form-header {
@@ -662,13 +703,13 @@
 .detail-form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
+  gap: 10px;
 }
 
 .detail-form-group {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .detail-form-group-full {
@@ -683,12 +724,12 @@
 
 .detail-form-input {
   width: 100%;
-  padding: 13px 14px;
-  border-radius: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
   border: 1px solid #cbd5e1;
   background: #ffffff;
   color: #0f172a;
-  font-size: 0.95rem;
+  font-size: 0.9rem;
   transition: all 0.2s ease;
   box-sizing: border-box;
 }
@@ -796,6 +837,73 @@
 
 .detail-history-item:last-child {
   border-bottom: none;
+}
+
+.intermediate-new-ingredient-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: min(38vh, 360px);
+  overflow-y: auto;
+  padding-right: 4px;
+  scrollbar-gutter: stable;
+}
+
+.intermediate-new-ingredient-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.intermediate-new-ingredient-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.intermediate-new-ingredient-list::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.55);
+  border-radius: 999px;
+}
+
+.intermediate-new-ingredient-item {
+  display: grid;
+  grid-template-columns: minmax(72px, 0.22fr) minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #f8fafc;
+}
+
+.intermediate-new-ingredient-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding-bottom: 4px;
+}
+
+.intermediate-new-ingredient-meta strong {
+  font-size: 0.85rem;
+  color: #334155;
+}
+
+.intermediate-new-ingredient-meta span {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #818cf8;
+}
+
+.intermediate-new-ingredient-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(110px, 0.6fr);
+  gap: 10px;
+  min-width: 0;
+}
+
+.intermediate-new-ingredient-actions {
+  display: flex;
+  align-items: end;
+  justify-content: flex-end;
+  padding-bottom: 1px;
 }
 
 .detail-history-meta {
@@ -910,6 +1018,26 @@
 
 .btn-secondary:hover {
   background: #e2e8f0;
+}
+
+.btn-danger {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.btn-danger:hover {
+  background: #fecaca;
+  transform: translateY(-1px);
+}
+
+.btn-danger:disabled {
+  opacity: 0.7;
+  cursor: wait;
+  transform: none;
+}
+
+.spin {
+  animation: spin 1s linear infinite;
 }
 
 /* ========== 반응형 ========== */
@@ -2378,6 +2506,30 @@ html[data-theme="dark"] .intake-footer {
 @media (max-width: 640px) {
   .intermediate-read-summary {
     grid-template-columns: 1fr;
+  }
+
+  .intermediate-new-ingredient-list {
+    max-height: min(42vh, 420px);
+  }
+
+  .intermediate-new-ingredient-item {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .intermediate-new-ingredient-meta {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: 0;
+  }
+
+  .intermediate-new-ingredient-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .intermediate-new-ingredient-actions {
+    justify-content: flex-end;
   }
 }
 
