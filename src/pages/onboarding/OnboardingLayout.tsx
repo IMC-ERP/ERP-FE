@@ -7,7 +7,7 @@ import RecipeSetupStep from './RecipeSetupStep';
 import CompleteSetupStep from './CompleteSetupStep';
 
 export default function OnboardingLayout() {
-  const { userProfile, loading } = useAuth();
+  const { userProfile, loading, refreshProfile } = useAuth();
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState<number | null>(null);
   const [isCompleting, setIsCompleting] = useState(false);
@@ -70,12 +70,17 @@ export default function OnboardingLayout() {
       // 1. DB에 온보딩 완료 플래그 기록 (필수)
       await userApi.completeOnboarding();
 
-      // 2. 성공 시 로컬스토리지 정리 (UI 진행 단계 흔적 제거)
+      // 2. AuthContext의 userProfile 갱신 — OnboardingGuard가 stale한
+      //    onboarding_completed_at=null을 보고 다시 /onboarding으로 튕기지 않도록
+      //    DB 진실값을 반드시 클라이언트 상태에 반영한 뒤 이동한다.
+      await refreshProfile();
+
+      // 3. 성공 시 로컬스토리지 정리 (UI 진행 단계 흔적 제거)
       localStorage.removeItem(`onboarding_step_${userProfile?.uid}`);
       // 완료 캐시는 더 이상 사용하지 않음 (DB 플래그가 진실의 원천)
       localStorage.removeItem(`onboarding_complete_${userProfile?.uid}`);
 
-      // 3. 메인으로 이동
+      // 4. 메인으로 이동
       navigate('/dashboard', { replace: true });
     } catch (error: any) {
       console.error('[ONBOARDING] complete-onboarding failed:', error);

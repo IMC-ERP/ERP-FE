@@ -7,6 +7,7 @@ export interface RawMaterial {
     unitCost: number;
     unit: string;
     currentStock: number;
+    itemType?: 'raw' | 'prep' | 'RAW' | 'PREP' | null;
 }
 
 export interface RecipeIngredient {

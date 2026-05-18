@@ -28,6 +28,9 @@ export const createDraftId = (prefix: string) => {
 };
 
 export const getUnitPrice = (material: RawMaterial) => {
+    if (material.itemType?.toLowerCase() === 'prep') {
+        return roundUnitCost(material.unitCost);
+    }
     if (material.purchaseUnitQty > 0 && material.purchasePrice > 0) {
         return roundUnitCost(material.purchasePrice / material.purchaseUnitQty);
     }

@@ -56,7 +56,7 @@ export default function Home() {
         {
             targetId: 'tour-kpi-cards',
             title: '📊 매장 현황 한눈에',
-            content: '사장님, 오늘 하루의 매장 현황을 한눈에 파악하세요. 방문 수, 판매 수 등 매장의 핵심 수치를 보여드립니다.',
+            content: '사장님, 어제 하루의 매장 현황을 한눈에 파악하세요. 방문 수, 판매 수 등 매장의 핵심 수치를 보여드립니다.',
             placement: 'bottom' as const,
             scrollOffset: 0.1, // 최상단에 가깝게 배치하여 말풍선 공간 확보
         },
@@ -81,10 +81,10 @@ export default function Home() {
         return hr >= (openHour ?? 0) && hr <= (closeHour ?? 24);
     }) || [];
 
-    // 만약 오늘 주문이 0이라면 프론트엔드 레벨에서 판매 개수 및 인기 메뉴도 0/없음으로 보정
+    // 만약 어제 주문이 0이라면 프론트엔드 레벨에서 판매 개수 및 인기 메뉴도 0/없음으로 보정
     const hasNoOrders = summary?.todayOrders === 0;
 
-    // 오늘 판매된 총 개수 (백엔드에서 daily_sale_items SUM 집계)
+    // 어제 판매된 총 개수 (백엔드에서 daily_sale_items SUM 집계)
     const itemsSold = hasNoOrders ? 0 : ((summary as any)?.todayItemsSold ?? topMenus?.reduce((acc: number, menu: any) => acc + menu.qty, 0) ?? 0);
 
     const displayTopMenus = hasNoOrders ? [] : (topMenus || []);
@@ -94,7 +94,7 @@ export default function Home() {
             {loading && !data ? (
                 <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
                     <Loader2 className="animate-spin text-blue-600" size={48} />
-                    <p className="text-slate-500 font-medium">오늘의 매장 정보를 분석 중입니다...</p>
+                    <p className="text-slate-500 font-medium">어제의 매장 정보를 분석 중입니다...</p>
                 </div>
             ) : !data ? (
                 <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
@@ -114,9 +114,9 @@ export default function Home() {
             <div className="flex w-full flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <div className="min-w-0">
                     <h1 className="text-xl sm:text-2xl font-bold leading-tight text-slate-800 md:text-3xl break-keep">
-                        {userProfile?.name} 사장님, <br className="hidden sm:block md:hidden" /> {storeProfile.name || '우리 매장'}의 오늘 현황입니다.
+                        {userProfile?.name} 사장님, <br className="hidden sm:block md:hidden" /> {storeProfile.name || '우리 매장'}의 어제 현황입니다.
                     </h1>
-                    <p className="mt-1.5 text-sm text-slate-500 md:text-base break-keep">오늘 하루도 힘내세요! 실시간으로 매장 상태를 모니터링 중입니다.</p>
+                    <p className="mt-1.5 text-sm text-slate-500 md:text-base break-keep">어제 매장 흐름을 기준으로 오늘 운영을 점검해보세요.</p>
                 </div>
                 <div className="flex w-full items-center justify-between gap-2 md:w-auto md:justify-end">
                     <button
@@ -146,7 +146,7 @@ export default function Home() {
                 {/* 🔹 상단 요약 칩 - Tour Step 1 target */}
                 <div id="tour-kpi-cards" className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full">
                     <SummaryCard
-                        title="오늘 방문(주문) 건수"
+                        title="어제 방문(주문) 건수"
                         value={summary.todayOrders}
                         trend={summary.orderTrend}
                         icon={ShoppingCart}
@@ -154,7 +154,7 @@ export default function Home() {
                         unit="건"
                     />
                     <SummaryCard
-                        title="오늘 판매한 수"
+                        title="어제 판매한 수"
                         value={itemsSold}
                         trend={0}
                         icon={Hash}
@@ -174,7 +174,7 @@ export default function Home() {
                 {/* 🔹 매출/수익 확인 패널 (토글로 제어) */}
                 <div className={`grid grid-cols-1 md:grid-cols-2 gap-6 transition-all duration-500 origin-top overflow-hidden w-full ${showRevenue ? 'max-h-96 opacity-100 scale-y-100 mt-6' : 'max-h-0 opacity-0 scale-y-0 mt-0'}`}>
                     <SummaryCard
-                        title="오늘 총매출"
+                        title="어제 총매출"
                         value={summary.todaySales}
                         trend={summary.salesTrend}
                         icon={DollarSign}
@@ -194,7 +194,7 @@ export default function Home() {
             <div className="w-full">
                 <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm">
                     <h3 className="font-bold text-slate-800 mb-6 font-mono tracking-tight border-l-4 border-blue-600 pl-3">
-                        오늘의 인기 메뉴
+                        어제의 인기 메뉴
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         {displayTopMenus.map((menu, idx) => (
@@ -253,7 +253,7 @@ export default function Home() {
                             <Clock className="text-blue-500" size={20} />
                             실시간 매출 흐름
                         </h3>
-                        <span className="text-xs text-slate-400">오늘 ({String(openHour).padStart(2, '0')}시 ~ {String(closeHour).padStart(2, '0')}시)</span>
+                        <span className="text-xs text-slate-400">어제 ({String(openHour).padStart(2, '0')}시 ~ {String(closeHour).padStart(2, '0')}시)</span>
                     </div>
                     <div className="h-[300px] w-full">
                         <ResponsiveContainer width="100%" height="100%">

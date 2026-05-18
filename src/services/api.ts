@@ -139,6 +139,7 @@ export interface InventoryItem {
   uom: string;
   purchase_price?: number;
   purchase_unit_qty?: number;
+  item_type?: 'raw' | 'prep' | 'RAW' | 'PREP' | null;
 }
 
 export interface InventoryUpdatePayload extends Partial<InventoryItem> {
@@ -309,9 +310,10 @@ export interface IntermediateProductionDetail {
   type: 'ingredient' | 'output';
   item_id: string;
   item_name: string;
-  before: number;
-  after: number;
+  before?: number;
+  after?: number;
   uom: string;
+  amount?: number;
   required_amount?: number;
   produced_amount?: number;
   unit_cost?: number;
@@ -344,6 +346,9 @@ export const intermediateApi = {
   getRecipes: () => dedupeGet<IntermediateRecipe[]>('/intermediate-recipes'),
   createRecipe: (data: IntermediateRecipeCreatePayload) => api.post<IntermediateRecipe>('/intermediate-recipes', data),
   updateRecipe: (recipeId: number, data: IntermediateRecipeCreatePayload) => api.put<IntermediateRecipe>(`/intermediate-recipes/${recipeId}`, data),
+  deleteRecipe: (recipeId: number) => api.delete(`/intermediate-recipes/${recipeId}`),
+  // --- 생산 등록 메서드는 레거시 보존 (BE 라우터 비활성화 + FE UI 트리거 제거 상태).
+  //     dead code로 남아있는 production 분기 JSX/핸들러가 타입체크에 통과하도록 시그니처만 유지.
   getProductionLogs: (limit: number = 20) => dedupeGet<IntermediateProductionLog[]>('/intermediate-productions', { params: { limit } }),
   createProduction: (data: IntermediateProductionCreatePayload) => api.post<IntermediateProductionLog>('/intermediate-productions', data),
   deleteProduction: (logId: number) => api.delete(`/intermediate-productions/${logId}`),

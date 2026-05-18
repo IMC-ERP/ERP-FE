@@ -21,6 +21,15 @@ const fmt = (n: number) => n.toLocaleString('ko-KR');
 const toYMD = (d: Date) =>
     `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
 
+const getCurrentMonthYMDRange = () => {
+    const today = new Date();
+    const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+    return {
+        start: toYMD(firstDay),
+        end: toYMD(today),
+    };
+};
+
 /** YYYYMMDD → YYYY-MM-DD (input[type=date] 호환) */
 const toInputDate = (ymd: string) => ymd.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3');
 /** YYYY-MM-DD → YYYYMMDD */
@@ -53,9 +62,10 @@ const smartYDomain = (data: number[]): [number, number] => {
 export default function SalesAnalysis() {
     const now = new Date();
     const yesterday = new Date(now); yesterday.setDate(now.getDate() - 1);
+    const defaultDateRange = useMemo(() => getCurrentMonthYMDRange(), []);
 
-    const [startDate, setStartDate] = useState(toYMD(now));
-    const [endDate, setEndDate] = useState(toYMD(now));
+    const [startDate, setStartDate] = useState(defaultDateRange.start);
+    const [endDate, setEndDate] = useState(defaultDateRange.end);
     const [data, setData] = useState<SalesAnalyticsResponse | null>(null);
     const [loading, setLoading] = useState(true);
     const [activeQuick, setActiveQuick] = useState<string | null>(null);
