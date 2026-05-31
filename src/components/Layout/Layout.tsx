@@ -141,7 +141,7 @@ export default function Layout() {
   const activeGroup = navGroups.find(group => group.children.some(child => child.to === location.pathname)) ?? navGroups[0];
 
   return (
-    <div className="flex flex-col min-h-screen bg-slate-50 relative overflow-x-hidden">
+    <div className="flex flex-col min-h-screen bg-slate-50 relative overflow-x-clip">
       {/* 상단 헤더: 로고 + 3탭 + 우상단 메뉴 */}
       <header className="sticky top-0 z-40 bg-white border-b border-slate-200">
         <div className="flex items-center gap-3 sm:gap-4 px-3 sm:px-6 h-14">
@@ -258,10 +258,10 @@ export default function Layout() {
 
       {/* 메인 콘텐츠 */}
       <div
-        className="flex-1 relative min-w-0 overflow-x-hidden transition-all duration-300 ease-in-out"
+        className="flex-1 relative min-w-0 overflow-x-clip transition-all duration-300 ease-in-out"
         style={{ marginRight: !isMobile && isAIDrawerOpen ? '400px' : '0' }}
       >
-        <main className={`${isMobile ? 'p-4 pb-24' : 'p-6 lg:p-8'} max-w-7xl mx-auto w-full min-w-0 overflow-x-hidden`}>
+        <main className={`${isMobile ? 'p-4 pb-24' : 'p-6 lg:p-8'} max-w-7xl mx-auto w-full min-w-0 overflow-x-clip`}>
           <Outlet />
         </main>
       </div>
