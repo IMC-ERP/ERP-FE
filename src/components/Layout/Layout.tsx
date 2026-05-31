@@ -37,6 +37,52 @@ interface NavItemProps {
   onClick?: () => void;
 }
 
+// 초안1: 상단 3탭 구조. 각 그룹은 기존 경로(children)를 묶는 진입점이다.
+interface NavChild {
+  id?: string;
+  to: string;
+  icon: React.ComponentType<{ size?: number }>;
+  label: string;
+}
+
+interface NavGroup {
+  key: string;
+  label: string;
+  icon: React.ComponentType<{ size?: number }>;
+  children: NavChild[];
+}
+
+const navGroups: NavGroup[] = [
+  {
+    key: 'dashboard',
+    label: '대시보드',
+    icon: LayoutDashboard,
+    children: [
+      { id: 'tour-nav-home', to: '/', icon: Home, label: '홈' },
+      { id: 'tour-nav-dashboard', to: '/dashboard', icon: LayoutDashboard, label: '경영 현황' },
+    ],
+  },
+  {
+    key: 'inventory',
+    label: '재고',
+    icon: Package,
+    children: [
+      { id: 'tour-nav-inventory', to: '/inventory', icon: Package, label: '재고 관리' },
+      { id: 'tour-nav-recipe', to: '/cost-recipe', icon: ChefHat, label: '원가/레시피 관리' },
+      { id: 'tour-nav-ai', to: '/ai', icon: Bot, label: 'AI Monstock' },
+    ],
+  },
+  {
+    key: 'report',
+    label: '리포트',
+    icon: ClipboardList,
+    children: [
+      { id: 'tour-nav-transactions', to: '/transactions', icon: ClipboardList, label: '거래 데이터 관리' },
+      { id: 'tour-nav-analysis', to: '/period', icon: Calendar, label: '매출 분석' },
+    ],
+  },
+];
+
 const NavItem = ({ id, to, icon: Icon, label, active, onClick }: NavItemProps) => (
   <Link
     id={id}
@@ -123,15 +169,8 @@ export default function Layout() {
   const fontSizeToken = appSettings.fontSize === 'small' ? 'A-' : appSettings.fontSize === 'medium' ? 'A' : 'A+';
   const fontSizeLabel = appSettings.fontSize === 'small' ? '작게' : appSettings.fontSize === 'medium' ? '보통' : '크게';
 
-  const navItems = [
-    { id: 'tour-nav-home', to: '/', icon: Home, label: '홈' },
-    { id: 'tour-nav-dashboard', to: '/dashboard', icon: LayoutDashboard, label: '경영 현황' },
-    { id: 'tour-nav-analysis', to: '/period', icon: Calendar, label: '매출 분석' },
-    { id: 'tour-nav-transactions', to: '/transactions', icon: ClipboardList, label: '거래 데이터 관리' },
-    { id: 'tour-nav-inventory', to: '/inventory', icon: Package, label: '재고 관리' },
-    { id: 'tour-nav-recipe', to: '/cost-recipe', icon: ChefHat, label: '원가/레시피 관리' },
-    { id: 'tour-nav-ai', to: '/ai', icon: Bot, label: 'AI Monstock' }
-  ];
+  // 3탭 그룹에서 평탄화한 전체 네비게이션 항목 (현 사이드바 렌더에서 사용)
+  const navItems = navGroups.flatMap(group => group.children);
 
   return (
     <div className="flex min-h-screen bg-slate-50 relative overflow-x-hidden">
