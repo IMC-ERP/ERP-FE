@@ -17,8 +17,6 @@ import {
   Settings,
   HelpCircle,
   X,
-  Menu,
-  Type,
   LogOut,
   Sun,
   Moon
@@ -27,15 +25,6 @@ import { useData } from '../../contexts/DataContext';
 import { useAuth } from '../../contexts/AuthContext';
 
 const AIAssistant = lazy(() => import('../../pages/AIAssistant'));
-
-interface NavItemProps {
-  id?: string;
-  to: string;
-  icon: React.ComponentType<{ size?: number }>;
-  label: string;
-  active: boolean;
-  onClick?: () => void;
-}
 
 // 초안1: 상단 3탭 구조. 각 그룹은 기존 경로(children)를 묶는 진입점이다.
 interface NavChild {
@@ -83,28 +72,12 @@ const navGroups: NavGroup[] = [
   },
 ];
 
-const NavItem = ({ id, to, icon: Icon, label, active, onClick }: NavItemProps) => (
-  <Link
-    id={id}
-    to={to}
-    onClick={onClick}
-    className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors duration-200 ${active
-      ? 'bg-blue-100 text-blue-700 font-semibold nav-item-active'
-      : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-      }`}
-  >
-    <Icon size={20} />
-    <span className="min-w-0 break-words leading-snug">{label}</span>
-  </Link>
-);
-
 export default function Layout() {
   const location = useLocation();
   const { storeProfile, appSettings, updateAppSettings } = useData();
   const { user, logout } = useAuth();
 
   const [isAIDrawerOpen, setIsAIDrawerOpen] = useState(false);
-  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
@@ -120,32 +93,13 @@ export default function Layout() {
       return;
     }
 
-    document.body.style.overflow = isMobileSidebarOpen || isAIDrawerOpen ? 'hidden' : '';
+    document.body.style.overflow = isAIDrawerOpen ? 'hidden' : '';
     return () => {
       document.body.style.overflow = '';
     };
-  }, [isAIDrawerOpen, isMobile, isMobileSidebarOpen]);
+  }, [isAIDrawerOpen, isMobile]);
 
-
-
-  useEffect(() => {
-    setIsMobileSidebarOpen(false);
-  }, [location.pathname]);
-
-  // 외부(예: 스포트라이트 투어)에서 사이드바를 강제로 열 수 있도록 이벤트 리스너 추가
-  useEffect(() => {
-    const handleOpenSidebar = () => {
-      if (isMobile) setIsMobileSidebarOpen(true);
-    };
-    window.addEventListener('erp:sidebar:open', handleOpenSidebar);
-    return () => window.removeEventListener('erp:sidebar:open', handleOpenSidebar);
-  }, [isMobile]);
-
-  const closeMobileSidebar = () => setIsMobileSidebarOpen(false);
-  const openAIDrawer = () => {
-    setIsMobileSidebarOpen(false);
-    setIsAIDrawerOpen(true);
-  };
+  const openAIDrawer = () => setIsAIDrawerOpen(true);
 
   const cycleFontSize = () => {
     const nextSize = appSettings.fontSize === 'small'
@@ -169,169 +123,141 @@ export default function Layout() {
   const fontSizeToken = appSettings.fontSize === 'small' ? 'A-' : appSettings.fontSize === 'medium' ? 'A' : 'A+';
   const fontSizeLabel = appSettings.fontSize === 'small' ? '작게' : appSettings.fontSize === 'medium' ? '보통' : '크게';
 
-  // 3탭 그룹에서 평탄화한 전체 네비게이션 항목 (현 사이드바 렌더에서 사용)
-  const navItems = navGroups.flatMap(group => group.children);
+  // 현재 경로가 속한 그룹 (없으면 첫 그룹). 상단 탭 활성 표시 + 서브탭 노출에 사용.
+  const activeGroup = navGroups.find(group => group.children.some(child => child.to === location.pathname)) ?? navGroups[0];
 
   return (
-    <div className="flex min-h-screen bg-slate-50 relative overflow-x-hidden">
-      {isMobile && (
-        <div className="mobile-top-header">
-          <button
-            onClick={() => setIsMobileSidebarOpen(true)}
-            className="mobile-hamburger-btn"
-            aria-label="메뉴 열기"
-          >
-            <Menu size={22} />
-          </button>
-          <div className="mobile-header-title">
+    <div className="flex flex-col min-h-screen bg-slate-50 relative overflow-x-hidden">
+      {/* 상단 헤더: 로고 + 3탭 + 우상단 메뉴 */}
+      <header className="sticky top-0 z-40 bg-white border-b border-slate-200">
+        <div className="flex items-center gap-3 sm:gap-4 px-3 sm:px-6 h-14">
+          {/* 로고 */}
+          <Link to="/" className="flex items-center gap-2 shrink-0">
             {storeProfile.logoUrl ? (
-              <img src={storeProfile.logoUrl} alt="Logo" className="mobile-header-logo" />
+              <img src={storeProfile.logoUrl} alt="Logo" className="w-8 h-8 rounded-full object-cover border border-slate-200" />
             ) : (
-              <Coffee className="text-amber-600" size={18} />
+              <div className="bg-amber-100 p-1.5 rounded-full">
+                <Coffee className="text-amber-700" size={20} />
+              </div>
             )}
-            <span>{storeProfile.name}</span>
-          </div>
-          <div className="mobile-header-actions flex items-center gap-2">
+            <span className="hidden sm:block text-sm font-bold text-slate-800 truncate max-w-[140px]">{storeProfile.name}</span>
+          </Link>
+
+          {/* 3탭 (대시보드 / 재고 / 리포트) */}
+          <nav id="tour-sidebar-nav" className="flex items-center gap-1 flex-1 min-w-0 overflow-x-auto">
+            {navGroups.map(group => {
+              const GroupIcon = group.icon;
+              const groupActive = group.key === activeGroup.key;
+              return (
+                <Link
+                  key={group.key}
+                  to={group.children[0].to}
+                  className={`flex items-center gap-2 px-3 sm:px-4 h-14 text-sm font-semibold whitespace-nowrap border-b-2 transition-colors ${groupActive
+                    ? 'border-blue-600 text-blue-700'
+                    : 'border-transparent text-slate-500 hover:text-slate-800'
+                    }`}
+                >
+                  <GroupIcon size={18} />
+                  <span>{group.label}</span>
+                </Link>
+              );
+            })}
+          </nav>
+
+          {/* 우상단 유틸: 다크모드 / 글자크기 / 도움말 / 설정 / 로그아웃 */}
+          <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
             <button
               onClick={() => updateAppSettings({ darkMode: !appSettings.darkMode })}
-              className="mobile-header-utility-btn"
-              title={appSettings.darkMode ? "라이트 모드로 전환" : "다크 모드로 전환"}
+              className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition-colors"
+              title={appSettings.darkMode ? '라이트 모드로 전환' : '다크 모드로 전환'}
               aria-label="다크 모드 전환"
             >
-              {appSettings.darkMode ? <Sun size={15} /> : <Moon size={15} />}
+              {appSettings.darkMode ? <Sun size={18} /> : <Moon size={18} />}
             </button>
             <button
               onClick={cycleFontSize}
-              className="mobile-header-utility-btn mobile-font-btn flex items-center gap-1"
+              className="flex items-center justify-center w-9 h-9 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition-colors"
               title={`글자 크기: ${fontSizeLabel}`}
               aria-label={`글자 크기: ${fontSizeLabel}`}
             >
-              <Type size={15} />
-              <span className="mobile-font-token font-bold text-xs">{fontSizeToken}</span>
+              <span className="font-black text-xs">{fontSizeToken}</span>
             </button>
+            <Link
+              to="/help"
+              className={`p-2 rounded-lg transition-colors ${location.pathname === '/help' ? 'bg-blue-100 text-blue-700' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800'}`}
+              title="도움말"
+              aria-label="도움말"
+            >
+              <HelpCircle size={18} />
+            </Link>
+            <Link
+              to="/settings"
+              className={`p-2 rounded-lg transition-colors ${location.pathname === '/settings' ? 'bg-blue-100 text-blue-700' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800'}`}
+              title="설정"
+              aria-label="설정"
+            >
+              <Settings size={18} />
+            </Link>
+            {user && (
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-2 pl-1.5 pr-1 sm:pr-2 py-1 ml-0.5 rounded-lg text-slate-500 hover:bg-red-50 hover:text-red-600 transition-colors"
+                title="로그아웃"
+              >
+                {user.user_metadata?.avatar_url ? (
+                  <img src={user.user_metadata.avatar_url} alt="Profile" className="w-7 h-7 rounded-full border border-slate-200" />
+                ) : (
+                  <div className="w-7 h-7 rounded-full bg-amber-100 flex items-center justify-center text-amber-700 font-bold text-xs">
+                    {user.email?.charAt(0).toUpperCase()}
+                  </div>
+                )}
+                <LogOut size={16} className="hidden sm:block" />
+              </button>
+            )}
           </div>
         </div>
-      )}
 
-      {isMobile && isMobileSidebarOpen && (
-        <div className="mobile-sidebar-overlay" onClick={closeMobileSidebar} />
-      )}
-
-      <div className={`
-        sidebar-container
-        ${isMobile ? 'mobile-sidebar' : ''}
-        ${isMobile && isMobileSidebarOpen ? 'mobile-sidebar-open' : ''}
-        ${isMobile && !isMobileSidebarOpen ? 'mobile-sidebar-closed' : ''}
-      `}>
-        <Link to="/" className="p-6 border-b border-slate-100 flex items-center gap-3 cursor-pointer hover:bg-slate-50 transition-colors">
-          {storeProfile.logoUrl ? (
-            <img src={storeProfile.logoUrl} alt="Logo" className="w-10 h-10 rounded-full object-cover border border-slate-200" />
-          ) : (
-            <div className="bg-amber-100 p-2 rounded-full">
-              <Coffee className="text-amber-700" size={24} />
-            </div>
-          )}
-          <div className="flex-1">
-            <h1 className="text-base font-bold text-slate-800 tracking-tight leading-tight">{storeProfile.name}</h1>
-            <p className="text-[10px] text-slate-400">Coffee ERP v2.5.4</p>
-          </div>
-          {isMobile && (
-            <button
-              onClick={closeMobileSidebar}
-              className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
-              aria-label="메뉴 닫기"
-            >
-              <X size={20} />
-            </button>
-          )}
-        </Link>
-
-        <nav id="tour-sidebar-nav" className="p-4 space-y-1 flex-1 overflow-y-auto">
-          {navItems.map(item => (
-            <NavItem
-              key={item.to}
-              id={item.id}
-              to={item.to}
-              icon={item.icon}
-              label={item.label}
-              active={location.pathname === item.to}
-              onClick={isMobile ? closeMobileSidebar : undefined}
-            />
-          ))}
-        </nav>
-
-        <div className="p-4 border-t border-slate-100 space-y-1 bg-slate-50/50">
-          <NavItem to="/help" icon={HelpCircle} label="도움말" active={location.pathname === '/help'} onClick={isMobile ? closeMobileSidebar : undefined} />
-          <NavItem to="/settings" icon={Settings} label="설정" active={location.pathname === '/settings'} onClick={isMobile ? closeMobileSidebar : undefined} />
-        </div>
-
-        {user && (
-          <div className="p-4 border-t border-slate-200 bg-slate-50">
-            <div className="flex items-center gap-3 mb-3">
-              {user.user_metadata?.avatar_url ? (
-                <img
-                  src={user.user_metadata.avatar_url}
-                  alt="Profile"
-                  className="w-8 h-8 rounded-full border border-slate-200"
-                />
-              ) : (
-                <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center text-amber-700 font-bold text-sm">
-                  {user.email?.charAt(0).toUpperCase()}
-                </div>
-              )}
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-slate-700 truncate">
-                  {user.user_metadata?.full_name || '사용자'}
-                </p>
-                <p className="text-xs text-slate-400 truncate">
-                  {user.email}
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={handleLogout}
-              className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-slate-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors duration-200"
-            >
-              <LogOut size={16} />
-              <span>로그아웃</span>
-            </button>
+        {/* 서브탭 줄: 활성 그룹의 하위 경로 */}
+        {activeGroup.children.length > 1 && (
+          <div className="flex items-center gap-1 px-2 sm:px-5 py-1.5 overflow-x-auto border-t border-slate-100 bg-slate-50/70">
+            {activeGroup.children.map(child => {
+              const ChildIcon = child.icon;
+              const childActive = location.pathname === child.to;
+              return (
+                <Link
+                  key={child.to}
+                  id={child.id}
+                  to={child.to}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm whitespace-nowrap transition-colors ${childActive
+                    ? 'bg-blue-600 text-white font-semibold nav-item-active'
+                    : 'text-slate-600 hover:bg-slate-200/70'
+                    }`}
+                >
+                  <ChildIcon size={16} />
+                  <span>{child.label}</span>
+                </Link>
+              );
+            })}
           </div>
         )}
-      </div>
+      </header>
 
+      {/* 메인 콘텐츠 */}
       <div
-        className={`flex-1 relative min-w-0 overflow-x-hidden transition-all duration-300 ease-in-out ${isMobile ? 'ml-0 layout-main-mobile' : 'ml-64'}`}
+        className="flex-1 relative min-w-0 overflow-x-hidden transition-all duration-300 ease-in-out"
         style={{ marginRight: !isMobile && isAIDrawerOpen ? '400px' : '0' }}
       >
-        <main className={`${isMobile ? 'p-4 pb-8' : 'p-8'} max-w-7xl mx-auto w-full min-w-0 overflow-x-hidden`}>
+        <main className={`${isMobile ? 'p-4 pb-24' : 'p-6 lg:p-8'} max-w-7xl mx-auto w-full min-w-0 overflow-x-hidden`}>
           <Outlet />
         </main>
       </div>
 
-      {!isMobile && !isAIDrawerOpen && (
-        <div className="fixed bottom-8 right-8 z-40 flex flex-col items-center gap-3">
-          {/* 다크/라이트 모드 (데스크탑) */}
-          <button
-            onClick={() => updateAppSettings({ darkMode: !appSettings.darkMode })}
-            className="p-3.5 rounded-full bg-white/95 backdrop-blur-sm border border-slate-200 shadow-md hover:shadow-lg hover:-translate-y-1 transition-all duration-200 text-slate-600"
-            title={appSettings.darkMode ? "라이트 모드로 전환" : "다크 모드로 전환"}
-          >
-            {appSettings.darkMode ? <Sun size={20} /> : <Moon size={20} />}
-          </button>
-
-          {/* 글자 크기 조절 (데스크탑) */}
-          <button
-            onClick={cycleFontSize}
-            className="flex items-center justify-center w-12 h-12 rounded-full bg-white/95 backdrop-blur-sm border border-slate-200 shadow-md hover:shadow-lg hover:-translate-y-1 transition-all duration-200 text-slate-600"
-            title={`글자 크기: ${fontSizeLabel}`}
-          >
-            <span className="font-black text-sm">{fontSizeToken}</span>
-          </button>
-
-          {/* AI Monstock */}
+      {/* 우하단 FAB: AI Monstock (통합 카메라 FAB는 Step 3에서 추가) */}
+      {!isAIDrawerOpen && (
+        <div className="fixed bottom-6 right-6 z-40">
           <button
             onClick={openAIDrawer}
-            className="p-4 rounded-full bg-blue-600 text-white shadow-lg shadow-blue-200 hover:shadow-xl hover:scale-110 hover:bg-blue-700 transition-all duration-200 mt-1"
+            className="p-4 rounded-full bg-blue-600 text-white shadow-lg shadow-blue-200 hover:shadow-xl hover:scale-110 hover:bg-blue-700 transition-all duration-200"
             title="AI Monstock 열기"
             aria-label="AI Monstock 열기"
           >
