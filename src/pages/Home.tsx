@@ -302,12 +302,9 @@ export default function Home() {
         tourKey="home_page"
         autoStart={tourReady}
         onStepChange={(idx) => {
-            // 스텝 3(index 2) 진입 시 대시보드 및 사이드바 제어
+            // 스텝 3(index 2) 진입 시 매출 상세 패널 펼침
             if (idx === 2) {
-                // 1. 매출 상세 패널 펼침
                 setShowRevenue(true);
-                // 2. 모바일/태블릿 등에서 사이드바(좌측 메뉴) 강제 오픈
-                window.dispatchEvent(new CustomEvent('erp:sidebar:open'));
             }
         }}
     />

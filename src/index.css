@@ -7,7 +7,6 @@
 @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
 
 :root {
-  --mobile-header-offset: 56px;
   /* TWA(Play Store)에서 시스템 다크모드를 따라가지 않도록 라이트 강제 */
   color-scheme: light;
 }
@@ -127,85 +126,6 @@ textarea {
   animation: fadeIn 0.3s ease-out;
 }
 
-.layout-main-mobile {
-  padding-top: var(--mobile-header-offset);
-  min-width: 0;
-  overflow-x: hidden;
-}
-
-.desktop-page-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  min-height: 56px;
-  margin-bottom: 24px;
-  display: flex;
-  width: 100%;
-  padding: 8px;
-  background: rgba(255, 255, 255, 0.92);
-  border: 1px solid #e2e8f0;
-  border-radius: 20px;
-  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
-  backdrop-filter: blur(12px);
-}
-
-.desktop-page-header-spacer {
-  flex: 1;
-  min-width: 0;
-}
-
-.desktop-page-header-actions,
-.mobile-header-actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
-  min-width: max-content;
-  flex-shrink: 0;
-}
-
-.desktop-utility-btn,
-.mobile-header-utility-btn,
-.desktop-ai-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  border: 1px solid #e2e8f0;
-  border-radius: 9999px;
-  background: #fff;
-  color: #334155;
-  font-weight: 700;
-  transition: all 0.2s ease;
-}
-
-.desktop-utility-btn {
-  min-width: 46px;
-  min-height: 40px;
-  padding: 0 12px;
-}
-
-.desktop-utility-btn:hover,
-.mobile-header-utility-btn:hover,
-.desktop-ai-btn:hover {
-  background: #f8fafc;
-  border-color: #cbd5e1;
-  color: #0f172a;
-}
-
-.desktop-ai-btn {
-  padding: 0 14px;
-}
-
-.desktop-ai-btn.active,
-.mobile-ai-btn.active {
-  background: linear-gradient(135deg, #2563eb, #4f46e5);
-  border-color: transparent;
-  color: #fff;
-  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.22);
-}
-
 .responsive-table-shell {
   display: block;
   width: 100%;
@@ -225,178 +145,6 @@ textarea {
   color: #94a3b8;
 }
 
-/* ========== 모바일 반응형 Layout ========== */
-
-/* 사이드바 공통 */
-.sidebar-container {
-  width: 16rem; /* w-64 */
-  background: white;
-  border-right: 1px solid #e2e8f0;
-  flex-shrink: 0;
-  position: fixed;
-  height: 100%;
-  z-index: 10;
-  transition: all 0.3s;
-  display: flex;
-  flex-direction: column;
-}
-
-/* 모바일 사이드바 */
-.mobile-sidebar {
-  z-index: 60;
-  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.15);
-  width: min(18rem, calc(100vw - 1rem));
-}
-
-.mobile-sidebar-closed {
-  transform: translateX(-100%);
-}
-
-.mobile-sidebar-open {
-  transform: translateX(0);
-}
-
-/* 모바일 오버레이 */
-.mobile-sidebar-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(15, 23, 42, 0.4);
-  backdrop-filter: blur(2px);
-  z-index: 55;
-  animation: fadeIn 0.2s ease-out;
-}
-
-/* 모바일 상단 헤더 */
-.mobile-top-header {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 56px;
-  background: white;
-  border-bottom: 1px solid #e2e8f0;
-  display: grid;
-  grid-template-columns: 40px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 8px;
-  padding: 0 12px;
-  z-index: 45;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
-}
-
-.mobile-hamburger-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  border: none;
-  background: none;
-  color: #475569;
-  border-radius: 10px;
-  transition: all 0.2s;
-}
-
-.mobile-hamburger-btn:hover,
-.mobile-hamburger-btn:active {
-  background: #f1f5f9;
-  color: #1e293b;
-}
-
-.mobile-header-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: 1;
-  min-width: 0;
-  justify-content: flex-start;
-  padding: 0 8px;
-  font-weight: 700;
-  font-size: 0.95rem;
-  color: #1e293b;
-}
-
-.mobile-header-title span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.mobile-header-logo {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 1px solid #e2e8f0;
-}
-
-.mobile-header-utility-btn {
-  min-width: 34px;
-  min-height: 34px;
-  padding: 0 8px;
-  font-size: 0.78rem;
-  flex-shrink: 0;
-}
-
-@media (max-width: 480px) {
-  .mobile-top-header {
-    gap: 4px;
-    padding: 0 8px;
-  }
-
-  .mobile-header-title {
-    justify-content: center;
-    padding: 0;
-  }
-
-  .mobile-header-title span {
-    display: none;
-  }
-
-  .mobile-header-actions {
-    gap: 4px;
-  }
-
-  .mobile-header-utility-btn {
-    padding: 0 7px;
-  }
-}
-
-@media (max-width: 390px) {
-  .mobile-top-header {
-    grid-template-columns: 36px minmax(0, 1fr) auto;
-    gap: 3px;
-    padding: 0 6px;
-  }
-
-  .mobile-hamburger-btn {
-    width: 36px;
-    height: 36px;
-  }
-
-  .mobile-header-title {
-    gap: 6px;
-  }
-
-  .mobile-header-actions {
-    gap: 3px;
-  }
-
-  .mobile-header-utility-btn {
-    min-width: 32px;
-    min-height: 32px;
-    padding: 0 6px;
-  }
-
-  .mobile-font-btn {
-    padding: 0;
-  }
-
-  .mobile-font-token {
-    display: none;
-  }
-}
-
 html[data-font-size="small"] {
   font-size: 14px;
 }
@@ -414,39 +162,8 @@ html[data-theme="dark"] body {
   color: #e2e8f0;
 }
 
-html[data-theme="dark"] .desktop-page-header {
-  background: rgba(15, 23, 42, 0.88);
-  border-color: #334155;
-  box-shadow: 0 12px 30px rgba(2, 6, 23, 0.45);
-}
-
-html[data-theme="dark"] .desktop-utility-btn,
-html[data-theme="dark"] .mobile-header-utility-btn,
-html[data-theme="dark"] .desktop-ai-btn {
-  background: #0f172a;
-  border-color: #334155;
-  color: #e2e8f0;
-}
-
-html[data-theme="dark"] .desktop-utility-btn:hover,
-html[data-theme="dark"] .mobile-header-utility-btn:hover,
-html[data-theme="dark"] .desktop-ai-btn:hover {
-  background: #1e293b;
-  border-color: #475569;
-  color: #f8fafc;
-}
-
-html[data-theme="dark"] .desktop-ai-btn.active,
-html[data-theme="dark"] .mobile-ai-btn.active {
-  background: linear-gradient(135deg, #2563eb, #4f46e5);
-  color: #fff;
-  border-color: transparent;
-}
-
 html[data-theme="dark"] .bg-white,
-html[data-theme="dark"] .bg-white\/50,
-html[data-theme="dark"] .sidebar-container,
-html[data-theme="dark"] .mobile-top-header {
+html[data-theme="dark"] .bg-white\/50 {
   background-color: #0f172a !important;
 }
 
@@ -628,16 +345,3 @@ html[data-theme="dark"] .table-select:focus {
   background-color: #0f172a;
 }
 
-/* safe-area 대응 (iPhone 노치 등) */
-@supports (padding-top: env(safe-area-inset-top)) {
-  :root {
-    --mobile-header-offset: calc(56px + env(safe-area-inset-top));
-  }
-
-  .mobile-top-header {
-    padding-top: env(safe-area-inset-top);
-    padding-left: calc(12px + env(safe-area-inset-left));
-    padding-right: calc(12px + env(safe-area-inset-right));
-    height: calc(56px + env(safe-area-inset-top));
-  }
-}
