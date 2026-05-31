@@ -2083,6 +2083,16 @@ const DailySalesAddView = () => {
 export default function TransactionManager() {
     const [activeTab, setActiveTab] = useState("dailySalesAdd");
 
+    // 전역 카메라 FAB(Layout) → 매출 등록 탭으로 진입
+    useEffect(() => {
+        const handleCaptureOpen = () => {
+            setActiveTab("dailySalesAdd");
+            window.scrollTo({ top: 0, behavior: "smooth" });
+        };
+        window.addEventListener("erp:capture:open", handleCaptureOpen);
+        return () => window.removeEventListener("erp:capture:open", handleCaptureOpen);
+    }, []);
+
     return (
         <div className="space-y-6 animate-fade-in">
             <header>

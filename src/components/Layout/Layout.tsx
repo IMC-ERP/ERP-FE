@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect, lazy, Suspense } from 'react';
-import { Link, Outlet, useLocation } from 'react-router-dom';
+import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
   Calendar,
@@ -19,7 +19,8 @@ import {
   X,
   LogOut,
   Sun,
-  Moon
+  Moon,
+  Camera
 } from 'lucide-react';
 import { useData } from '../../contexts/DataContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -74,6 +75,7 @@ const navGroups: NavGroup[] = [
 
 export default function Layout() {
   const location = useLocation();
+  const navigate = useNavigate();
   const { storeProfile, appSettings, updateAppSettings } = useData();
   const { user, logout } = useAuth();
 
@@ -100,6 +102,18 @@ export default function Layout() {
   }, [isAIDrawerOpen, isMobile]);
 
   const openAIDrawer = () => setIsAIDrawerOpen(true);
+
+  // 초안1 통합 카메라 FAB: 어느 화면에서든 매출 등록(영수증/명세서/직접입력) 진입점으로 이동.
+  // 거래 데이터 관리 페이지의 기존 입력 플로우를 erp:capture:open 이벤트로 호출한다.
+  const openCapture = () => {
+    if (location.pathname !== '/transactions') {
+      navigate('/transactions');
+      // 페이지 마운트 후 리스너가 준비되도록 약간 지연 후 이벤트 발송
+      setTimeout(() => window.dispatchEvent(new CustomEvent('erp:capture:open')), 300);
+    } else {
+      window.dispatchEvent(new CustomEvent('erp:capture:open'));
+    }
+  };
 
   const cycleFontSize = () => {
     const nextSize = appSettings.fontSize === 'small'
@@ -252,16 +266,26 @@ export default function Layout() {
         </main>
       </div>
 
-      {/* 우하단 FAB: AI Monstock (통합 카메라 FAB는 Step 3에서 추가) */}
+      {/* 우하단 FAB: 통합 카메라(매출 등록) + AI Monstock */}
       {!isAIDrawerOpen && (
-        <div className="fixed bottom-6 right-6 z-40">
+        <div className="fixed bottom-6 right-6 z-40 flex flex-col items-center gap-3">
+          {/* AI Monstock */}
           <button
             onClick={openAIDrawer}
-            className="p-4 rounded-full bg-blue-600 text-white shadow-lg shadow-blue-200 hover:shadow-xl hover:scale-110 hover:bg-blue-700 transition-all duration-200"
+            className="p-3.5 rounded-full bg-white text-blue-600 border border-slate-200 shadow-md hover:shadow-lg hover:scale-110 transition-all duration-200"
             title="AI Monstock 열기"
             aria-label="AI Monstock 열기"
           >
-            <Bot size={24} />
+            <Bot size={22} />
+          </button>
+          {/* 통합 카메라 FAB (매출 영수증/거래명세서/직접 입력 진입점) */}
+          <button
+            onClick={openCapture}
+            className="p-4 rounded-full bg-blue-600 text-white shadow-lg shadow-blue-200 hover:shadow-xl hover:scale-110 hover:bg-blue-700 transition-all duration-200"
+            title="매출 등록 (영수증 촬영·직접 입력)"
+            aria-label="매출 등록"
+          >
+            <Camera size={26} />
           </button>
         </div>
       )}
