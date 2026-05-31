@@ -659,13 +659,24 @@ export interface HomeMarginWarning {
   costPrice: number;
 }
 
+// 단가 인상이 메뉴 마진에 미치는 영향
+export interface HomeAffectedMenu {
+  name: string;
+  oldMargin: number;
+  newMargin: number;
+}
+
 // 단가 인상 감지 (stock_intakes 직전 입고 단가 대비)
 export interface HomeCostWarning {
   name: string;
+  inventoryItemId: string | null;
   oldPrice: number;
   newPrice: number;
   changePct: number;
+  unitCostBefore: number | null;
+  unitCostAfter: number | null;
   intakeAt: string | null;
+  affectedMenus: HomeAffectedMenu[];
 }
 
 export interface HomeDataResponse {

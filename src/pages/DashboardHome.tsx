@@ -179,10 +179,21 @@ export default function DashboardHome() {
                                 <Sparkles className="text-amber-500 shrink-0 mt-0.5" size={18} />
                                 <div className="min-w-0 text-sm">
                                     <p className="font-bold text-amber-800 mb-1">AI 원가 알림</p>
-                                    <ul className="space-y-0.5 text-amber-700">
+                                    <ul className="space-y-1.5 text-amber-700">
                                         {costWarnings.slice(0, 3).map((c, i) => (
                                             <li key={i} className="break-keep">
-                                                <span className="font-semibold">{c.name}</span> 단가 <span className="font-semibold">{c.changePct}%</span> 인상 감지 ({wonFull(c.oldPrice)} → {wonFull(c.newPrice)}). 메뉴 원가·가격 점검을 추천합니다.
+                                                <span className="font-semibold">{c.name}</span> 단가 <span className="font-semibold">{c.changePct}%</span> 인상 감지 ({wonFull(c.oldPrice)} → {wonFull(c.newPrice)}).
+                                                {c.affectedMenus.length > 0 ? (
+                                                    <span className="block text-xs text-amber-600 mt-0.5">
+                                                        {c.affectedMenus.map((m, j) => (
+                                                            <span key={j} className="mr-2 whitespace-nowrap">
+                                                                · {m.name} 마진 {m.oldMargin}% → <span className="font-semibold">{m.newMargin}%</span>
+                                                            </span>
+                                                        ))}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-amber-600"> 메뉴 원가·가격 점검을 추천합니다.</span>
+                                                )}
                                             </li>
                                         ))}
                                     </ul>
