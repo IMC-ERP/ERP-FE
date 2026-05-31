@@ -111,7 +111,7 @@ export default function DashboardHome() {
 
     const summary = data?.summary;
     const stockWarnings = data?.stockWarnings ?? [];
-    const marginWarnings = data?.marginWarnings ?? [];
+    const costWarnings = data?.costWarnings ?? [];
     const topMenus = data?.topMenus ?? [];
     const openHour = data?.openHour ?? 0;
     const closeHour = data?.closeHour ?? 24;
@@ -173,16 +173,16 @@ export default function DashboardHome() {
                             />
                         </div>
 
-                        {/* AI 마진 알림 (marginWarnings 있을 때만) */}
-                        {marginWarnings.length > 0 && (
+                        {/* AI 원가 알림: 단가 인상 감지 (costWarnings 있을 때만) */}
+                        {costWarnings.length > 0 && (
                             <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 flex gap-3">
                                 <Sparkles className="text-amber-500 shrink-0 mt-0.5" size={18} />
                                 <div className="min-w-0 text-sm">
-                                    <p className="font-bold text-amber-800 mb-1">AI 마진 알림</p>
+                                    <p className="font-bold text-amber-800 mb-1">AI 원가 알림</p>
                                     <ul className="space-y-0.5 text-amber-700">
-                                        {marginWarnings.slice(0, 3).map((m, i) => (
+                                        {costWarnings.slice(0, 3).map((c, i) => (
                                             <li key={i} className="break-keep">
-                                                <span className="font-semibold">{m.name}</span> 마진율이 <span className="font-semibold">{Math.round(m.marginRate)}%</span>로 낮아요. 가격·원가 점검을 추천합니다.
+                                                <span className="font-semibold">{c.name}</span> 단가 <span className="font-semibold">{c.changePct}%</span> 인상 감지 ({wonFull(c.oldPrice)} → {wonFull(c.newPrice)}). 메뉴 원가·가격 점검을 추천합니다.
                                             </li>
                                         ))}
                                     </ul>
@@ -211,7 +211,7 @@ export default function DashboardHome() {
                                                 <div className="min-w-0">
                                                     <span className="font-semibold text-slate-700 block truncate">{item.name}</span>
                                                     <p className="text-xs text-slate-400 mt-0.5">
-                                                        현재 {item.currentStock}{item.unit} · 안전재고 {item.safetyStock}{item.unit}
+                                                        현재 {item.current}{item.unit} · 안전재고 {item.safety}{item.unit}
                                                     </p>
                                                 </div>
                                                 <span className="shrink-0 text-xs font-bold px-2 py-1 bg-rose-50 text-rose-600 rounded border border-rose-100">발주 필요</span>

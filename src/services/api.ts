@@ -645,9 +645,10 @@ export interface HomeHourlyData {
 }
 
 export interface HomeStockWarning {
+  id: string;
   name: string;
-  currentStock: number;
-  safetyStock: number;
+  current: number;
+  safety: number;
   unit: string;
 }
 
@@ -658,12 +659,22 @@ export interface HomeMarginWarning {
   costPrice: number;
 }
 
+// 단가 인상 감지 (stock_intakes 직전 입고 단가 대비)
+export interface HomeCostWarning {
+  name: string;
+  oldPrice: number;
+  newPrice: number;
+  changePct: number;
+  intakeAt: string | null;
+}
+
 export interface HomeDataResponse {
   summary: HomeSummary;
   hourlySales: HomeHourlyData[];
   topMenus: any[];
   stockWarnings: HomeStockWarning[];
   marginWarnings: HomeMarginWarning[];
+  costWarnings: HomeCostWarning[];
   openHour: number;
   closeHour: number;
   updatedAt: string;
