@@ -12,14 +12,13 @@ import OnboardingGuard from './components/OnboardingGuard';
 import OnboardingLayout from './pages/onboarding/OnboardingLayout';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
-import Dashboard from './pages/Dashboard';
+import DashboardHome from './pages/DashboardHome';
 import Inventory from './pages/Inventory';
 import Recipes from './pages/Recipes';
 import AIAssistant from './pages/AIAssistant';
 import SalesAnalysis from './pages/SalesAnalysis';
 import TransactionManager from './pages/TransactionManager';
 import CostRecipeManager from './pages/CostRecipeManager';
-import Home from './pages/Home';
 import SettingsPage from './pages/SettingsPage';
 import InvitePage from './pages/InvitePage';
 import PrivacyPolicy from './pages/PrivacyPolicy';
@@ -180,8 +179,8 @@ function App() {
                 </OnboardingGuard>
               </ProtectedRoute>
             }>
-              <Route index element={<Home />} />
-              <Route path="dashboard" element={<Dashboard />} />
+              <Route index element={<DashboardHome />} />
+              <Route path="dashboard" element={<Navigate to="/" replace />} />
               <Route path="period" element={<SalesAnalysis />} />
               <Route path="transactions" element={<TransactionManager />} />
               <Route path="sales" element={<Navigate to="/" replace />} />

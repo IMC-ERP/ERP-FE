@@ -48,8 +48,7 @@ const navGroups: NavGroup[] = [
     label: '대시보드',
     icon: LayoutDashboard,
     children: [
-      { id: 'tour-nav-home', to: '/', icon: Home, label: '홈' },
-      { id: 'tour-nav-dashboard', to: '/dashboard', icon: LayoutDashboard, label: '경영 현황' },
+      { id: 'tour-nav-home', to: '/', icon: Home, label: '대시보드' },
     ],
   },
   {
