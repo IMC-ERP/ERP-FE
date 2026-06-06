@@ -20,12 +20,6 @@ import SpotlightTour from '../components/SpotlightTour';
 
 // ── 포매터 ──────────────────────────────────────────────
 const wonFull = (v: number) => `₩${Math.round(v || 0).toLocaleString()}`;
-const wonCompact = (v: number) => {
-    const n = Math.round(v || 0);
-    if (n >= 100000000) return `₩${(n / 100000000).toFixed(1)}억`;
-    if (n >= 10000) return `₩${Math.round(n / 1000)}K`;
-    return `₩${n.toLocaleString()}`;
-};
 const pct = (cur: number, prev: number) => (prev ? Math.round(((cur - prev) / Math.abs(prev)) * 100) : 0);
 const marginRate = (profit: number, rev: number) => (rev > 0 ? Math.round((profit / rev) * 100) : 0);
 
@@ -168,7 +162,7 @@ export default function DashboardHome() {
                             />
                             <KpiCard
                                 title="오늘 매출"
-                                value={wonCompact(summary.todayRevenue)}
+                                value={wonFull(summary.todayRevenue)}
                                 sub={`${(summary.todayOrders ?? 0).toLocaleString()}건 주문`}
                             />
                         </div>
