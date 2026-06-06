@@ -695,6 +695,21 @@ export const homeApi = {
   get: () => api.get<HomeDataResponse>('/home'),
 };
 
+// ==================== Notifications (Web Push) API ====================
+
+export const notificationsApi = {
+  getVapidPublicKey: () => api.get<{ publicKey: string }>('/notifications/vapid-public-key'),
+  subscribe: (subscription: PushSubscriptionJSON) =>
+    api.post<{ ok: boolean }>('/notifications/subscribe', { subscription }),
+  unsubscribe: (endpoint: string) =>
+    api.post<{ ok: boolean }>('/notifications/unsubscribe', { endpoint }),
+  sendTest: () =>
+    api.post<{
+      payload: { title: string; body: string };
+      delivery: { sent: number; failed: number; total: number };
+    }>('/notifications/test'),
+};
+
 // ==================== Expenses API ====================
 
 export interface ExpenseItemCreate {

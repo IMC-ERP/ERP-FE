@@ -45,6 +45,8 @@ export default defineConfig({
       workbox: {
         // 정적 자산 precache
         globPatterns: ['**/*.{js,css,html,ico,png,svg,webp,woff2}'],
+        // 웹푸시 push/notificationclick 핸들러를 생성된 SW에 주입
+        importScripts: ['/sw-push-handler.js'],
         // 동적 캐싱 전략
         runtimeCaching: [
           {

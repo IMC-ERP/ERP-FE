@@ -7,11 +7,12 @@
 import { useState, useEffect } from 'react';
 import { useData } from '../contexts/DataContext';
 import { useAuth } from '../contexts/AuthContext';
-import { userApi, type StoreMemberData } from '../services/api';
+import { userApi, notificationsApi, type StoreMemberData } from '../services/api';
+import { isPushSupported, getPermission, getCurrentSubscription, enablePush, disablePush } from '../services/push';
 import {
     Store, User, MapPin, Phone, Calendar, Users, UserPlus, Shield, Mail,
     Monitor, Moon, Sun, Type, Save, Check, Loader2, AlertCircle, Trash2, X,
-    Copy, Edit3, ChevronDown, ChevronUp, ClipboardList
+    Copy, Edit3, ChevronDown, ChevronUp, ClipboardList, Bell, BellOff, Send
 } from 'lucide-react';
 
 interface InvitationRecord {
@@ -23,7 +24,7 @@ interface InvitationRecord {
     expires_at: string | null;
 }
 
-type SettingsTab = 'profile' | 'account' | 'display';
+type SettingsTab = 'profile' | 'account' | 'display' | 'notif';
 
 const roleLabel = (role: string) => {
     switch (role) {
@@ -39,6 +40,60 @@ export default function SettingsPage() {
     const { userProfile, logout, refreshProfile } = useAuth();
 
     const [activeTab, setActiveTab] = useState<SettingsTab>('profile');
+
+    // ========== 알림(웹푸시) 상태 ==========
+    const pushSupported = isPushSupported();
+    const [pushEnabled, setPushEnabled] = useState(false);
+    const [pushPermission, setPushPermission] = useState<NotificationPermission | 'unsupported'>(getPermission());
+    const [pushBusy, setPushBusy] = useState(false);
+    const [pushMsg, setPushMsg] = useState<{ type: 'ok' | 'error'; text: string } | null>(null);
+
+    useEffect(() => {
+        if (!pushSupported) return;
+        getCurrentSubscription().then((sub) => setPushEnabled(!!sub));
+    }, [pushSupported]);
+
+    const handleTogglePush = async () => {
+        setPushBusy(true);
+        setPushMsg(null);
+        try {
+            if (pushEnabled) {
+                await disablePush();
+                setPushEnabled(false);
+                setPushMsg({ type: 'ok', text: '마감 리포트 알림을 껐습니다.' });
+            } else {
+                const ok = await enablePush();
+                setPushPermission(getPermission());
+                if (ok) {
+                    setPushEnabled(true);
+                    setPushMsg({ type: 'ok', text: '알림을 켰습니다. 매일 마감 리포트를 보내드려요.' });
+                } else {
+                    setPushMsg({ type: 'error', text: '브라우저에서 알림 권한이 거부되어 있어요. 권한을 허용해 주세요.' });
+                }
+            }
+        } catch (err: any) {
+            setPushMsg({ type: 'error', text: err?.message || '알림 설정 중 오류가 발생했습니다.' });
+        } finally {
+            setPushBusy(false);
+        }
+    };
+
+    const handleSendTest = async () => {
+        setPushBusy(true);
+        setPushMsg(null);
+        try {
+            const { data } = await notificationsApi.sendTest();
+            if (data.delivery.sent > 0) {
+                setPushMsg({ type: 'ok', text: `테스트 알림을 ${data.delivery.sent}개 기기로 보냈어요.` });
+            } else {
+                setPushMsg({ type: 'error', text: '발송 대상 기기가 없어요. 먼저 알림을 켜주세요.' });
+            }
+        } catch (err: any) {
+            setPushMsg({ type: 'error', text: err?.response?.data?.detail || '테스트 발송에 실패했습니다.' });
+        } finally {
+            setPushBusy(false);
+        }
+    };
 
     // ========== 매장 프로필 상태 ==========
     const [storeSlug, setStoreSlug] = useState('');
@@ -399,6 +454,7 @@ export default function SettingsPage() {
                         <TabButton tab="profile" icon={Store} label="매장 프로필" />
                         <TabButton tab="account" icon={User} label="계정 관리" />
                         <TabButton tab="display" icon={Monitor} label="디스플레이" />
+                        <TabButton tab="notif" icon={Bell} label="알림 설정" />
                     </nav>
                 </div>
 
@@ -984,6 +1040,71 @@ export default function SettingsPage() {
                         </div>
                     )}
 
+                    {/* ===================== 알림 설정 탭 ===================== */}
+                    {activeTab === 'notif' && (
+                        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 sm:p-6 md:p-8 space-y-6 animate-fade-in">
+                            <h3 className="text-lg font-bold text-slate-800 border-b border-slate-100 pb-3">알림 설정</h3>
+
+                            {!pushSupported ? (
+                                <div className="flex items-start gap-3 rounded-xl bg-amber-50 border border-amber-200 p-4 text-sm text-amber-700">
+                                    <AlertCircle size={18} className="shrink-0 mt-0.5" />
+                                    <p>이 브라우저는 푸시 알림을 지원하지 않습니다. 휴대폰에 홈 화면으로 추가(PWA 설치) 후 다시 시도해 보세요.</p>
+                                </div>
+                            ) : (
+                                <>
+                                    {/* 마감 리포트 토글 */}
+                                    <div className="flex items-center justify-between gap-4 rounded-xl border border-slate-200 p-4">
+                                        <div className="min-w-0">
+                                            <p className="font-bold text-slate-800 flex items-center gap-2">
+                                                <Bell size={16} className="text-blue-600" /> 마감 리포트 알림
+                                            </p>
+                                            <p className="text-sm text-slate-500 mt-1">
+                                                매일 마감 후 오늘의 매출·순이익·발주 알림을 받아보세요.
+                                            </p>
+                                        </div>
+                                        <button
+                                            onClick={handleTogglePush}
+                                            disabled={pushBusy}
+                                            role="switch"
+                                            aria-checked={pushEnabled}
+                                            className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors disabled:opacity-50 ${pushEnabled ? 'bg-blue-600' : 'bg-slate-300'}`}
+                                        >
+                                            <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${pushEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
+                                        </button>
+                                    </div>
+
+                                    {pushPermission === 'denied' && (
+                                        <div className="flex items-start gap-3 rounded-xl bg-rose-50 border border-rose-200 p-4 text-sm text-rose-700">
+                                            <BellOff size={18} className="shrink-0 mt-0.5" />
+                                            <p>브라우저 알림 권한이 차단되어 있어요. 주소창의 자물쇠 아이콘 → 알림 허용으로 바꾼 뒤 다시 켜주세요.</p>
+                                        </div>
+                                    )}
+
+                                    {/* 테스트 발송 */}
+                                    <div className="flex items-center justify-between gap-4 rounded-xl border border-slate-200 p-4">
+                                        <div className="min-w-0">
+                                            <p className="font-bold text-slate-800">테스트 알림 보내기</p>
+                                            <p className="text-sm text-slate-500 mt-1">지금 이 기기로 마감 리포트를 한 번 보내봅니다.</p>
+                                        </div>
+                                        <button
+                                            onClick={handleSendTest}
+                                            disabled={pushBusy || !pushEnabled}
+                                            className="shrink-0 inline-flex items-center gap-2 rounded-lg bg-slate-800 px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-slate-700 disabled:opacity-40"
+                                        >
+                                            {pushBusy ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />} 보내기
+                                        </button>
+                                    </div>
+
+                                    {pushMsg && (
+                                        <div className={`flex items-center gap-2 rounded-xl p-3 text-sm ${pushMsg.type === 'ok' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'}`}>
+                                            {pushMsg.type === 'ok' ? <Check size={16} /> : <AlertCircle size={16} />}
+                                            {pushMsg.text}
+                                        </div>
+                                    )}
+                                </>
+                            )}
+                        </div>
+                    )}
 
                 </div>
             </div>
