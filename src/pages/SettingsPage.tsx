@@ -11,7 +11,7 @@ import { userApi, type StoreMemberData } from '../services/api';
 import {
     Store, User, MapPin, Phone, Calendar, Users, UserPlus, Shield, Mail,
     Monitor, Moon, Sun, Type, Save, Check, Loader2, AlertCircle, Trash2, X,
-    Copy, Edit3, ChevronDown, ChevronUp, ClipboardList
+    Copy, Edit3, ChevronDown, ChevronUp, ClipboardList, Bell
 } from 'lucide-react';
 
 interface InvitationRecord {
@@ -23,7 +23,7 @@ interface InvitationRecord {
     expires_at: string | null;
 }
 
-type SettingsTab = 'profile' | 'account' | 'display';
+type SettingsTab = 'profile' | 'account' | 'display' | 'notif';
 
 const roleLabel = (role: string) => {
     switch (role) {
@@ -39,6 +39,18 @@ export default function SettingsPage() {
     const { userProfile, logout, refreshProfile } = useAuth();
 
     const [activeTab, setActiveTab] = useState<SettingsTab>('profile');
+
+    // ========== 알림 설정 (현재 표시용 토글 — 발송 기능 준비 중) ==========
+    const [dailyReportOn, setDailyReportOn] = useState<boolean>(
+        () => localStorage.getItem('notif_daily_report') === 'on'
+    );
+    const toggleDailyReport = () => {
+        setDailyReportOn(prev => {
+            const next = !prev;
+            localStorage.setItem('notif_daily_report', next ? 'on' : 'off');
+            return next;
+        });
+    };
 
     // ========== 매장 프로필 상태 ==========
     const [storeSlug, setStoreSlug] = useState('');
@@ -399,6 +411,7 @@ export default function SettingsPage() {
                         <TabButton tab="profile" icon={Store} label="매장 프로필" />
                         <TabButton tab="account" icon={User} label="계정 관리" />
                         <TabButton tab="display" icon={Monitor} label="디스플레이" />
+                        <TabButton tab="notif" icon={Bell} label="알림 설정" />
                     </nav>
                 </div>
 
@@ -984,6 +997,36 @@ export default function SettingsPage() {
                         </div>
                     )}
 
+                    {/* ===================== 알림 설정 탭 ===================== */}
+                    {activeTab === 'notif' && (
+                        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 sm:p-6 md:p-8 space-y-6 animate-fade-in">
+                            <h3 className="text-lg font-bold text-slate-800 border-b border-slate-100 pb-3">알림 설정</h3>
+
+                            <div className="flex items-center justify-between gap-4 rounded-xl border border-slate-200 p-4">
+                                <div className="min-w-0">
+                                    <p className="font-bold text-slate-800 flex items-center gap-2">
+                                        <Bell size={16} className="text-blue-600" /> 마감 리포트 알림
+                                    </p>
+                                    <p className="text-sm text-slate-500 mt-1">
+                                        매일 마감 후 오늘의 매출·순이익 요약을 받아보세요.
+                                    </p>
+                                </div>
+                                <button
+                                    onClick={toggleDailyReport}
+                                    role="switch"
+                                    aria-checked={dailyReportOn}
+                                    className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors ${dailyReportOn ? 'bg-blue-600' : 'bg-slate-300'}`}
+                                >
+                                    <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${dailyReportOn ? 'translate-x-6' : 'translate-x-1'}`} />
+                                </button>
+                            </div>
+
+                            <div className="flex items-start gap-3 rounded-xl bg-slate-50 border border-slate-200 p-4 text-sm text-slate-500">
+                                <AlertCircle size={18} className="shrink-0 mt-0.5" />
+                                <p>푸시 알림 발송 기능은 준비 중이에요. 지금은 받을지 여부만 미리 설정해 둘 수 있어요.</p>
+                            </div>
+                        </div>
+                    )}
 
                 </div>
             </div>
