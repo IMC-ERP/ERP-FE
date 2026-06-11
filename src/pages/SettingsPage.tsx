@@ -51,6 +51,16 @@ export default function SettingsPage() {
             return next;
         });
     };
+    const [morningBriefOn, setMorningBriefOn] = useState<boolean>(
+        () => localStorage.getItem('notif_morning_brief') === 'on'
+    );
+    const toggleMorningBrief = () => {
+        setMorningBriefOn(prev => {
+            const next = !prev;
+            localStorage.setItem('notif_morning_brief', next ? 'on' : 'off');
+            return next;
+        });
+    };
 
     // ========== 매장 프로필 상태 ==========
     const [storeSlug, setStoreSlug] = useState('');
@@ -1018,6 +1028,25 @@ export default function SettingsPage() {
                                     className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors ${dailyReportOn ? 'bg-blue-600' : 'bg-slate-300'}`}
                                 >
                                     <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${dailyReportOn ? 'translate-x-6' : 'translate-x-1'}`} />
+                                </button>
+                            </div>
+
+                            <div className="flex items-center justify-between gap-4 rounded-xl border border-slate-200 p-4">
+                                <div className="min-w-0">
+                                    <p className="font-bold text-slate-800 flex items-center gap-2">
+                                        <Bell size={16} className="text-amber-500" /> 아침 브리핑 알림
+                                    </p>
+                                    <p className="text-sm text-slate-500 mt-1">
+                                        매일 아침, 오늘 발주할 재고와 어제 요약을 받아보세요.
+                                    </p>
+                                </div>
+                                <button
+                                    onClick={toggleMorningBrief}
+                                    role="switch"
+                                    aria-checked={morningBriefOn}
+                                    className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors ${morningBriefOn ? 'bg-blue-600' : 'bg-slate-300'}`}
+                                >
+                                    <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${morningBriefOn ? 'translate-x-6' : 'translate-x-1'}`} />
                                 </button>
                             </div>
 
